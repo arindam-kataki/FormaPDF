@@ -5,7 +5,6 @@ Helper functions for positioning, sizing, and grid operations
 
 from typing import Tuple, Optional
 from PyQt6.QtCore import QPoint, QRect
-from PyQt6.QtGui import QCursor
 from PyQt6.QtCore import Qt
 
 
@@ -32,7 +31,7 @@ class BoundaryConstraints:
 
     @staticmethod
     def constrain_position(x: int, y: int, width: int, height: int,
-                           canvas_width: int, canvas_height: int) -> Tuple[int, int]:
+                          canvas_width: int, canvas_height: int) -> Tuple[int, int]:
         """Constrain position to keep element within canvas bounds"""
         constrained_x = max(0, min(x, canvas_width - width))
         constrained_y = max(0, min(y, canvas_height - height))
@@ -40,8 +39,8 @@ class BoundaryConstraints:
 
     @staticmethod
     def constrain_size(width: int, height: int, x: int, y: int,
-                       canvas_width: int, canvas_height: int,
-                       min_width: int = 10, min_height: int = 10) -> Tuple[int, int]:
+                      canvas_width: int, canvas_height: int,
+                      min_width: int = 10, min_height: int = 10) -> Tuple[int, int]:
         """Constrain size to fit within canvas and meet minimum requirements"""
         max_width = canvas_width - x
         max_height = canvas_height - y
@@ -80,7 +79,7 @@ class ResizeHandles:
 
     @staticmethod
     def get_handle_at_position(pos_x: int, pos_y: int, field_x: int, field_y: int,
-                               field_width: int, field_height: int) -> Optional[str]:
+                              field_width: int, field_height: int) -> Optional[str]:
         """Determine which resize handle is at the given position"""
         handle_positions = ResizeHandles.get_handle_positions(
             field_x, field_y, field_width, field_height
@@ -89,7 +88,7 @@ class ResizeHandles:
 
         for handle_name, (hx, hy) in handle_positions.items():
             if (hx <= pos_x <= hx + handle_size and
-                    hy <= pos_y <= hy + handle_size):
+                hy <= pos_y <= hy + handle_size):
                 return handle_name
 
         return None
@@ -115,8 +114,8 @@ class ResizeCalculator:
 
     @staticmethod
     def calculate_resize(start_x: int, start_y: int, start_width: int, start_height: int,
-                         dx: int, dy: int, handle_name: str,
-                         min_width: int = 20, min_height: int = 15) -> Tuple[int, int, int, int]:
+                        dx: int, dy: int, handle_name: str,
+                        min_width: int = 20, min_height: int = 15) -> Tuple[int, int, int, int]:
         """
         Calculate new position and size during resize operation
 

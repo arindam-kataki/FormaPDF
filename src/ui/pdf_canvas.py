@@ -1,5 +1,5 @@
 """
-PDF Canvas Widget
+PDF Canvas Widget - Updated for New Field Model
 Main widget for displaying PDF pages with interactive form fields
 """
 
@@ -288,7 +288,7 @@ class PDFCanvas(QLabel):
 
         # Ctrl+D for duplicate
         if (key == Qt.Key.Key_D and
-                modifiers & Qt.KeyboardModifier.ControlModifier):
+            modifiers & Qt.KeyboardModifier.ControlModifier):
             self.duplicate_selected_field()
             return
 
@@ -306,7 +306,7 @@ class PDFCanvas(QLabel):
 
     @property
     def form_fields(self) -> list:
-        """Get all form fields (for backward compatibility)"""
+        """Get all form fields as dictionaries (for backward compatibility)"""
         return [field.to_dict() for field in self.field_manager.fields]
 
     def get_field_manager(self) -> FieldManager:

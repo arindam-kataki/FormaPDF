@@ -407,7 +407,7 @@ class PropertiesPanel(QWidget):
         date_layout.addWidget(QLabel("Date Format:"))
         formats = ["DD/MM/YYYY", "MM/DD/YYYY", "YYYY-MM-DD", "DD-MM-YYYY"]
         format_widget = ChoicePropertyWidget("date_format", formats,
-                                             field.properties.get("date_format", "DD/MM/YYYY"))
+                                           field.properties.get("date_format", "DD/MM/YYYY"))
         format_widget.connect_signal(lambda value: self._emit_property_change("date_format", value))
         date_layout.addWidget(format_widget.widget)
         self.property_widgets["date_format"] = format_widget
@@ -431,7 +431,7 @@ class PropertiesPanel(QWidget):
         button_layout.addWidget(QLabel("Action:"))
         actions = ["Submit", "Reset", "Custom"]
         action_widget = ChoicePropertyWidget("action", actions,
-                                             field.properties.get("action", "Submit"))
+                                          field.properties.get("action", "Submit"))
         action_widget.connect_signal(lambda value: self._emit_property_change("action", value))
         button_layout.addWidget(action_widget.widget)
         self.property_widgets["action"] = action_widget
@@ -497,7 +497,8 @@ class PropertiesPanel(QWidget):
     def update_field_property(self, field_id: str, property_name: str, value: Any):
         """Update property widget when field changes externally"""
         if (self.current_field and
-                self.current_field.id == field_id and
-                property_name in self.property_widgets):
+            self.current_field.id == field_id and
+            property_name in self.property_widgets):
+
             widget = self.property_widgets[property_name]
             widget.set_value(value)

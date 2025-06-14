@@ -1,0 +1,125 @@
+"""
+Project Setup Utility
+Creates directory structure and initializes the project
+"""
+
+import os
+from pathlib import Path
+
+def create_project_structure():
+    """Create the complete project directory structure"""
+
+    # Define the project structure
+    directories = [
+        "src",
+        "src/models",
+        "src/ui",
+        "src/utils",
+        "src/core",
+        "src/training",
+        "data",
+        "data/models",
+        "data/training",
+        "data/templates",
+        "tests",
+        "tests/unit",
+        "tests/integration",
+        "docs",
+        "scripts",
+        "outputs",
+        "outputs/modified_pdfs",
+        "outputs/logs",
+        "outputs/temp",
+        "assets"
+    ]
+
+    base_path = Path.cwd()
+
+    print("📁 Creating project directory structure...")
+
+    for directory in directories:
+        dir_path = base_path / directory
+        dir_path.mkdir(parents=True, exist_ok=True)
+        print(f"  ✓ {directory}")
+
+    print("✅ Project structure created successfully!")
+
+    # Create empty __init__.py files
+    init_files = [
+        "src/__init__.py",
+        "src/models/__init__.py",
+        "src/ui/__init__.py",
+        "src/utils/__init__.py",
+        "src/core/__init__.py",
+        "src/training/__init__.py",
+        "tests/__init__.py",
+        "tests/unit/__init__.py",
+        "tests/integration/__init__.py"
+    ]
+
+    print("\n📝 Creating __init__.py files...")
+
+    for init_file in init_files:
+        init_path = base_path / init_file
+        if not init_path.exists():
+            init_path.write_text('"""Package initialization file"""\n')
+            print(f"  ✓ {init_file}")
+
+    print("✅ Package initialization files created!")
+
+    # Create a basic requirements.txt if it doesn't exist
+    requirements_path = base_path / "requirements.txt"
+    if not requirements_path.exists():
+        requirements_content = """# PDF Processing
+PyPDF2==3.0.1
+pdfplumber==0.10.3
+pymupdf==1.23.14
+reportlab==4.0.7
+
+# Voice Processing
+SpeechRecognition==3.10.0
+pyaudio==0.2.13
+pyttsx3==2.90
+
+# Machine Learning
+scikit-learn==1.3.2
+pandas==2.1.4
+numpy==1.25.2
+joblib==1.3.2
+
+# GUI Framework
+PyQt6==6.6.1
+PyQt6-tools==6.6.0
+
+# Natural Language Processing
+spacy==3.7.2
+nltk==3.8.1
+
+# Image Processing (for scanned PDFs)
+opencv-python==4.8.1.78
+Pillow==10.1.0
+pytesseract==0.3.10
+
+# Utilities
+python-dotenv==1.0.0
+configparser==6.0.0
+colorlog==6.8.0
+
+# Development
+pytest==7.4.3
+pytest-cov==4.1.0
+black==23.11.0
+flake8==6.1.0
+pre-commit==3.6.0
+"""
+        requirements_path.write_text(requirements_content)
+        print("✅ requirements.txt created!")
+
+    print("\n🎉 Project setup complete!")
+    print("\nNext steps:")
+    print("1. Install dependencies: pip install -r requirements.txt")
+    print("2. Copy the refactored source files into their respective directories")
+    print("3. Run the application: python main.py")
+
+if __name__ == "__main__":
+    create_project_structure()

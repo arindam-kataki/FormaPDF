@@ -10,8 +10,6 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor
 
-from ..models.field_model import FieldType
-
 
 class FieldButton(QPushButton):
     """Custom button for field types with icons and descriptions"""
@@ -179,6 +177,11 @@ class FieldPalette(QWidget):
         """Clear all field type highlights"""
         for field_type in self.field_buttons:
             self.highlight_field_type(field_type, False)
+
+    def set_field_selected(self, has_selection: bool):
+        """Update UI based on whether a field is selected (for enhanced palette)"""
+        # This method is called by the enhanced version
+        pass
 
 
 class FieldPreviewWidget(QWidget):
