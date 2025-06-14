@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QMessageBox, QApplication
 )
 from PyQt6.QtGui import QAction, QKeySequence, QFont
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, pyqtSlot, QSettings
 
 # Safe imports with fallbacks
 try:
@@ -69,8 +69,25 @@ class PDFViewerMainWindow(QMainWindow):
 
     def init_ui(self):
         """Initialize the user interface"""
-        self.setWindowTitle("PDF Voice Editor")
-        self.setGeometry(100, 100, 1200, 800)
+                # Window setup - Enhanced for resizability
+        self.setWindowTitle("PDF Voice Editor - Enhanced with Draggable Fields")
+
+        # Set initial size and make fully resizable
+        self.setGeometry(100, 100, 1400, 900)
+        self.setMinimumSize(800, 600)  # Minimum usable size
+
+        # Remove any size constraints that might prevent resizing
+        self.setMaximumSize(16777215, 16777215)  # Qt's maximum size
+
+        # Set size policy to allow growing and shrinking
+        from PyQt6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Preferred)
+
+        # Enable window resizing (this should be default, but make it explicit)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.Window)
+
+        # Show the window initially in a normal state (not maximized/minimized)
+        self.setWindowState(Qt.WindowState.WindowNoState)
 
         # Create central widget
         central_widget = QWidget()
@@ -133,7 +150,7 @@ class PDFViewerMainWindow(QMainWindow):
         """Create center panel with PDF viewer"""
         # Scroll area for PDF canvas
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidgetResizable(False)
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Configure scroll bars (removed the local import)
@@ -325,6 +342,9 @@ class PDFViewerMainWindow(QMainWindow):
             status_bar.addPermanentWidget(QLabel("All modules loaded"))
 
     def setup_connections(self):
+        
+        # Restore window state from previous session
+        self.restore_window_state()
         """Setup signal connections between components safely"""
         try:
             # Field palette connections - check both object and signal exist
@@ -974,6 +994,66 @@ class PDFViewerMainWindow(QMainWindow):
     def on_property_changed(self, field_id: str, property_name: str, value):
         """Handle property change"""
         print(f"Property {property_name} of field {field_id} changed to {value}")
+
+
+    def resizeEvent(self, event):
+        """Handle window resize events"""
+        super().resizeEvent(event)
+
+        # Update scroll area when window is resized
+        if hasattr(self, 'scroll_area') and self.scroll_area:
+            # Force scroll area to update its viewport
+            self.scroll_area.updateGeometry()
+
+        # Update status bar with window size (optional)
+        if hasattr(self, 'statusBar'):
+            size = event.size()
+            # Uncomment the next line if you want to see window size in status bar
+            # self.statusBar().showMessage(f"Window size: {size.width()}x{size.height()}", 2000)
+
+        # Ensure splitter proportions are maintained
+        if hasattr(self, 'splitter') and self.splitter:
+            # Maintain proportional sizing
+            total_width = self.width()
+            left_width = max(250, min(400, total_width * 0.25))  # 25% but between 250-400px
+            center_width = total_width - left_width - 20  # 20px for splitter handle
+            self.splitter.setSizes([int(left_width), int(center_width)])
+
+
+
+    def save_window_state(self):
+        """Save window state and geometry"""
+        try:
+            settings = QSettings('PDFVoiceEditor', 'MainWindow')
+            settings.setValue('geometry', self.saveGeometry())
+            settings.setValue('windowState', self.saveState())
+            if hasattr(self, 'splitter'):
+                settings.setValue('splitterSizes', self.splitter.saveState())
+        except Exception as e:
+            print(f"Could not save window state: {e}")
+
+    def restore_window_state(self):
+        """Restore window state and geometry"""
+        try:
+            settings = QSettings('PDFVoiceEditor', 'MainWindow')
+            geometry = settings.value('geometry')
+            if geometry:
+                self.restoreGeometry(geometry)
+            window_state = settings.value('windowState')
+            if window_state:
+                self.restoreState(window_state)
+            if hasattr(self, 'splitter'):
+                splitter_state = settings.value('splitterSizes')
+                if splitter_state:
+                    self.splitter.restoreState(splitter_state)
+        except Exception as e:
+            print(f"Could not restore window state: {e}")
+
+    def closeEvent(self, event):
+        """Handle window close event"""
+        self.save_window_state()
+        super().closeEvent(event)
+
 
 
 def main():
