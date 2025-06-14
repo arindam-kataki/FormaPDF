@@ -112,6 +112,13 @@ class PDFCanvas(QLabel):
             self.page_pixmap = QPixmap()
             self.page_pixmap.loadFromData(img_data)
 
+            # Set the widget size to match the pixmap size
+            pixmap_size = self.page_pixmap.size()
+            self.resize(pixmap_size  # This makes scroll bars appear!
+
+            # Update the displayed pixmap
+            self.setPixmap(self.page_pixmap)
+
             # Draw overlay (grid, fields, etc.)
             self.draw_overlay()
 
