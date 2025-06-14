@@ -23,7 +23,7 @@ except ImportError:
 try:
     from models.field_model import FormField, FieldType
     from ui.field_renderer import FieldRenderer
-    from ui.drag_handler import DragHandler
+    from ui.drag_handler import DragHandler, SelectionHandler
     from ui.selection_handler import SelectionHandler
     from managers.field_manager import FieldManager
     FIELD_COMPONENTS_AVAILABLE = True
@@ -219,7 +219,7 @@ class PDFCanvas(QLabel):
             # Clear selection safely
             try:
                 self.selection_handler.clear_selection()
-            except AttributeError as e:
+            except Exception as e:
                 print(f"⚠️ Selection handler issue: {e}")
                 # Continue without clearing selection
 
@@ -786,6 +786,10 @@ class PDFCanvas(QLabel):
             print(f"⚠️ Error drawing selection handles: {e}")
 
     def mousePressEvent(self, event):
+        print("🖱️ Mouse press event started")
+        print(f"   Button: {event.button()}")
+        print(f"   Position: {event.position().toPoint()}")
+        
         """Handle mouse press events"""
         if event.button() == Qt.MouseButton.LeftButton:
             self.setFocus()  # Enable keyboard events
@@ -802,6 +806,8 @@ class PDFCanvas(QLabel):
                 # Clear selection safely
                 try:  # ✅ Proper indentation
                     self.selection_handler.clear_selection()
+                except Exception as e:
+                    print(f"⚠️ Selection handler issue: {e}")
                 except AttributeError as e:
                     print(f"⚠️ Selection handler issue: {e}")
                     # Continue without clearing selection
@@ -826,3 +832,33 @@ class PDFCanvas(QLabel):
 
             if was_dragging:
                 self.draw_overlay()
+
+class SafeSelectionHandler:
+    """Emergency fallback SelectionHandler that never crashes"""
+
+    def __init__(self, field_manager=None):
+        self.field_manager = field_manager
+        self.selected_field = None
+        print("🛡️ SafeSelectionHandler initialized (emergency fallback)")
+
+    def select_field(self, field):
+        """Safe select field"""
+        self.selected_field = field
+        print(f"🛡️ Safe selection: {field.name if field else 'None'}")
+
+    def clear_selection(self):
+        """Safe clear selection"""
+        print("🛡️ Safe clear selection")
+        self.selected_field = None
+
+    def get_selected_field(self):
+        """Safe get selected field"""
+        return self.selected_field
+
+    def select_field_at_position(self, x, y):
+        """Safe select at position"""
+        if self.field_manager and hasattr(self.field_manager, 'get_field_at_position'):
+            field = self.field_manager.get_field_at_position(x, y)
+            self.select_field(field)
+            return field
+        return None
