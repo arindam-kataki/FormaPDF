@@ -221,6 +221,123 @@ class PDFCanvas(QLabel):
             self.draw_overlay()
 
     # Mouse event handlers
+    def keyPressEvent(self, event):
+        """Enhanced keyboard event handling for fields, scrolling, and zoom"""
+        key = event.key()
+        modifiers = event.modifiers()
+
+        # Get selected field state once
+        selected_field = self.selection_handler.get_selected_field()
+
+        # Priority 1: Field manipulation (arrow keys only, when field selected)
+        if selected_field and key in [Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right]:
+            step = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
+
+            dx, dy = 0, 0
+            if key == Qt.Key.Key_Up:
+                dy = -step
+            elif key == Qt.Key.Key_Down:
+                dy = step
+            elif key == Qt.Key.Key_Left:
+                dx = -step
+            elif key == Qt.Key.Key_Right:
+                dx = step
+
+            # Move the field within bounds
+            new_x = selected_field.x + dx
+            new_y = selected_field.y + dy
+            selected_field.x = max(0, min(new_x, self.width() - selected_field.width))
+            selected_field.y = max(0, min(new_y, self.height() - selected_field.height))
+
+            self.draw_overlay()
+            event.accept()
+            return  # Exit early - don't process other shortcuts
+
+        # Priority 2: Zoom shortcuts (work regardless of field selection)
+        if modifiers & Qt.KeyboardModifier.ControlModifier:
+            zoom_handled = False
+
+            if key in [Qt.Key.Key_Plus, Qt.Key.Key_Equal]:
+                if hasattr(self, 'zoom_in_step'):
+                    self.zoom_in_step()
+                    zoom_handled = True
+            elif key == Qt.Key.Key_Minus:
+                if hasattr(self, 'zoom_out_step'):
+                    self.zoom_out_step()
+                    zoom_handled = True
+            elif key == Qt.Key.Key_0:
+                if hasattr(self, 'set_zoom'):
+                    self.set_zoom(1.0)  # Reset to 100%
+                    zoom_handled = True
+
+            if zoom_handled:
+                event.accept()
+                return  # Exit early
+
+        # Priority 3: Navigation shortcuts (Page Up/Down, Home/End)
+        # These work regardless of field selection
+        navigation_handled = False
+
+        if key == Qt.Key.Key_PageUp:
+            if hasattr(self, 'scroll_page'):
+                self.scroll_page(-1)
+                navigation_handled = True
+        elif key == Qt.Key.Key_PageDown:
+            if hasattr(self, 'scroll_page'):
+                self.scroll_page(1)
+                navigation_handled = True
+        elif key == Qt.Key.Key_Home:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if hasattr(self, 'scroll_to_top'):
+                    self.scroll_to_top()
+                    navigation_handled = True
+            else:
+                if hasattr(self, 'scroll_to_left'):
+                    self.scroll_to_left()
+                    navigation_handled = True
+        elif key == Qt.Key.Key_End:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if hasattr(self, 'scroll_to_bottom'):
+                    self.scroll_to_bottom()
+                    navigation_handled = True
+            else:
+                if hasattr(self, 'scroll_to_right'):
+                    self.scroll_to_right()
+                    navigation_handled = True
+
+        if navigation_handled:
+            event.accept()
+            return  # Exit early
+
+        # Priority 4: Arrow key scrolling (ONLY when no field is selected)
+        # If field is selected, arrow keys were already handled above
+        if not selected_field and key in [Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right]:
+            scroll_handled = False
+
+            if key == Qt.Key.Key_Up:
+                if hasattr(self, 'scroll_vertical'):
+                    self.scroll_vertical(-50)
+                    scroll_handled = True
+            elif key == Qt.Key.Key_Down:
+                if hasattr(self, 'scroll_vertical'):
+                    self.scroll_vertical(50)
+                    scroll_handled = True
+            elif key == Qt.Key.Key_Left:
+                if hasattr(self, 'scroll_horizontal'):
+                    self.scroll_horizontal(-50)
+                    scroll_handled = True
+            elif key == Qt.Key.Key_Right:
+                if hasattr(self, 'scroll_horizontal'):
+                    self.scroll_horizontal(50)
+                    scroll_handled = True
+
+            if scroll_handled:
+                event.accept()
+                return  # Exit early
+
+        # Fallback: Pass unhandled events to parent
+        super().keyPressEvent(event)
+
     def mousePressEvent(self, event):
         """Handle mouse press events"""
         if event.button() == Qt.MouseButton.LeftButton:
@@ -256,47 +373,6 @@ class PDFCanvas(QLabel):
 
             if was_dragging:
                 self.draw_overlay()
-
-    def keyPressEvent(self, event):
-        """Handle keyboard shortcuts for field manipulation"""
-        selected_field = self.selection_handler.get_selected_field()
-        if not selected_field:
-            super().keyPressEvent(event)
-            return
-
-        key = event.key()
-        modifiers = event.modifiers()
-
-        # Arrow keys for movement
-        if key in [Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right]:
-            step = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
-
-            dx, dy = 0, 0
-            if key == Qt.Key.Key_Up:
-                dy = -step
-            elif key == Qt.Key.Key_Down:
-                dy = step
-            elif key == Qt.Key.Key_Left:
-                dx = -step
-            elif key == Qt.Key.Key_Right:
-                dx = step
-
-            self.drag_handler.handle_keyboard_move(selected_field, dx, dy)
-            self.draw_overlay()
-            return
-
-        # Delete key
-        if key == Qt.Key.Key_Delete:
-            self.delete_selected_field()
-            return
-
-        # Ctrl+D for duplicate
-        if (key == Qt.Key.Key_D and
-            modifiers & Qt.KeyboardModifier.ControlModifier):
-            self.duplicate_selected_field()
-            return
-
-        super().keyPressEvent(event)
 
     def _on_selection_changed(self, field: Optional[FormField]):
         """Handle selection changes"""
@@ -454,103 +530,12 @@ class PDFCanvas(QLabel):
         # Shift + Wheel = Horizontal scroll
         elif modifiers & Qt.KeyboardModifier.ShiftModifier:
             # Let the parent scroll area handle horizontal scrolling
-            event.ignore()
+            super().wheelEvent(event)
 
         # Regular wheel = Vertical scroll
         else:
             # Let the parent scroll area handle vertical scrolling
-            event.ignore()
-
-    def keyPressEvent(self, event):
-        """Enhanced keyboard event handling including scrolling"""
-        key = event.key()
-        modifiers = event.modifiers()
-
-        # Handle field manipulation if a field is selected
-        selected_field = self.selection_handler.get_selected_field()
-        if selected_field:
-            # Arrow keys for movement (existing functionality)
-            if key in [Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right]:
-                step = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
-
-                dx, dy = 0, 0
-                if key == Qt.Key.Key_Up:
-                    dy = -step
-                elif key == Qt.Key.Key_Down:
-                    dy = step
-                elif key == Qt.Key.Key_Left:
-                    dx = -step
-                elif key == Qt.Key.Key_Right:
-                    dx = step
-
-                # Move the field
-                new_x = selected_field.x + dx
-                new_y = selected_field.y + dy
-                selected_field.x = max(0, min(new_x, self.width() - selected_field.width))
-                selected_field.y = max(0, min(new_y, self.height() - selected_field.height))
-
-                self.draw_overlay()
-                event.accept()
-                return
-
-        # Scrolling keyboard shortcuts (when no field is selected)
-        scroll_handled = False
-
-        # Page Up/Down for vertical scrolling
-        if key == Qt.Key.Key_PageUp:
-            self.scroll_page(-1)
-            scroll_handled = True
-        elif key == Qt.Key.Key_PageDown:
-            self.scroll_page(1)
-            scroll_handled = True
-
-        # Home/End for horizontal scrolling
-        elif key == Qt.Key.Key_Home:
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                self.scroll_to_top()
-            else:
-                self.scroll_to_left()
-            scroll_handled = True
-        elif key == Qt.Key.Key_End:
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                self.scroll_to_bottom()
-            else:
-                self.scroll_to_right()
-            scroll_handled = True
-
-        # Arrow keys for scrolling (when no field selected)
-        elif key == Qt.Key.Key_Up and not selected_field:
-            self.scroll_vertical(-50)
-            scroll_handled = True
-        elif key == Qt.Key.Key_Down and not selected_field:
-            self.scroll_vertical(50)
-            scroll_handled = True
-        elif key == Qt.Key.Key_Left and not selected_field:
-            self.scroll_horizontal(-50)
-            scroll_handled = True
-        elif key == Qt.Key.Key_Right and not selected_field:
-            self.scroll_horizontal(50)
-            scroll_handled = True
-
-        # Zoom shortcuts
-        elif key == Qt.Key.Key_Plus or key == Qt.Key.Key_Equal:
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                self.zoom_in_step()
-                scroll_handled = True
-        elif key == Qt.Key.Key_Minus:
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                self.zoom_out_step()
-                scroll_handled = True
-        elif key == Qt.Key.Key_0:
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                self.set_zoom(1.0)  # Reset to 100%
-                scroll_handled = True
-
-        if scroll_handled:
-            event.accept()
-        else:
-            # Pass to parent for other events
-            super().keyPressEvent(event)
+            super().wheelEvent(event)
 
     def scroll_page(self, direction: int):
         """Scroll by one page height"""
