@@ -176,6 +176,12 @@ class PDFViewerMainWindow(QMainWindow):
                 """)
 
         self.scroll_area.setWidget(self.pdf_canvas)
+
+        # Debug: Print scroll area configuration
+        print(f"📏 Scroll area configured:")
+        print(f"  Widget resizable: {self.scroll_area.widgetResizable()}")
+        print(f"  H scroll policy: {self.scroll_area.horizontalScrollBarPolicy()}")
+        print(f"  V scroll policy: {self.scroll_area.verticalScrollBarPolicy()}")
         return self.scroll_area
 
     def create_toolbar(self):
@@ -345,25 +351,39 @@ class PDFViewerMainWindow(QMainWindow):
         )
 
         if file_path:
+            print(f"🔍 Opening PDF file: {file_path}")
+            print(f"📁 File exists: {Path(file_path).exists()}")
+            print(f"📏 File size: {Path(file_path).stat().st_size if Path(file_path).exists() else 'N/A'} bytes")
+
             try:
                 if hasattr(self.pdf_canvas, 'load_pdf'):
-                    if self.pdf_canvas.load_pdf(file_path):
+                    print(f"📋 Calling pdf_canvas.load_pdf({file_path})")
+                    result = self.pdf_canvas.load_pdf(file_path)
+                    print(f"📋 load_pdf returned: {result}")
+
+                    if result:
+                        print("✅ PDF loading succeeded")
                         self.current_pdf_path = file_path
                         self.statusBar().showMessage(f"Loaded: {Path(file_path).name}", 3000)
                         self.field_info_label.setText(f"Loaded: {Path(file_path).name}")
                     else:
+                        print("❌ PDF loading failed")
+                        self.statusBar().showMessage("Failed to load PDF", 3000)
                         QMessageBox.critical(self, "Error", "Failed to load PDF file")
                 else:
                     # Fallback - just show the selected file
+                    print("⚠️ pdf_canvas.load_pdf method not available, using fallback")
                     self.current_pdf_path = file_path
                     self.field_info_label.setText(f"Selected: {Path(file_path).name}")
                     QMessageBox.information(
-                        self, "Info", 
+                        self, "Info",
                         f"PDF selected: {Path(file_path).name}\n\n"
                         "PDF viewing not fully available in current mode.\n"
                         "Fix missing modules to enable full functionality."
                     )
+
             except Exception as e:
+                print(f"❌ Exception occurred: {e}")
                 QMessageBox.critical(self, "Error", f"Error opening PDF: {e}")
 
     @pyqtSlot()
