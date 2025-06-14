@@ -13,15 +13,24 @@ from PyQt6.QtWidgets import (
     QScrollArea, QLabel, QToolBar, QStatusBar, QPushButton,
     QComboBox, QFileDialog, QMessageBox, QApplication
 )
-from PyQt6.QtGui import QAction, QKeySequence, QFont, QIcon, QPixmap, QColor
+from PyQt6.QtGui import QAction, QKeySequence, QFont, QIcon, QPixmap, QColor, QCursor
 from PyQt6.QtCore import Qt, pyqtSlot
 
-from .pdf_canvas import PDFCanvas
-from .field_palette import EnhancedFieldPalette
-from .properties_panel import PropertiesPanel
-from ..models.field_model import FormField
-from ..utils.icon_utils import create_app_icon, create_toolbar_icons
+# Fix these imports to use absolute imports (remove leading dots)
+from ui.pdf_canvas import PDFCanvas
+from ui.field_palette import EnhancedFieldPalette
+from ui.properties_panel import PropertiesPanel
+from models.field_model import FormField
+from utils.icon_utils import create_app_icon, create_toolbar_icons
 
+# Optional imports - only import if available
+try:
+    from core.voice_handler import VoiceHandler, VoiceState
+    from training.intent_classifier import IntentClassifier
+    VOICE_AVAILABLE = True
+except ImportError:
+    print("⚠️ Voice recognition not available - continuing without voice features")
+    VOICE_AVAILABLE = False
 
 class PDFViewerMainWindow(QMainWindow):
     """Main application window with enhanced draggable functionality"""

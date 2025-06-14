@@ -19,7 +19,7 @@ from sklearn.metrics import classification_report, confusion_matrix, accuracy_sc
 from sklearn.pipeline import Pipeline
 
 # Import our training data manager
-from .training_data import TrainingDataManager
+from training_data import TrainingDataManager
 
 
 class IntentClassifier:

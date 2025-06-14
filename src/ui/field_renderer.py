@@ -7,8 +7,8 @@ from typing import List, Optional
 from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QFont
 from PyQt6.QtCore import Qt
 
-from ..models.field_model import FormField, FieldType
-from ..utils.geometry_utils import ResizeHandles
+from models.field_model import FormField, FieldType
+from utils.geometry_utils import ResizeHandles
 
 
 class FieldRenderer:

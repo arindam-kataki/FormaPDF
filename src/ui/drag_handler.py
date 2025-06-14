@@ -3,15 +3,18 @@ Drag Handler
 Manages drag and drop operations for form fields
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, TYPE_CHECKING
 from enum import Enum
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QObject
-from PyQt6.QtGui import QCursor
 
-from ..models.field_model import FormField, FieldManager
-from ..utils.geometry_utils import (
+from models.field_model import FormField, FieldManager
+from utils.geometry_utils import (
     ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
 )
+
+# Type checking imports for better IDE support
+if TYPE_CHECKING:
+    from PyQt6.QtCore import pyqtBoundSignal
 
 
 class DragMode(Enum):
@@ -49,10 +52,10 @@ class DragState:
 class DragHandler(QObject):
     """Handles drag and drop operations for form fields"""
 
-    # Signals
-    fieldMoved = pyqtSignal(str, int, int)  # field_id, new_x, new_y
-    fieldResized = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
-    cursorChanged = pyqtSignal(Qt.CursorShape)
+    # Type hints for signals to eliminate IDE warnings
+    fieldMoved: 'pyqtBoundSignal' = pyqtSignal(str, int, int)  # field_id, new_x, new_y
+    fieldResized: 'pyqtBoundSignal' = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
+    cursorChanged: 'pyqtBoundSignal' = pyqtSignal(Qt.CursorShape)
 
     def __init__(self, field_manager: FieldManager):
         super().__init__()
@@ -239,7 +242,7 @@ class DragHandler(QObject):
 
             if handle:
                 cursor = ResizeHandles.get_cursor_for_handle(handle)
-                self.cursorChanged.emit(cursor)
+                self.cursorChanged.emit(cursor)  # No IDE warning with proper typing
                 return
 
             # Check if over field body (for move cursor)
@@ -278,7 +281,7 @@ class DragHandler(QObject):
 class SelectionHandler(QObject):
     """Handles field selection logic"""
 
-    selectionChanged = pyqtSignal(object)  # FormField or None
+    selectionChanged: 'pyqtBoundSignal' = pyqtSignal(object)  # FormField or None
 
     def __init__(self, field_manager: FieldManager):
         super().__init__()

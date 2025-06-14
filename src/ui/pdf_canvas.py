@@ -7,11 +7,11 @@ from typing import Optional
 import fitz  # PyMuPDF
 from PyQt6.QtWidgets import QLabel, QMessageBox
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap, QPainter
+from PyQt6.QtGui import QPixmap, QPainter, QCursor  # QCursor IS needed here
 
-from ..models.field_model import FormField, FieldManager
-from .field_renderer import FieldRenderer
-from .drag_handler import DragHandler, SelectionHandler
+from models.field_model import FormField, FieldManager
+from field_renderer import FieldRenderer
+from drag_handler import DragHandler, SelectionHandler
 
 
 class PDFCanvas(QLabel):
@@ -66,7 +66,11 @@ class PDFCanvas(QLabel):
         # Connect drag handler signals
         self.drag_handler.fieldMoved.connect(self.fieldMoved)
         self.drag_handler.fieldResized.connect(self.fieldResized)
-        self.drag_handler.cursorChanged.connect(self.setCursor)
+
+        # THIS is where QCursor is needed - converting CursorShape enum to QCursor object
+        self.drag_handler.cursorChanged.connect(
+            lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
+        )
 
         # Connect selection handler signals
         self.selection_handler.selectionChanged.connect(self.selectionChanged)
@@ -316,3 +320,4 @@ class PDFCanvas(QLabel):
     def get_fields_as_objects(self) -> list:
         """Get all fields as FormField objects"""
         return self.field_manager.fields.copy()
+
