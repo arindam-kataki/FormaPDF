@@ -94,18 +94,25 @@ class BoolPropertyWidget(PropertyWidget):
 class MultilineTextPropertyWidget(PropertyWidget):
     """Property widget for multiline text values"""
 
-    def __init__(self, name: str, initial_value: str = ""):
+    def __init__(self, name: str, initial_value = ""):
         widget = QTextEdit()
         widget.setMaximumHeight(80)
-        widget.setPlainText(initial_value)
+
+        # Handle both string and list inputs
+        if isinstance(initial_value, list):
+            text_value = '\n'.join(initial_value)
+        else:
+            text_value = str(initial_value) if initial_value else ""
+
+        widget.setPlainText(text_value)
         super().__init__(name, widget, "textChanged")
 
     def set_value(self, value):
         self.widget.blockSignals(True)
         if isinstance(value, list):
-            self.widget.setPlainText('\n'.join(value))
+            self.widget.setPlainText('\n'.join(str(v) for v in value))
         else:
-            self.widget.setPlainText(str(value))
+            self.widget.setPlainText(str(value) if value else "")
         self.widget.blockSignals(False)
 
     def get_value(self):

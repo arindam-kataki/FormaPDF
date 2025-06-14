@@ -10,8 +10,8 @@ from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtGui import QPixmap, QPainter, QCursor  # QCursor IS needed here
 
 from models.field_model import FormField, FieldManager
-from field_renderer import FieldRenderer
-from drag_handler import DragHandler, SelectionHandler
+from ui.field_renderer import FieldRenderer
+from ui.drag_handler import DragHandler, SelectionHandler
 
 
 class PDFCanvas(QLabel):
