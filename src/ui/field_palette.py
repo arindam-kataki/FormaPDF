@@ -1,0 +1,401 @@
+"""
+Field Palette Widget
+Provides UI for selecting and creating different types of form fields
+"""
+
+from PyQt6.QtWidgets import (
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QButtonGroup, QFrame, QToolTip, QGroupBox
+)
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor
+
+from ..models.field_model import FieldType
+
+
+class FieldButton(QPushButton):
+    """Custom button for field types with icons and descriptions"""
+
+    def __init__(self, field_type: str, display_name: str, icon: str, description: str):
+        super().__init__()
+        self.field_type = field_type
+        self.display_name = display_name
+        self.description = description
+
+        # Set button properties
+        self.setText(f"{icon} {display_name}")
+        self.setMinimumHeight(40)
+        self.setToolTip(description)
+
+        # Style the button
+        self.setStyleSheet("""
+            QPushButton {
+                text-align: left;
+                padding: 8px 12px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: #f8f9fa;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+                border-color: #0078d4;
+            }
+            QPushButton:pressed {
+                background-color: #dee2e6;
+            }
+        """)
+
+
+class FieldPalette(QWidget):
+    """Widget containing field type buttons for creating form fields"""
+
+    fieldRequested = pyqtSignal(str)  # field_type
+
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the user interface"""
+        layout = QVBoxLayout()
+        layout.setSpacing(5)
+
+        # Title
+        title = QLabel("Form Fields")
+        title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
+        title.setStyleSheet("color: #2c3e50; margin-bottom: 10px;")
+        layout.addWidget(title)
+
+        # Instructions
+        instructions = QLabel("Click to add fields to the PDF:")
+        instructions.setFont(QFont("Arial", 9))
+        instructions.setStyleSheet("color: #6c757d; margin-bottom: 5px;")
+        instructions.setWordWrap(True)
+        layout.addWidget(instructions)
+
+        # Separator
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Sunken)
+        separator.setStyleSheet("color: #dee2e6;")
+        layout.addWidget(separator)
+
+        # Field type definitions
+        field_types = [
+            ("text", "Text Field", "📝", "Single or multi-line text input"),
+            ("checkbox", "Checkbox", "☑️", "Boolean checkbox for yes/no options"),
+            ("radio", "Radio Button", "🔘", "Single selection from multiple options"),
+            ("dropdown", "Dropdown", "📋", "Dropdown list with multiple options"),
+            ("signature", "Signature", "✏️", "Digital signature capture area"),
+            ("date", "Date Field", "📅", "Date picker input field"),
+            ("button", "Button", "🔘", "Clickable action button")
+        ]
+
+        # Create buttons for each field type
+        self.field_buttons = {}
+        for field_type, display_name, icon, description in field_types:
+            button = FieldButton(field_type, display_name, icon, description)
+            button.clicked.connect(lambda checked, ft=field_type: self.fieldRequested.emit(ft))
+            layout.addWidget(button)
+            self.field_buttons[field_type] = button
+
+        # Add some spacing
+        layout.addStretch()
+
+        # Tips section
+        tips_group = QGroupBox("💡 Tips")
+        tips_layout = QVBoxLayout()
+
+        tips = [
+            "Drag fields to move them",
+            "Drag handles to resize",
+            "Use arrow keys for precision",
+            "Ctrl+D to duplicate",
+            "Delete key to remove"
+        ]
+
+        for tip in tips:
+            tip_label = QLabel(f"• {tip}")
+            tip_label.setFont(QFont("Arial", 8))
+            tip_label.setStyleSheet("color: #6c757d;")
+            tips_layout.addWidget(tip_label)
+
+        tips_group.setLayout(tips_layout)
+        tips_group.setStyleSheet("""
+            QGroupBox {
+                font-weight: bold;
+                border: 1px solid #dee2e6;
+                border-radius: 4px;
+                margin-top: 10px;
+                padding-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                left: 10px;
+                padding: 0 8px 0 8px;
+            }
+        """)
+        layout.addWidget(tips_group)
+
+        self.setLayout(layout)
+
+    def set_field_enabled(self, field_type: str, enabled: bool):
+        """Enable or disable a specific field type button"""
+        if field_type in self.field_buttons:
+            self.field_buttons[field_type].setEnabled(enabled)
+
+    def highlight_field_type(self, field_type: str, highlight: bool = True):
+        """Highlight a specific field type (e.g., when selected)"""
+        if field_type in self.field_buttons:
+            button = self.field_buttons[field_type]
+            if highlight:
+                button.setStyleSheet(button.styleSheet() + """
+                    QPushButton {
+                        background-color: #e3f2fd;
+                        border-color: #0078d4;
+                        border-width: 2px;
+                    }
+                """)
+            else:
+                # Reset to default style
+                button.setStyleSheet("""
+                    QPushButton {
+                        text-align: left;
+                        padding: 8px 12px;
+                        border: 1px solid #ccc;
+                        border-radius: 4px;
+                        background-color: #f8f9fa;
+                    }
+                    QPushButton:hover {
+                        background-color: #e9ecef;
+                        border-color: #0078d4;
+                    }
+                    QPushButton:pressed {
+                        background-color: #dee2e6;
+                    }
+                """)
+
+    def clear_highlights(self):
+        """Clear all field type highlights"""
+        for field_type in self.field_buttons:
+            self.highlight_field_type(field_type, False)
+
+
+class FieldPreviewWidget(QWidget):
+    """Widget showing a preview of the selected field type"""
+
+    def __init__(self):
+        super().__init__()
+        self.current_field_type = None
+        self.setFixedSize(120, 40)
+        self.setStyleSheet("border: 1px solid #ccc; background-color: white;")
+
+    def set_field_type(self, field_type: str):
+        """Set the field type to preview"""
+        self.current_field_type = field_type
+        self.update()
+
+    def paintEvent(self, event):
+        """Draw preview of the field type"""
+        if not self.current_field_type:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        # Draw field preview based on type
+        rect = self.rect().adjusted(5, 5, -5, -5)
+
+        if self.current_field_type == "text":
+            painter.drawRect(rect)
+            painter.drawText(rect.adjusted(5, 0, 0, 0), Qt.AlignmentFlag.AlignVCenter, "Text...")
+
+        elif self.current_field_type == "checkbox":
+            checkbox_size = min(rect.width(), rect.height()) - 10
+            checkbox_rect = rect.adjusted(5, 5, -rect.width() + checkbox_size + 5, -5)
+            painter.drawRect(checkbox_rect)
+            # Draw checkmark
+            painter.drawLine(checkbox_rect.left() + 3, checkbox_rect.center().y(),
+                           checkbox_rect.center().x(), checkbox_rect.bottom() - 3)
+            painter.drawLine(checkbox_rect.center().x(), checkbox_rect.bottom() - 3,
+                           checkbox_rect.right() - 3, checkbox_rect.top() + 3)
+
+        elif self.current_field_type == "dropdown":
+            painter.drawRect(rect)
+            painter.drawText(rect.adjusted(5, 0, -15, 0), Qt.AlignmentFlag.AlignVCenter, "Select")
+            # Draw dropdown arrow
+            arrow_rect = rect.adjusted(rect.width() - 15, 0, 0, 0)
+            painter.drawText(arrow_rect, Qt.AlignmentFlag.AlignCenter, "▼")
+
+        elif self.current_field_type == "signature":
+            painter.drawRect(rect)
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "Sign here")
+
+        elif self.current_field_type == "date":
+            painter.drawRect(rect)
+            painter.drawText(rect.adjusted(5, 0, 0, 0), Qt.AlignmentFlag.AlignVCenter, "DD/MM/YY")
+
+        elif self.current_field_type == "button":
+            painter.setBrush(QColor(240, 240, 240))
+            painter.drawRect(rect)
+            painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, "Button")
+
+        elif self.current_field_type == "radio":
+            radio_size = min(rect.width(), rect.height()) - 10
+            radio_rect = rect.adjusted(5, 5, -rect.width() + radio_size + 5, -5)
+            painter.drawEllipse(radio_rect)
+            # Draw filled circle
+            inner_rect = radio_rect.adjusted(4, 4, -4, -4)
+            painter.setBrush(QColor(0, 0, 0))
+            painter.drawEllipse(inner_rect)
+
+
+class QuickActionsWidget(QWidget):
+    """Widget with quick action buttons for field operations"""
+
+    duplicateRequested = pyqtSignal()
+    deleteRequested = pyqtSignal()
+    alignRequested = pyqtSignal(str)  # alignment type
+
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize quick actions UI"""
+        layout = QVBoxLayout()
+
+        # Title
+        title = QLabel("Quick Actions")
+        title.setFont(QFont("Arial", 10, QFont.Weight.Bold))
+        title.setStyleSheet("color: #2c3e50; margin-bottom: 5px;")
+        layout.addWidget(title)
+
+        # Action buttons
+        actions_layout = QVBoxLayout()
+        actions_layout.setSpacing(3)
+
+        # Duplicate button
+        duplicate_btn = QPushButton("📄 Duplicate")
+        duplicate_btn.setToolTip("Duplicate selected field (Ctrl+D)")
+        duplicate_btn.clicked.connect(self.duplicateRequested.emit)
+        actions_layout.addWidget(duplicate_btn)
+
+        # Delete button
+        delete_btn = QPushButton("🗑️ Delete")
+        delete_btn.setToolTip("Delete selected field (Delete key)")
+        delete_btn.clicked.connect(self.deleteRequested.emit)
+        actions_layout.addWidget(delete_btn)
+
+        # Alignment buttons
+        align_group = QGroupBox("Align")
+        align_layout = QHBoxLayout()
+        align_layout.setSpacing(2)
+
+        align_buttons = [
+            ("⬅️", "left", "Align left"),
+            ("➡️", "right", "Align right"),
+            ("⬆️", "top", "Align top"),
+            ("⬇️", "bottom", "Align bottom")
+        ]
+
+        for icon, alignment, tooltip in align_buttons:
+            btn = QPushButton(icon)
+            btn.setFixedSize(30, 25)
+            btn.setToolTip(tooltip)
+            btn.clicked.connect(lambda checked, a=alignment: self.alignRequested.emit(a))
+            align_layout.addWidget(btn)
+
+        align_group.setLayout(align_layout)
+        actions_layout.addWidget(align_group)
+
+        layout.addLayout(actions_layout)
+        layout.addStretch()
+
+        # Style all buttons
+        self.setStyleSheet("""
+            QPushButton {
+                padding: 5px 8px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background-color: #f8f9fa;
+                font-size: 11px;
+            }
+            QPushButton:hover {
+                background-color: #e9ecef;
+                border-color: #0078d4;
+            }
+            QPushButton:pressed {
+                background-color: #dee2e6;
+            }
+            QPushButton:disabled {
+                color: #6c757d;
+                background-color: #e9ecef;
+                border-color: #dee2e6;
+            }
+        """)
+
+        self.setLayout(layout)
+
+    def set_actions_enabled(self, enabled: bool):
+        """Enable/disable all action buttons"""
+        for button in self.findChildren(QPushButton):
+            button.setEnabled(enabled)
+
+
+class EnhancedFieldPalette(QWidget):
+    """Enhanced field palette with preview and quick actions"""
+
+    fieldRequested = pyqtSignal(str)
+    duplicateRequested = pyqtSignal()
+    deleteRequested = pyqtSignal()
+    alignRequested = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.init_ui()
+
+    def init_ui(self):
+        """Initialize the enhanced palette UI"""
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+
+        # Main field palette
+        self.field_palette = FieldPalette()
+        layout.addWidget(self.field_palette)
+
+        # Field preview
+        preview_group = QGroupBox("Preview")
+        preview_layout = QVBoxLayout()
+        self.preview_widget = FieldPreviewWidget()
+        preview_layout.addWidget(self.preview_widget)
+        preview_group.setLayout(preview_layout)
+        layout.addWidget(preview_group)
+
+        # Quick actions
+        self.quick_actions = QuickActionsWidget()
+        layout.addWidget(self.quick_actions)
+
+        self.setLayout(layout)
+
+        # Connect signals
+        self.field_palette.fieldRequested.connect(self._on_field_requested)
+        self.quick_actions.duplicateRequested.connect(self.duplicateRequested)
+        self.quick_actions.deleteRequested.connect(self.deleteRequested)
+        self.quick_actions.alignRequested.connect(self.alignRequested)
+
+    def _on_field_requested(self, field_type: str):
+        """Handle field request and update preview"""
+        self.preview_widget.set_field_type(field_type)
+        self.fieldRequested.emit(field_type)
+
+    def set_field_selected(self, has_selection: bool):
+        """Update UI based on whether a field is selected"""
+        self.quick_actions.set_actions_enabled(has_selection)
+
+    def highlight_field_type(self, field_type: str):
+        """Highlight a field type in the palette"""
+        self.field_palette.clear_highlights()
+        if field_type:
+            self.field_palette.highlight_field_type(field_type, True)
+            self.preview_widget.set_field_type(field_type)
