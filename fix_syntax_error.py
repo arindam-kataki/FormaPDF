@@ -1,4 +1,59 @@
+#!/usr/bin/env python3
 """
+Fix Encoding and Syntax Issues in main_window.py
+Handles encoding problems and creates a clean working version
+"""
+
+import os
+import sys
+from pathlib import Path
+
+
+def read_file_safely(filepath):
+    """Read a file with multiple encoding attempts"""
+    encodings_to_try = ['utf-8', 'utf-8-sig', 'latin1', 'cp1252', 'iso-8859-1']
+
+    for encoding in encodings_to_try:
+        try:
+            with open(filepath, 'r', encoding=encoding) as f:
+                content = f.read()
+            print(f"  ✅ Successfully read file with {encoding} encoding")
+            return content, encoding
+        except UnicodeDecodeError:
+            continue
+        except Exception as e:
+            print(f"  ⚠️ Error with {encoding}: {e}")
+            continue
+
+    print("  ❌ Could not read file with any encoding")
+    return None, None
+
+
+def create_clean_main_window():
+    """Create a completely clean main_window.py file"""
+
+    main_window_path = Path("src/ui/main_window.py")
+    backup_path = Path("src/ui/main_window_broken.py")
+
+    print("🔧 Creating clean main_window.py...")
+
+    try:
+        # Backup the problematic file if it exists
+        if main_window_path.exists():
+            # Try to read and backup the current file
+            content, encoding = read_file_safely(main_window_path)
+            if content:
+                with open(backup_path, 'w', encoding='utf-8') as f:
+                    f.write(content)
+                print(f"  ✅ Backed up current file to {backup_path}")
+            else:
+                # If we can't read it, just rename it
+                import shutil
+                shutil.move(str(main_window_path), str(backup_path))
+                print(f"  ✅ Moved problematic file to {backup_path}")
+
+        # Create a clean, working main_window.py
+        clean_content = '''"""
 Main Application Window
 Clean working version of the PDF Voice Editor main window
 """
@@ -105,7 +160,7 @@ class PDFViewerMainWindow(QMainWindow):
             left_layout.addWidget(self.field_palette)
         else:
             # Fallback widget
-            self.field_palette = QLabel("Field Palette\n(Not Available)")
+            self.field_palette = QLabel("Field Palette\\n(Not Available)")
             self.field_palette.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.field_palette.setStyleSheet("border: 1px solid #ccc; padding: 20px;")
             left_layout.addWidget(self.field_palette)
@@ -116,7 +171,7 @@ class PDFViewerMainWindow(QMainWindow):
             left_layout.addWidget(self.properties_panel)
         else:
             # Fallback widget
-            self.properties_panel = QLabel("Properties Panel\n(Not Available)")
+            self.properties_panel = QLabel("Properties Panel\\n(Not Available)")
             self.properties_panel.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.properties_panel.setStyleSheet("border: 1px solid #ccc; padding: 20px;")
             left_layout.addWidget(self.properties_panel)
@@ -140,12 +195,12 @@ class PDFViewerMainWindow(QMainWindow):
         else:
             # Fallback widget
             self.pdf_canvas = QLabel(
-                "PDF Canvas Not Available\n\n"
-                "Some modules are missing.\n"
-                "The application is running in limited mode.\n\n"
-                "To fix this:\n"
-                "1. Ensure all Python files are present\n"
-                "2. Run the fix scripts\n"
+                "PDF Canvas Not Available\\n\\n"
+                "Some modules are missing.\\n"
+                "The application is running in limited mode.\\n\\n"
+                "To fix this:\\n"
+                "1. Ensure all Python files are present\\n"
+                "2. Run the fix scripts\\n"
                 "3. Check imports"
             )
             self.pdf_canvas.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -253,8 +308,8 @@ class PDFViewerMainWindow(QMainWindow):
                     self.field_info_label.setText(f"Selected: {Path(file_path).name}")
                     QMessageBox.information(
                         self, "Info", 
-                        f"PDF selected: {Path(file_path).name}\n\n"
-                        "PDF viewing not fully available in current mode.\n"
+                        f"PDF selected: {Path(file_path).name}\\n\\n"
+                        "PDF viewing not fully available in current mode.\\n"
                         "Fix missing modules to enable full functionality."
                     )
             except Exception as e:
@@ -374,6 +429,70 @@ def main():
 
     # Run the application
     return app.exec()
+
+
+if __name__ == "__main__":
+    sys.exit(main())
+'''
+
+        # Write the clean version with explicit UTF-8 encoding
+        with open(main_window_path, 'w', encoding='utf-8') as f:
+            f.write(clean_content)
+
+        print("✅ Created clean main_window.py with UTF-8 encoding")
+
+        # Validate the new file
+        try:
+            with open(main_window_path, 'r', encoding='utf-8') as f:
+                test_content = f.read()
+            compile(test_content, main_window_path, 'exec')
+            print("✅ New file has valid Python syntax")
+            return True
+        except Exception as e:
+            print(f"❌ Error validating new file: {e}")
+            return False
+
+    except Exception as e:
+        print(f"❌ Error creating clean file: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def main():
+    """Main function"""
+    print("🔧 PDF Voice Editor - Encoding & Syntax Fixer")
+    print("=" * 50)
+
+    # Check if we're in the right directory
+    if not Path("src").exists():
+        print("❌ Error: 'src' directory not found.")
+        return 1
+
+    main_window_path = Path("src/ui/main_window.py")
+
+    if main_window_path.exists():
+        print("📄 Checking current main_window.py...")
+        content, encoding = read_file_safely(main_window_path)
+
+        if content is None:
+            print("❌ Cannot read current file due to encoding issues")
+            print("🔧 Will create a clean version instead")
+        else:
+            print(f"📄 Current file read successfully with {encoding} encoding")
+            print(f"📊 File size: {len(content)} characters")
+
+    # Create clean version
+    if create_clean_main_window():
+        print("\\n🎉 Successfully created clean main_window.py!")
+        print("\\n🎯 Next steps:")
+        print("1. Try running: python launch.py")
+        print("2. The application should now start")
+        print("3. If modules are missing, run the appropriate fix scripts")
+        return 0
+    else:
+        print("\\n❌ Failed to create clean version")
+        return 1
 
 
 if __name__ == "__main__":
