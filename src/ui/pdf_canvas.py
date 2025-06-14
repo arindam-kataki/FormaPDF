@@ -712,6 +712,79 @@ class PDFCanvas(QLabel):
             self.parent().ensureVisible(x, y, margin, margin)
 
     # Mouse event handlers
+
+    def paintEvent(self, event):
+        """Paint event to render PDF and fields"""
+        super().paintEvent(event)
+
+        try:
+            # Get a painter for this widget
+            from PyQt6.QtGui import QPainter, QPen, QBrush, QColor
+            painter = QPainter(self)
+
+            # Draw all fields
+            if hasattr(self, 'field_manager') and self.field_manager:
+                for field in self.field_manager.fields:
+                    self._draw_field(painter, field)
+
+            # Draw selection handles for selected field
+            if (hasattr(self, 'selection_handler') and 
+                self.selection_handler and 
+                hasattr(self.selection_handler, 'selected_field') and
+                self.selection_handler.selected_field):
+
+                self._draw_selection_handles(painter, self.selection_handler.selected_field)
+
+        except Exception as e:
+            print(f"⚠️ Error in paintEvent: {e}")
+
+    def _draw_field(self, painter, field):
+        """Draw a single field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+            from PyQt6.QtCore import Qt
+
+            # Set up pen and brush
+            painter.setPen(QPen(QColor(0, 0, 255), 2))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 100)))
+
+            # Draw field rectangle
+            painter.drawRect(field.x, field.y, field.width, field.height)
+
+            # Draw field type text
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(field.x + 5, field.y + 15, f"{field.type.value}")
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field: {e}")
+
+    def _draw_selection_handles(self, painter, field):
+        """Draw selection handles around a field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            # Draw selection rectangle
+            painter.setPen(QPen(QColor(255, 0, 0), 2))
+            painter.setBrush(QBrush())
+            painter.drawRect(field.x - 2, field.y - 2, field.width + 4, field.height + 4)
+
+            # Draw corner handles
+            handle_size = 6
+            painter.setBrush(QBrush(QColor(255, 0, 0)))
+
+            positions = [
+                (field.x - handle_size//2, field.y - handle_size//2),
+                (field.x + field.width - handle_size//2, field.y - handle_size//2),
+                (field.x - handle_size//2, field.y + field.height - handle_size//2),
+                (field.x + field.width - handle_size//2, field.y + field.height - handle_size//2)
+            ]
+
+            for pos_x, pos_y in positions:
+                painter.drawRect(pos_x, pos_y, handle_size, handle_size)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selection handles: {e}")
+
     def mousePressEvent(self, event):
         """Handle mouse press events"""
         if event.button() == Qt.MouseButton.LeftButton:

@@ -546,10 +546,63 @@ class PDFViewerMainWindow(QMainWindow):
     # Placeholder methods for signal connections
     @pyqtSlot(str)
     def create_field_at_center(self, field_type: str):
-        """Create field at center (placeholder)"""
-        self.statusBar().showMessage(f"Field creation requested: {field_type}", 2000)
+        """Create a new field at the center of the visible area"""
+        print(f"Creating field of type: {field_type}")
 
-    @pyqtSlot(str)
+        try:
+            # Calculate center of visible area
+            if hasattr(self, 'scroll_area') and self.scroll_area:
+                center_x = self.scroll_area.width() // 2
+                center_y = self.scroll_area.height() // 2
+
+                # Convert to canvas coordinates
+                scroll_x = self.scroll_area.horizontalScrollBar().value()
+                scroll_y = self.scroll_area.verticalScrollBar().value()
+
+                canvas_x = center_x + scroll_x
+                canvas_y = center_y + scroll_y
+            else:
+                # Fallback position
+                canvas_x, canvas_y = 200, 200
+
+            # Create field using pdf_canvas
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'add_field'):
+                    field = self.pdf_canvas.add_field(field_type, canvas_x, canvas_y)
+                    if field:
+                        print(f"✅ Created {field_type} field: {field.name}")
+                        self.statusBar().showMessage(f"Created {field_type} field", 2000)
+
+                        # Force canvas to redraw
+                        if hasattr(self.pdf_canvas, 'draw_overlay'):
+                            self.pdf_canvas.draw_overlay()
+                        else:
+                            self.pdf_canvas.update()
+
+                        return field
+                    else:
+                        print(f"❌ Failed to create {field_type} field")
+                        self.statusBar().showMessage(f"Failed to create {field_type} field", 3000)
+                elif hasattr(self.pdf_canvas.field_manager, 'add_field'):
+                    # Alternative: use field manager directly
+                    field = self.pdf_canvas.field_manager.add_field(field_type, canvas_x, canvas_y)
+                    if field:
+                        print(f"✅ Created {field_type} field via field manager: {field.name}")
+                        self.statusBar().showMessage(f"Created {field_type} field", 2000)
+                        self.pdf_canvas.update()
+                        return field
+                else:
+                    print("❌ No field creation method available")
+                    self.statusBar().showMessage("Field creation not available", 3000)
+            else:
+                print("❌ PDF Canvas not available")
+                self.statusBar().showMessage("PDF Canvas not available", 3000)
+
+        except Exception as e:
+            print(f"❌ Error creating field: {e}")
+            self.statusBar().showMessage(f"Error creating field: {e}", 3000)
+
+        return None
     def on_field_clicked(self, field_id: str):
         """Handle field click (placeholder)"""
         self.statusBar().showMessage(f"Field clicked: {field_id}", 2000)

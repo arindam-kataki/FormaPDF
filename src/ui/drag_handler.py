@@ -274,50 +274,83 @@ class DragHandler(QObject):
         self.fieldMoved.emit(field.id, field.x, field.y)
 
 
+
+
+
+
 class SelectionHandler(QObject):
-    """Handles field selection logic"""
+    """Handles field selection logic - bulletproof version"""
 
     selectionChanged = pyqtSignal(object)  # FormField or None
 
-    def __init__(self, field_manager: FieldManager):
+    def __init__(self, field_manager=None):
         super().__init__()
         self.field_manager = field_manager
-        self.selected_field: Optional[FormField] = None
+        self.selected_field = None
+        print("✅ SelectionHandler initialized properly")
 
-    def select_field(self, field: Optional[FormField]):
-        """Select a field"""
-        if self.selected_field != field:
-            self.selected_field = field
-            self.selectionChanged.emit(field)
+    def select_field(self, field):
+        """Select a field safely"""
+        try:
+            if self.selected_field != field:
+                self.selected_field = field
+                self.selectionChanged.emit(field)
+                print(f"✅ Field selected: {field.name if field else 'None'}")
+        except Exception as e:
+            print(f"⚠️ Error selecting field: {e}")
+            self.selected_field = field  # Set it anyway
 
-    def select_field_at_position(self, x: int, y: int) -> Optional[FormField]:
-        """Select field at given position"""
-        field = self.field_manager.get_field_at_position(x, y)
-        self.select_field(field)
-        return field
+    def select_field_at_position(self, x, y):
+        """Select field at given position safely"""
+        try:
+            if self.field_manager and hasattr(self.field_manager, 'get_field_at_position'):
+                field = self.field_manager.get_field_at_position(x, y)
+                self.select_field(field)
+                return field
+            else:
+                print("⚠️ Field manager not available for position selection")
+                return None
+        except Exception as e:
+            print(f"⚠️ Error selecting field at position: {e}")
+            return None
 
     def clear_selection(self):
-        """Clear current selection"""
-        self.select_field(None)
+        """Clear current selection safely"""
+        try:
+            self.select_field(None)
+            print("✅ Selection cleared")
+        except Exception as e:
+            print(f"⚠️ Error clearing selection: {e}")
+            self.selected_field = None  # Clear it anyway
 
-    def get_selected_field(self) -> Optional[FormField]:
+    def get_selected_field(self):
         """Get currently selected field"""
         return self.selected_field
 
-    def delete_selected_field(self) -> bool:
-        """Delete currently selected field"""
-        if self.selected_field:
-            success = self.field_manager.remove_field(self.selected_field)
-            if success:
-                self.clear_selection()
-            return success
-        return False
+    def delete_selected_field(self):
+        """Delete currently selected field safely"""
+        try:
+            if self.selected_field and self.field_manager:
+                if hasattr(self.field_manager, 'remove_field'):
+                    success = self.field_manager.remove_field(self.selected_field)
+                    if success:
+                        self.clear_selection()
+                    return success
+            return False
+        except Exception as e:
+            print(f"⚠️ Error deleting selected field: {e}")
+            return False
 
-    def duplicate_selected_field(self) -> Optional[FormField]:
-        """Duplicate currently selected field"""
-        if self.selected_field:
-            new_field = self.field_manager.duplicate_field(self.selected_field)
-            if new_field:
-                self.select_field(new_field)
-            return new_field
-        return None
+    def duplicate_selected_field(self):
+        """Duplicate currently selected field safely"""
+        try:
+            if self.selected_field and self.field_manager:
+                if hasattr(self.field_manager, 'duplicate_field'):
+                    new_field = self.field_manager.duplicate_field(self.selected_field)
+                    if new_field:
+                        self.select_field(new_field)
+                    return new_field
+            return None
+        except Exception as e:
+            print(f"⚠️ Error duplicating selected field: {e}")
+            return None
