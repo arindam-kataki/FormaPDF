@@ -16,7 +16,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtGui import QAction, QKeySequence, QFont, QIcon, QPixmap, QColor, QCursor
 from PyQt6.QtCore import Qt, pyqtSlot
 
-# Fix these imports to use absolute imports (remove leading dots)
+
 from ui.pdf_canvas import PDFCanvas
 from ui.field_palette import EnhancedFieldPalette
 from ui.properties_panel import PropertiesPanel
@@ -34,6 +34,13 @@ except ImportError:
 
 class PDFViewerMainWindow(QMainWindow):
     """Main application window with enhanced draggable functionality"""
+
+    def _safe_call_field_palette(self, method_name: str, *args, **kwargs):
+        """Safely call a method on field_palette if it exists"""
+        if hasattr(self.field_palette, method_name):
+            method = getattr(self.field_palette, method_name)
+            return method(*args, **kwargs)
+        return None
 
     def __init__(self):
         super().__init__()
@@ -607,8 +614,14 @@ class PDFViewerMainWindow(QMainWindow):
         if selected_field:
             self.properties_panel.show_field_properties(selected_field)
             self.field_info_label.setText(f"Selected: {selected_field.name} ({selected_field.type.value})")
-            self.field_palette.set_field_selected(True)
-            self.field_palette.highlight_field_type(selected_field.type.value)
+
+            # Set field as selected in palette
+            if hasattr(self.field_palette, "set_field_selected"):
+                self.field_palette.set_field_selected(True)
+
+            # Highlight the field type in palette
+            if hasattr(self.field_palette, "highlight_field_type"):
+                self.field_palette.highlight_field_type(selected_field.type.value)
 
     @pyqtSlot(str, int, int)
     def on_field_moved(self, field_id: str, x: int, y: int):
@@ -639,12 +652,16 @@ class PDFViewerMainWindow(QMainWindow):
         """Handle selection change"""
         if field:
             self.properties_panel.show_field_properties(field)
-            self.field_palette.set_field_selected(True)
-            self.field_palette.highlight_field_type(field.type.value)
+            if hasattr(self.field_palette, "set_field_selected"):
+            if hasattr(self.field_palette, "set_field_selected"):
+            if hasattr(self.field_palette, "highlight_field_type"):
+            if hasattr(self.field_palette, "highlight_field_type"):
         else:
             self.properties_panel.show_no_selection()
-            self.field_palette.set_field_selected(False)
-            self.field_palette.clear_highlights()
+            if hasattr(self.field_palette, "set_field_selected"):
+            if hasattr(self.field_palette, "set_field_selected"):
+            if hasattr(self.field_palette, "clear_highlights"):
+            if hasattr(self.field_palette, "clear_highlights"):
 
     @pyqtSlot(str, str, object)
     def on_property_changed(self, field_id: str, property_name: str, value):

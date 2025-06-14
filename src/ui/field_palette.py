@@ -182,6 +182,58 @@ class FieldPalette(QWidget):
         """Update UI based on whether a field is selected (for enhanced palette)"""
         # This method is called by the enhanced version
         pass
+    def clear_highlights(self):
+        """Clear all field type highlights"""
+        if hasattr(self, 'field_buttons'):
+            for field_type in self.field_buttons:
+                self.highlight_field_type(field_type, False)
+
+    def highlight_field_type(self, field_type: str, highlight: bool = True):
+        """Highlight a specific field type (e.g., when selected)"""
+        if not hasattr(self, 'field_buttons') or field_type not in self.field_buttons:
+            return
+
+        button = self.field_buttons[field_type]
+
+        if highlight:
+            # Apply highlighted style
+            button.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 8px 12px;
+                    border: 2px solid #0078d4;
+                    border-radius: 4px;
+                    background-color: #e3f2fd;
+                    color: #0078d4;
+                    font-weight: bold;
+                }
+                QPushButton:hover {
+                    background-color: #bbdefb;
+                    border-color: #0056b3;
+                }
+                QPushButton:pressed {
+                    background-color: #90caf9;
+                }
+            """)
+        else:
+            # Reset to default style
+            button.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 8px 12px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    background-color: #f8f9fa;
+                }
+                QPushButton:hover {
+                    background-color: #e9ecef;
+                    border-color: #0078d4;
+                }
+                QPushButton:pressed {
+                    background-color: #dee2e6;
+                }
+            """)
+
 
 
 class FieldPreviewWidget(QWidget):
@@ -401,4 +453,22 @@ class EnhancedFieldPalette(QWidget):
         self.field_palette.clear_highlights()
         if field_type:
             self.field_palette.highlight_field_type(field_type, True)
+            self.preview_widget.set_field_type(field_type)
+    def clear_highlights(self):
+        """Clear all field type highlights"""
+        if hasattr(self.field_palette, 'clear_highlights'):
+            self.field_palette.clear_highlights()
+
+    def highlight_field_type(self, field_type: str):
+        """Highlight a field type in the palette"""
+        # Clear existing highlights first
+        if hasattr(self.field_palette, 'clear_highlights'):
+            self.field_palette.clear_highlights()
+
+        # Highlight the selected field type
+        if field_type and hasattr(self.field_palette, 'highlight_field_type'):
+            self.field_palette.highlight_field_type(field_type, True)
+
+        # Update preview widget
+        if hasattr(self, 'preview_widget') and field_type:
             self.preview_widget.set_field_type(field_type)

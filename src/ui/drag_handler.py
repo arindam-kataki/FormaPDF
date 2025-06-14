@@ -3,7 +3,7 @@ Drag Handler
 Manages drag and drop operations for form fields
 """
 
-from typing import Optional, Tuple, TYPE_CHECKING
+from typing import Optional, Tuple
 from enum import Enum
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QObject
 
@@ -11,10 +11,6 @@ from models.field_model import FormField, FieldManager
 from utils.geometry_utils import (
     ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
 )
-
-# Type checking imports for better IDE support
-if TYPE_CHECKING:
-    from PyQt6.QtCore import pyqtBoundSignal
 
 
 class DragMode(Enum):
@@ -53,9 +49,9 @@ class DragHandler(QObject):
     """Handles drag and drop operations for form fields"""
 
     # Type hints for signals to eliminate IDE warnings
-    fieldMoved: 'pyqtBoundSignal' = pyqtSignal(str, int, int)  # field_id, new_x, new_y
-    fieldResized: 'pyqtBoundSignal' = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
-    cursorChanged: 'pyqtBoundSignal' = pyqtSignal(Qt.CursorShape)
+    fieldMoved = pyqtSignal(str, int, int)  # field_id, new_x, new_y
+    fieldResized = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
+    cursorChanged = pyqtSignal(Qt.CursorShape)
 
     def __init__(self, field_manager: FieldManager):
         super().__init__()
@@ -281,7 +277,7 @@ class DragHandler(QObject):
 class SelectionHandler(QObject):
     """Handles field selection logic"""
 
-    selectionChanged: 'pyqtBoundSignal' = pyqtSignal(object)  # FormField or None
+    selectionChanged = pyqtSignal(object)  # FormField or None
 
     def __init__(self, field_manager: FieldManager):
         super().__init__()
