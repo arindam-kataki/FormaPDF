@@ -1,0 +1,30 @@
+{
+  "version": "1.0",
+  "created": "2025-06-11T16:27:26.217957",
+  "total_files": 6,
+  "total_examples": 240,
+  "intents": [
+    "NEXT_PAGE",
+    "PREV_PAGE",
+    "GOTO_PAGE",
+    "ZOOM_IN",
+    "ZOOM_OUT",
+    "SET_ZOOM"
+  ],
+  "intent_counts": {
+    "NEXT_PAGE": 40,
+    "PREV_PAGE": 40,
+    "GOTO_PAGE": 40,
+    "ZOOM_IN": 40,
+    "ZOOM_OUT": 40,
+    "SET_ZOOM": 40
+  },
+  "files": [
+    "next_page_commands.json",
+    "prev_page_commands.json",
+    "goto_page_commands.json",
+    "zoom_in_commands.json",
+    "zoom_out_commands.json",
+    "set_zoom_commands.json"
+  ]
+}
