@@ -186,6 +186,10 @@ class PDFViewerMainWindow(QMainWindow):
         info_action.setToolTip("Show application info")
         info_action.triggered.connect(self.show_info)
         toolbar.addAction(info_action)
+        
+        # Make sure toolbar is visible
+        toolbar.show()
+        print("🔧 Toolbar created and should be visible")
 
     def create_status_bar(self):
         """Create status bar"""
@@ -344,6 +348,201 @@ class PDFViewerMainWindow(QMainWindow):
     def on_property_changed(self, field_id: str, property_name: str, value):
         """Handle property change (placeholder)"""
         self.statusBar().showMessage(f"Property changed: {property_name}", 2000)
+
+
+    # Navigation and Zoom Methods
+    @pyqtSlot()
+    def previous_page(self):
+        """Navigate to previous page"""
+        if not hasattr(self.pdf_canvas, 'current_page'):
+            self.statusBar().showMessage("No PDF loaded", 1000)
+            return
+
+        if hasattr(self.pdf_canvas, 'current_page') and self.pdf_canvas.current_page > 0:
+            if hasattr(self.pdf_canvas, 'set_page'):
+                new_page = self.pdf_canvas.current_page - 1
+                self.pdf_canvas.set_page(new_page)
+                self.statusBar().showMessage(f"Page {new_page + 1}", 1000)
+                self.update_document_info()
+            else:
+                self.statusBar().showMessage("Navigation not available", 1000)
+        else:
+            self.statusBar().showMessage("Already at first page", 1000)
+
+    @pyqtSlot()
+    def next_page(self):
+        """Navigate to next page"""
+        if not hasattr(self.pdf_canvas, 'current_page') or not hasattr(self.pdf_canvas, 'pdf_document'):
+            self.statusBar().showMessage("No PDF loaded", 1000)
+            return
+
+        if (self.pdf_canvas.pdf_document and 
+            self.pdf_canvas.current_page < self.pdf_canvas.pdf_document.page_count - 1):
+            if hasattr(self.pdf_canvas, 'set_page'):
+                new_page = self.pdf_canvas.current_page + 1
+                self.pdf_canvas.set_page(new_page)
+                self.statusBar().showMessage(f"Page {new_page + 1}", 1000)
+                self.update_document_info()
+            else:
+                self.statusBar().showMessage("Navigation not available", 1000)
+        else:
+            self.statusBar().showMessage("Already at last page", 1000)
+
+    @pyqtSlot()
+    def zoom_in(self):
+        """Increase zoom level"""
+        if not hasattr(self.pdf_canvas, 'zoom_level') or not hasattr(self.pdf_canvas, 'set_zoom'):
+            self.statusBar().showMessage("Zoom not available", 1000)
+            return
+
+        current_zoom = self.pdf_canvas.zoom_level
+        new_zoom = min(current_zoom * 1.25, 5.0)
+        self.pdf_canvas.set_zoom(new_zoom)
+        zoom_percent = int(new_zoom * 100)
+        self.statusBar().showMessage(f"Zoom: {zoom_percent}%", 1000)
+        self.update_document_info()
+
+    @pyqtSlot()
+    def zoom_out(self):
+        """Decrease zoom level"""
+        if not hasattr(self.pdf_canvas, 'zoom_level') or not hasattr(self.pdf_canvas, 'set_zoom'):
+            self.statusBar().showMessage("Zoom not available", 1000)
+            return
+
+        current_zoom = self.pdf_canvas.zoom_level
+        new_zoom = max(current_zoom / 1.25, 0.1)
+        self.pdf_canvas.set_zoom(new_zoom)
+        zoom_percent = int(new_zoom * 100)
+        self.statusBar().showMessage(f"Zoom: {zoom_percent}%", 1000)
+        self.update_document_info()
+
+    @pyqtSlot()
+    def fit_width(self):
+        """Fit PDF page to window width"""
+        if (not hasattr(self.pdf_canvas, 'page_pixmap') or 
+            not hasattr(self.pdf_canvas, 'set_zoom') or
+            not self.pdf_canvas.page_pixmap):
+            self.statusBar().showMessage("Fit width not available", 1000)
+            return
+
+        try:
+            # Calculate zoom needed to fit width
+            available_width = self.scroll_area.width() - 40  # Account for margins
+            current_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+            page_width = self.pdf_canvas.page_pixmap.width() / current_zoom
+            new_zoom = available_width / page_width
+            new_zoom = max(0.1, min(new_zoom, 5.0))  # Clamp to reasonable range
+
+            self.pdf_canvas.set_zoom(new_zoom)
+            zoom_percent = int(new_zoom * 100)
+            self.statusBar().showMessage(f"Fit width: {zoom_percent}%", 1000)
+            self.update_document_info()
+        except Exception as e:
+            self.statusBar().showMessage("Fit width failed", 1000)
+
+    @pyqtSlot()
+    def toggle_grid(self):
+        """Toggle grid display"""
+        if hasattr(self.pdf_canvas, 'toggle_grid'):
+            self.pdf_canvas.toggle_grid()
+
+            # Update grid action state if it exists
+            if hasattr(self, 'grid_action') and hasattr(self.pdf_canvas, 'show_grid'):
+                self.grid_action.setChecked(self.pdf_canvas.show_grid)
+
+            grid_status = "on" if getattr(self.pdf_canvas, 'show_grid', False) else "off"
+            self.statusBar().showMessage(f"Grid {grid_status}", 1000)
+        else:
+            self.statusBar().showMessage("Grid toggle not available", 1000)
+
+    @pyqtSlot()
+    def zoom_to_fit(self):
+        """Zoom to fit entire page in window"""
+        if (not hasattr(self.pdf_canvas, 'page_pixmap') or 
+            not hasattr(self.pdf_canvas, 'set_zoom') or
+            not self.pdf_canvas.page_pixmap):
+            self.statusBar().showMessage("Zoom to fit not available", 1000)
+            return
+
+        try:
+            # Calculate zoom to fit both width and height
+            available_width = self.scroll_area.width() - 40
+            available_height = self.scroll_area.height() - 40
+            current_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+
+            page_width = self.pdf_canvas.page_pixmap.width() / current_zoom
+            page_height = self.pdf_canvas.page_pixmap.height() / current_zoom
+
+            zoom_for_width = available_width / page_width
+            zoom_for_height = available_height / page_height
+
+            # Use the smaller zoom to ensure page fits completely
+            new_zoom = min(zoom_for_width, zoom_for_height)
+            new_zoom = max(0.1, min(new_zoom, 5.0))
+
+            self.pdf_canvas.set_zoom(new_zoom)
+            zoom_percent = int(new_zoom * 100)
+            self.statusBar().showMessage(f"Zoom to fit: {zoom_percent}%", 1000)
+            self.update_document_info()
+        except Exception as e:
+            self.statusBar().showMessage("Zoom to fit failed", 1000)
+
+    def update_document_info(self):
+        """Update document information display - enhanced version"""
+        try:
+            if hasattr(self.pdf_canvas, 'pdf_document') and self.pdf_canvas.pdf_document:
+                # Get current page info
+                current_page = getattr(self.pdf_canvas, 'current_page', 0) + 1
+                total_pages = self.pdf_canvas.pdf_document.page_count
+
+                # Get zoom info
+                zoom_level = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+                zoom_percent = int(zoom_level * 100)
+
+                # Get field count
+                field_count = 0
+                if hasattr(self.pdf_canvas, 'get_fields_as_objects'):
+                    try:
+                        fields = self.pdf_canvas.get_fields_as_objects()
+                        field_count = len(fields)
+                    except:
+                        pass
+
+                # Update display
+                info_text = f"Page {current_page} of {total_pages} | Zoom: {zoom_percent}% | Fields: {field_count}"
+                self.field_info_label.setText(info_text)
+
+            else:
+                self.field_info_label.setText("No document loaded")
+
+        except Exception as e:
+            # Fallback to basic info
+            self.field_info_label.setText("Document info unavailable")
+
+    def get_navigation_state(self) -> dict:
+        """Get current navigation state for UI updates"""
+        state = {
+            'has_document': False,
+            'can_go_previous': False,
+            'can_go_next': False,
+            'current_page': 0,
+            'total_pages': 0,
+            'zoom_percent': 100
+        }
+
+        try:
+            if hasattr(self.pdf_canvas, 'pdf_document') and self.pdf_canvas.pdf_document:
+                state['has_document'] = True
+                state['current_page'] = getattr(self.pdf_canvas, 'current_page', 0) + 1
+                state['total_pages'] = self.pdf_canvas.pdf_document.page_count
+                state['can_go_previous'] = getattr(self.pdf_canvas, 'current_page', 0) > 0
+                state['can_go_next'] = getattr(self.pdf_canvas, 'current_page', 0) < state['total_pages'] - 1
+                state['zoom_percent'] = int(getattr(self.pdf_canvas, 'zoom_level', 1.0) * 100)
+
+        except Exception:
+            pass
+
+        return state
 
 
 def main():

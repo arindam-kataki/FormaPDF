@@ -321,3 +321,110 @@ class PDFCanvas(QLabel):
         """Get all fields as FormField objects"""
         return self.field_manager.fields.copy()
 
+
+    """
+    Safe enhancement to PDF Canvas - adds navigation and zoom without breaking existing functionality
+    Add these methods to your existing PDFCanvas class in src/ui/pdf_canvas.py
+    """
+
+
+    # Add these methods to your existing PDFCanvas class after the existing methods
+
+    def get_page_count(self) -> int:
+        """Get total number of pages in the document"""
+        if self.pdf_document:
+            return self.pdf_document.page_count
+        return 0
+
+
+    def get_current_page_number(self) -> int:
+        """Get current page number (1-based)"""
+        return self.current_page + 1 if self.pdf_document else 0
+
+
+    def can_go_previous(self) -> bool:
+        """Check if can navigate to previous page"""
+        return self.pdf_document and self.current_page > 0
+
+
+    def can_go_next(self) -> bool:
+        """Check if can navigate to next page"""
+        return (self.pdf_document and
+                self.current_page < self.pdf_document.page_count - 1)
+
+
+    def go_to_page(self, page_number: int) -> bool:
+        """Navigate to specific page (1-based numbering)"""
+        if not self.pdf_document:
+            return False
+
+        # Convert to 0-based indexing
+        page_index = page_number - 1
+
+        if 0 <= page_index < self.pdf_document.page_count:
+            self.set_page(page_index)
+            return True
+        return False
+
+
+    def zoom_to_level(self, zoom_percent: int) -> bool:
+        """Set zoom to specific percentage (e.g., 100 for 100%)"""
+        if zoom_percent < 10 or zoom_percent > 500:
+            return False
+
+        zoom_level = zoom_percent / 100.0
+        self.set_zoom(zoom_level)
+        return True
+
+
+    def zoom_in_step(self, step: float = 1.25) -> float:
+        """Zoom in by a step factor, returns new zoom level"""
+        new_zoom = min(self.zoom_level * step, 5.0)
+        self.set_zoom(new_zoom)
+        return new_zoom
+
+
+    def zoom_out_step(self, step: float = 1.25) -> float:
+        """Zoom out by a step factor, returns new zoom level"""
+        new_zoom = max(self.zoom_level / step, 0.1)
+        self.set_zoom(new_zoom)
+        return new_zoom
+
+
+    def get_zoom_percent(self) -> int:
+        """Get current zoom as percentage"""
+        return int(self.zoom_level * 100)
+
+
+    def fit_to_width(self, available_width: int) -> float:
+        """Fit page to available width, returns new zoom level"""
+        if not self.page_pixmap:
+            return self.zoom_level
+
+        # Calculate zoom needed to fit width
+        page_width = self.page_pixmap.width() / self.zoom_level
+        new_zoom = (available_width - 40) / page_width  # 40px margin
+        new_zoom = max(0.1, min(new_zoom, 5.0))  # Clamp to reasonable range
+
+        self.set_zoom(new_zoom)
+        return new_zoom
+
+
+    def get_document_info(self) -> dict:
+        """Get document information"""
+        if not self.pdf_document:
+            return {
+                'page_count': 0,
+                'current_page': 0,
+                'zoom_percent': 100,
+                'field_count': 0,
+                'has_document': False
+            }
+
+        return {
+            'page_count': self.pdf_document.page_count,
+            'current_page': self.current_page + 1,
+            'zoom_percent': self.get_zoom_percent(),
+            'field_count': len(self.field_manager.fields),
+            'has_document': True
+        }
