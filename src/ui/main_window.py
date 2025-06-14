@@ -325,25 +325,98 @@ class PDFViewerMainWindow(QMainWindow):
             status_bar.addPermanentWidget(QLabel("All modules loaded"))
 
     def setup_connections(self):
-        """Setup signal connections safely"""
+        """Setup signal connections between components safely"""
         try:
-            # Only connect signals if the objects have the required methods
-            if hasattr(self.field_palette, 'fieldRequested'):
-                self.field_palette.fieldRequested.connect(self.create_field_at_center)
+            # Field palette connections - check both object and signal exist
+            if (hasattr(self, 'field_palette') and 
+                self.field_palette is not None and 
+                hasattr(self.field_palette, 'fieldRequested')):
+                try:
+                    self.field_palette.fieldRequested.connect(self.create_field_at_center)
+                    print("  ✅ Connected field_palette.fieldRequested")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect fieldRequested: {e}")
 
-            if hasattr(self.pdf_canvas, 'fieldClicked'):
-                self.pdf_canvas.fieldClicked.connect(self.on_field_clicked)
+            if (hasattr(self, 'field_palette') and 
+                self.field_palette is not None and 
+                hasattr(self.field_palette, 'duplicateRequested')):
+                try:
+                    self.field_palette.duplicateRequested.connect(lambda: print("Duplicate requested"))
+                    print("  ✅ Connected field_palette.duplicateRequested")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect duplicateRequested: {e}")
 
-            if hasattr(self.pdf_canvas, 'selectionChanged'):
-                self.pdf_canvas.selectionChanged.connect(self.on_selection_changed)
+            if (hasattr(self, 'field_palette') and 
+                self.field_palette is not None and 
+                hasattr(self.field_palette, 'deleteRequested')):
+                try:
+                    self.field_palette.deleteRequested.connect(lambda: print("Delete requested"))
+                    print("  ✅ Connected field_palette.deleteRequested")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect deleteRequested: {e}")
 
-            if hasattr(self.properties_panel, 'propertyChanged'):
-                self.properties_panel.propertyChanged.connect(self.on_property_changed)
+            # PDF canvas connections - check both object and signal exist
+            if (hasattr(self, 'pdf_canvas') and 
+                self.pdf_canvas is not None and 
+                hasattr(self.pdf_canvas, 'fieldClicked')):
+                try:
+                    self.pdf_canvas.fieldClicked.connect(self.on_field_clicked)
+                    print("  ✅ Connected pdf_canvas.fieldClicked")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect fieldClicked: {e}")
+
+            if (hasattr(self, 'pdf_canvas') and 
+                self.pdf_canvas is not None and 
+                hasattr(self.pdf_canvas, 'fieldMoved')):
+                try:
+                    self.pdf_canvas.fieldMoved.connect(self.on_field_moved)
+                    print("  ✅ Connected pdf_canvas.fieldMoved")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect fieldMoved: {e}")
+
+            if (hasattr(self, 'pdf_canvas') and 
+                self.pdf_canvas is not None and 
+                hasattr(self.pdf_canvas, 'fieldResized')):
+                try:
+                    self.pdf_canvas.fieldResized.connect(self.on_field_resized)
+                    print("  ✅ Connected pdf_canvas.fieldResized")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect fieldResized: {e}")
+
+            if (hasattr(self, 'pdf_canvas') and 
+                self.pdf_canvas is not None and 
+                hasattr(self.pdf_canvas, 'positionClicked')):
+                try:
+                    self.pdf_canvas.positionClicked.connect(self.on_position_clicked)
+                    print("  ✅ Connected pdf_canvas.positionClicked")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect positionClicked: {e}")
+
+            if (hasattr(self, 'pdf_canvas') and 
+                self.pdf_canvas is not None and 
+                hasattr(self.pdf_canvas, 'selectionChanged')):
+                try:
+                    self.pdf_canvas.selectionChanged.connect(self.on_selection_changed)
+                    print("  ✅ Connected pdf_canvas.selectionChanged")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect selectionChanged: {e}")
+
+            # Properties panel connections - check both object and signal exist
+            if (hasattr(self, 'properties_panel') and 
+                self.properties_panel is not None and 
+                hasattr(self.properties_panel, 'propertyChanged')):
+                try:
+                    self.properties_panel.propertyChanged.connect(self.on_property_changed)
+                    print("  ✅ Connected properties_panel.propertyChanged")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect propertyChanged: {e}")
+
+            print("✅ Signal connections setup completed")
 
         except Exception as e:
-            print(f"Warning: Some signal connections failed: {e}")
-
-    @pyqtSlot()
+            print(f"Warning: Error setting up signal connections: {e}")
+            import traceback
+            traceback.print_exc()
     def open_pdf(self):
         """Open PDF file dialog and load selected file"""
         file_path, _ = QFileDialog.getOpenFileName(
@@ -861,6 +934,46 @@ class PDFViewerMainWindow(QMainWindow):
             pass
 
         return state
+
+
+    @pyqtSlot(str)
+    def create_field_at_center(self, field_type: str):
+        """Create a new field at the center of the visible area"""
+        print(f"Creating field of type: {field_type}")
+        # Implementation would go here
+
+    @pyqtSlot(str)
+    def on_field_clicked(self, field_id: str):
+        """Handle field click"""
+        print(f"Field clicked: {field_id}")
+
+    @pyqtSlot(str, int, int)
+    def on_field_moved(self, field_id: str, x: int, y: int):
+        """Handle field movement"""
+        print(f"Field {field_id} moved to ({x}, {y})")
+
+    @pyqtSlot(str, int, int, int, int)
+    def on_field_resized(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Handle field resize"""
+        print(f"Field {field_id} resized to {width}x{height} at ({x}, {y})")
+
+    @pyqtSlot(int, int)
+    def on_position_clicked(self, x: int, y: int):
+        """Handle position click (no field)"""
+        print(f"Position clicked: ({x}, {y})")
+
+    @pyqtSlot(object)
+    def on_selection_changed(self, field):
+        """Handle selection change"""
+        if field:
+            print(f"Field selected: {field}")
+        else:
+            print("Selection cleared")
+
+    @pyqtSlot(str, str, object)
+    def on_property_changed(self, field_id: str, property_name: str, value):
+        """Handle property change"""
+        print(f"Property {property_name} of field {field_id} changed to {value}")
 
 
 def main():

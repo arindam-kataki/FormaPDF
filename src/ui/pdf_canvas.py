@@ -59,7 +59,11 @@ class MinimalSelectionHandler:
 
     def clear_selection(self):
         self.selected_field = None
-        self.selectionChanged.emit(None)
+        try:
+            self.selectionChanged.emit(None)
+        except AttributeError as e:
+            print(f"⚠️ Selection handler issue: {e}")
+            # Continue without clearing selection
 
     def get_selected_field(self):
         return self.selected_field
@@ -211,7 +215,13 @@ class PDFCanvas(QLabel):
 
             # Clear existing fields
             self.field_manager.clear_all()
-            self.selection_handler.clear_selection()
+
+            # Clear selection safely
+            try:
+                self.selection_handler.clear_selection()
+            except AttributeError as e:
+                print(f"⚠️ Selection handler issue: {e}")
+                # Continue without clearing selection
 
             # Render the first page
             self.render_page()
@@ -716,7 +726,13 @@ class PDFCanvas(QLabel):
                 self.selection_handler.select_field(selected_field)
                 self.fieldClicked.emit(selected_field.id)
             else:
-                self.selection_handler.clear_selection()
+                # Clear selection safely
+                try:  # ✅ Proper indentation
+                    self.selection_handler.clear_selection()
+                except AttributeError as e:
+                    print(f"⚠️ Selection handler issue: {e}")
+                    # Continue without clearing selection
+
                 self.positionClicked.emit(pos.x(), pos.y())
 
             self.draw_overlay()
