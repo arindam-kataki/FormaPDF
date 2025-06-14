@@ -134,12 +134,9 @@ class PDFViewerMainWindow(QMainWindow):
         # Scroll area for PDF canvas
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
-                # Enhanced scroll area configuration
-        self.scroll_area.setWidgetResizable(True)
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Configure scroll bars
-        from PyQt6.QtCore import Qt
+        # Configure scroll bars (removed the local import)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
@@ -154,7 +151,31 @@ class PDFViewerMainWindow(QMainWindow):
             h_scrollbar.setSingleStep(10)
             h_scrollbar.setPageStep(100)
 
-self.scroll_area.setWidget(self.pdf_canvas)
+        # Create PDF canvas (add this missing part)
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            pass  # PDF canvas already exists
+        else:
+            # Create PDF canvas or fallback
+            try:
+                from ui.pdf_canvas import PDFCanvas
+                self.pdf_canvas = PDFCanvas()
+            except ImportError:
+                # Fallback if PDFCanvas not available
+                self.pdf_canvas = QLabel(
+                    "PDF Canvas Not Available\n\n"
+                    "Some modules are missing.\n"
+                    "Application running in limited mode."
+                )
+                self.pdf_canvas.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.pdf_canvas.setStyleSheet("""
+                    border: 2px dashed #ccc; 
+                    background-color: #f9f9f9; 
+                    color: #666;
+                    font-size: 14px;
+                    padding: 40px;
+                """)
+
+        self.scroll_area.setWidget(self.pdf_canvas)
         return self.scroll_area
 
     def create_toolbar(self):
@@ -746,7 +767,7 @@ self.scroll_area.setWidget(self.pdf_canvas)
         else:
             self.statusBar().showMessage("Zoom not available", 1000)
 
-        def enable_smooth_scrolling(self):
+    def enable_smooth_scrolling(self):
         """Enable smooth scrolling for the scroll area"""
         if hasattr(self, 'scroll_area'):
             # Configure scroll bar step sizes for smoother scrolling
@@ -759,6 +780,7 @@ self.scroll_area.setWidget(self.pdf_canvas)
             if h_scrollbar:
                 h_scrollbar.setSingleStep(10)
                 h_scrollbar.setPageStep(100)
+
     def update_document_info(self):
         """Update document information display - enhanced version"""
         try:
