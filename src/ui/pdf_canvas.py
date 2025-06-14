@@ -420,6 +420,191 @@ class PDFCanvas(QLabel):
                 'field_count': 0,
                 'has_document': False
             }
+    # Scrolling Event Handlers
+    def wheelEvent(self, event):
+        """Handle mouse wheel events for zooming and scrolling"""
+        modifiers = event.modifiers()
+
+        # Ctrl + Wheel = Zoom
+        if modifiers & Qt.KeyboardModifier.ControlModifier:
+            # Get the angle delta (positive = zoom in, negative = zoom out)
+            delta = event.angleDelta().y()
+
+            if delta > 0:
+                # Zoom in
+                new_zoom = min(self.zoom_level * 1.15, 5.0)
+            else:
+                # Zoom out
+                new_zoom = max(self.zoom_level / 1.15, 0.1)
+
+            if new_zoom != self.zoom_level:
+                # Store the mouse position relative to the widget
+                mouse_pos = event.position().toPoint()
+
+                # Set new zoom
+                self.set_zoom(new_zoom)
+
+                # Emit signal to notify main window of zoom change
+                if hasattr(self, 'zoomChanged'):
+                    self.zoomChanged.emit(new_zoom)
+
+            # Accept the event to prevent default scrolling
+            event.accept()
+
+        # Shift + Wheel = Horizontal scroll
+        elif modifiers & Qt.KeyboardModifier.ShiftModifier:
+            # Let the parent scroll area handle horizontal scrolling
+            event.ignore()
+
+        # Regular wheel = Vertical scroll
+        else:
+            # Let the parent scroll area handle vertical scrolling
+            event.ignore()
+
+    def keyPressEvent(self, event):
+        """Enhanced keyboard event handling including scrolling"""
+        key = event.key()
+        modifiers = event.modifiers()
+
+        # Handle field manipulation if a field is selected
+        selected_field = self.selection_handler.get_selected_field()
+        if selected_field:
+            # Arrow keys for movement (existing functionality)
+            if key in [Qt.Key.Key_Up, Qt.Key.Key_Down, Qt.Key.Key_Left, Qt.Key.Key_Right]:
+                step = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
+
+                dx, dy = 0, 0
+                if key == Qt.Key.Key_Up:
+                    dy = -step
+                elif key == Qt.Key.Key_Down:
+                    dy = step
+                elif key == Qt.Key.Key_Left:
+                    dx = -step
+                elif key == Qt.Key.Key_Right:
+                    dx = step
+
+                # Move the field
+                new_x = selected_field.x + dx
+                new_y = selected_field.y + dy
+                selected_field.x = max(0, min(new_x, self.width() - selected_field.width))
+                selected_field.y = max(0, min(new_y, self.height() - selected_field.height))
+
+                self.draw_overlay()
+                event.accept()
+                return
+
+        # Scrolling keyboard shortcuts (when no field is selected)
+        scroll_handled = False
+
+        # Page Up/Down for vertical scrolling
+        if key == Qt.Key.Key_PageUp:
+            self.scroll_page(-1)
+            scroll_handled = True
+        elif key == Qt.Key.Key_PageDown:
+            self.scroll_page(1)
+            scroll_handled = True
+
+        # Home/End for horizontal scrolling
+        elif key == Qt.Key.Key_Home:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                self.scroll_to_top()
+            else:
+                self.scroll_to_left()
+            scroll_handled = True
+        elif key == Qt.Key.Key_End:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                self.scroll_to_bottom()
+            else:
+                self.scroll_to_right()
+            scroll_handled = True
+
+        # Arrow keys for scrolling (when no field selected)
+        elif key == Qt.Key.Key_Up and not selected_field:
+            self.scroll_vertical(-50)
+            scroll_handled = True
+        elif key == Qt.Key.Key_Down and not selected_field:
+            self.scroll_vertical(50)
+            scroll_handled = True
+        elif key == Qt.Key.Key_Left and not selected_field:
+            self.scroll_horizontal(-50)
+            scroll_handled = True
+        elif key == Qt.Key.Key_Right and not selected_field:
+            self.scroll_horizontal(50)
+            scroll_handled = True
+
+        # Zoom shortcuts
+        elif key == Qt.Key.Key_Plus or key == Qt.Key.Key_Equal:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                self.zoom_in_step()
+                scroll_handled = True
+        elif key == Qt.Key.Key_Minus:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                self.zoom_out_step()
+                scroll_handled = True
+        elif key == Qt.Key.Key_0:
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                self.set_zoom(1.0)  # Reset to 100%
+                scroll_handled = True
+
+        if scroll_handled:
+            event.accept()
+        else:
+            # Pass to parent for other events
+            super().keyPressEvent(event)
+
+    def scroll_page(self, direction: int):
+        """Scroll by one page height"""
+        if hasattr(self.parent(), 'verticalScrollBar'):
+            scroll_bar = self.parent().verticalScrollBar()
+            page_step = scroll_bar.pageStep()
+            current_value = scroll_bar.value()
+            new_value = current_value + (page_step * direction)
+            scroll_bar.setValue(new_value)
+
+    def scroll_vertical(self, delta: int):
+        """Scroll vertically by delta pixels"""
+        if hasattr(self.parent(), 'verticalScrollBar'):
+            scroll_bar = self.parent().verticalScrollBar()
+            current_value = scroll_bar.value()
+            scroll_bar.setValue(current_value + delta)
+
+    def scroll_horizontal(self, delta: int):
+        """Scroll horizontally by delta pixels"""
+        if hasattr(self.parent(), 'horizontalScrollBar'):
+            scroll_bar = self.parent().horizontalScrollBar()
+            current_value = scroll_bar.value()
+            scroll_bar.setValue(current_value + delta)
+
+    def scroll_to_top(self):
+        """Scroll to top of document"""
+        if hasattr(self.parent(), 'verticalScrollBar'):
+            self.parent().verticalScrollBar().setValue(0)
+
+    def scroll_to_bottom(self):
+        """Scroll to bottom of document"""
+        if hasattr(self.parent(), 'verticalScrollBar'):
+            scroll_bar = self.parent().verticalScrollBar()
+            scroll_bar.setValue(scroll_bar.maximum())
+
+    def scroll_to_left(self):
+        """Scroll to left edge of document"""
+        if hasattr(self.parent(), 'horizontalScrollBar'):
+            self.parent().horizontalScrollBar().setValue(0)
+
+    def scroll_to_right(self):
+        """Scroll to right edge of document"""
+        if hasattr(self.parent(), 'horizontalScrollBar'):
+            scroll_bar = self.parent().horizontalScrollBar()
+            scroll_bar.setValue(scroll_bar.maximum())
+
+    def center_on_point(self, x: int, y: int):
+        """Center the view on a specific point"""
+        if hasattr(self.parent(), 'ensureVisible'):
+            # QScrollArea method to ensure a point is visible
+            margin = 50  # Margin around the point
+            self.parent().ensureVisible(x, y, margin, margin)
+
+
 
         return {
             'page_count': self.pdf_document.page_count,
