@@ -923,8 +923,9 @@ class PDFCanvas(QLabel):
 
             # Create the field
             new_field = FormField(
+                id=field_name,
                 name=field_name,
-                field_type=field_enum,
+                type=field_enum,
                 x=field_x,
                 y=field_y,
                 width=width,

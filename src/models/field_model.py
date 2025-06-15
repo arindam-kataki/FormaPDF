@@ -17,6 +17,7 @@ class FieldType(Enum):
     SIGNATURE = "signature"
     DATE = "date"
     BUTTON = "button"
+    NUMBER = "number"
 
 
 @dataclass
@@ -46,7 +47,8 @@ class FormField:
             FieldType.DROPDOWN: (120, 25),
             FieldType.SIGNATURE: (200, 50),
             FieldType.DATE: (100, 25),
-            FieldType.BUTTON: (80, 30)
+            FieldType.BUTTON: (80, 30),
+            FieldType.NUMBER: (100, 25)
         }
 
         field_type_enum = FieldType(field_type)
