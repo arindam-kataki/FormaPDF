@@ -1472,7 +1472,7 @@ class PDFCanvas(QLabel):
 
             # Create the field using FormField.create() method
             field_id = f"{field_type}_{len(self.field_manager.fields) + 1}"
-            new_field = FormField.create(field_type, field_x, field_y, field_id, page_number=page_num)
+            new_field = FormField.create(field_type, field_x, field_y, field_id, page_num)
 
             # Add to field manager
             self.field_manager.fields.append(new_field)

@@ -23,11 +23,14 @@ class FieldRenderer:
         self.handle_bg_color = QColor(255, 255, 255)
 
     def render_fields(self, painter: QPainter, fields: List[FormField],
-                     selected_field: Optional[FormField] = None):
+                     selected_field: Optional[FormField] = None, current_page: int = 0):
         """Render all form fields"""
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        for field in fields:
+        # Filter fields for current page
+        page_fields = [field for field in fields if getattr(field, 'page_number', 0) == current_page]
+
+        for field in page_fields:
             is_selected = field == selected_field
             self.render_single_field(painter, field, is_selected)
 
