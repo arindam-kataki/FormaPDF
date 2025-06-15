@@ -23,7 +23,7 @@ except ImportError:
 try:
     from models.field_model import FormField, FieldType
     from ui.field_renderer import FieldRenderer
-    from ui.drag_handler import DragHandler, SelectionHandler
+    from ui.drag_handler import DragHandler, SelectionHandler, WorkingSelectionHandler
     from ui.selection_handler import SelectionHandler
     from managers.field_manager import FieldManager
     FIELD_COMPONENTS_AVAILABLE = True
@@ -130,7 +130,7 @@ class PDFCanvas(QLabel):
         if FIELD_COMPONENTS_AVAILABLE:
             try:
                 self.field_manager = FieldManager()
-                self.selection_handler = SelectionHandler()
+                self.selection_handler = WorkingSelectionHandler(self.field_manager)
                 self.drag_handler = DragHandler()
                 self.field_renderer = FieldRenderer()
             except Exception as e:
@@ -845,8 +845,11 @@ class PDFCanvas(QLabel):
 
                     # Select the new field
                     try:
-                        self.selection_handler.select_field(new_field)
+                        print(f"⚠️ Error selecting new field: 0")
+                        # self.selection_handler.select_field(new_field)
+                        print(f"⚠️ Error selecting new field: 1")
                         self._handle_field_clicked(new_field.id)
+                        print(f"⚠️ Error selecting new field: 2")
                     except Exception as e:
                         print(f"⚠️ Error selecting new field: {e}")
 
@@ -862,6 +865,11 @@ class PDFCanvas(QLabel):
     def _get_selected_field_type(self):
         """Get the currently selected field type from the field palette"""
         try:
+
+            if hasattr(self, 'selected_field_type') and self.selected_field_type:
+                print(f"✅ Using stored field type: {self.selected_field_type}")
+                return self.selected_field_type
+
             # Get the main window
             main_window = self._get_main_window()
             if not main_window:
@@ -905,7 +913,8 @@ class PDFCanvas(QLabel):
                 "radio": FieldType.RADIO,
                 "dropdown": FieldType.DROPDOWN,
                 "date": FieldType.DATE,
-                "number": FieldType.NUMBER
+                "number": FieldType.NUMBER,
+                "button": FieldType.BUTTON
             }
 
             # Get the enum value
@@ -949,7 +958,8 @@ class PDFCanvas(QLabel):
                 FieldType.RADIO: (20, 20),
                 FieldType.DROPDOWN: (120, 25),
                 FieldType.DATE: (100, 25),
-                FieldType.NUMBER: (80, 25)
+                FieldType.NUMBER: (80, 25),
+                FieldType.BUTTON: (80, 30)
             }
 
             return dimensions.get(field_type, (100, 25))  # Default fallback

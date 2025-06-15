@@ -352,7 +352,7 @@ class PDFViewerMainWindow(QMainWindow):
                 self.field_palette is not None and 
                 hasattr(self.field_palette, 'fieldRequested')):
                 try:
-                    self.field_palette.fieldRequested.connect(self.create_field_at_center)
+                    self.field_palette.fieldRequested.connect(self._on_field_type_selected)
                     print("  ✅ Connected field_palette.fieldRequested")
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect fieldRequested: {e}")
