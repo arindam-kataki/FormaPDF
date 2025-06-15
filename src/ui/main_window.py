@@ -710,7 +710,7 @@ class PDFViewerMainWindow(QMainWindow):
 
         try:
             # Calculate zoom needed to fit width
-            available_width = self.scroll_area.width() - 40  # Account for margins
+            available_width = self.scroll_area.viewport().width() - 40  # Account for margins
             current_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
             page_width = self.pdf_canvas.page_pixmap.width() / current_zoom
             new_zoom = available_width / page_width
@@ -851,7 +851,7 @@ class PDFViewerMainWindow(QMainWindow):
             self.statusBar().showMessage("Invalid zoom value", 1000)
 
     @pyqtSlot()
-    def fit_page(self):
+    def deprecated_fit_page(self):
         """Fit entire page in window"""
         if (not hasattr(self.pdf_canvas, 'page_pixmap') or 
             not hasattr(self.pdf_canvas, 'set_zoom') or
@@ -884,6 +884,39 @@ class PDFViewerMainWindow(QMainWindow):
 
             self.statusBar().showMessage(f"Fit page: {zoom_percent}%", 1000)
             self.update_document_info()
+        except Exception as e:
+            self.statusBar().showMessage("Fit page failed", 1000)
+
+    @pyqtSlot()
+    def fit_page(self):
+        """Fit current page (not entire document) to window"""
+        if not hasattr(self.pdf_canvas, 'pdf_document') or not self.pdf_canvas.pdf_document:
+            return
+
+        try:
+            # Get CURRENT PAGE dimensions, not entire document
+            current_page_num = getattr(self.pdf_canvas, 'current_page', 0)
+            page = self.pdf_canvas.pdf_document[current_page_num]
+
+            # Calculate single page size at current zoom
+            current_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+            page_width = page.rect.width
+            page_height = page.rect.height
+
+            # Available space
+            available_width = self.scroll_area.viewport().width() - 40
+            available_height = self.scroll_area.viewport().height() - 40
+
+            # Calculate zoom for single page
+            zoom_for_width = available_width / page_width
+            zoom_for_height = available_height / page_height
+            new_zoom = min(zoom_for_width, zoom_for_height)
+            new_zoom = max(0.1, min(new_zoom, 5.0))
+
+            self.pdf_canvas.set_zoom(new_zoom)
+            zoom_percent = int(new_zoom * 100)
+            self.statusBar().showMessage(f"Fit page: {zoom_percent}%", 1000)
+
         except Exception as e:
             self.statusBar().showMessage("Fit page failed", 1000)
 

@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import QLabel, QApplication
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette
 from PyQt6.QtCore import QObject, pyqtSignal, Qt
 
 # Try to import PyMuPDF
@@ -116,8 +116,10 @@ class PDFCanvas(QLabel):
 
         # Initialize UI
         self.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.setStyleSheet("border: 1px solid #ccc; background-color: white;")
+        # self.setStyleSheet("border: 1px solid #ccc; background-color: white;")
         self.setMinimumSize(400, 300)
+
+        self.setStyleSheet("border:none;")  # Remove border
 
         # Show initial message
         self.show_no_document_message()
@@ -228,7 +230,7 @@ class PDFCanvas(QLabel):
             print("✅ First page rendered")
 
             # Update styling
-            self.setStyleSheet("border: 1px solid #ccc; background-color: white;")
+            self.setStyleSheet("border: none; background-color: transparent;")
 
             return True
 
@@ -243,18 +245,20 @@ class PDFCanvas(QLabel):
         """Render all PDF pages as continuous vertical view with simple spacing and borders"""
         if not self.pdf_document:
             return
-
         # Import PyQt6 classes locally to avoid import issues
         from PyQt6.QtGui import QColor, QPainter, QPen
         from PyQt6.QtCore import Qt, QRect
+
+        self.setStyleSheet("border:solid 1px red;");
 
         try:
             print(f"🎨 Rendering all {self.pdf_document.page_count} pages with simple moats")
 
             # Simple spacing settings
-            top_margin = 10  # Gap from top
+            top_margin = 15  # Gap from top
+            bottom_margin = 15 # Gap from bottom
             vertical_spacing = 15  # Gap between pages
-            horizontal_margin = 10  # Left/right gaps when fit-to-width
+            horizontal_margin = 15  # Left/right gaps when fit-to-width
 
             # Calculate page dimensions
             page_heights = []
@@ -274,13 +278,22 @@ class PDFCanvas(QLabel):
 
             # Calculate total canvas dimensions
             canvas_width = max_width + (2 * horizontal_margin)
-            total_height = top_margin + sum(page_heights) + (len(page_heights) - 1) * vertical_spacing + top_margin
+            total_height = top_margin + sum(page_heights) + (len(page_heights) - 1) * vertical_spacing + top_margin + bottom_margin
 
             # Create canvas with white background (no overall boundary)
             self.page_pixmap = QPixmap(canvas_width, total_height)
-            self.page_pixmap.fill(QColor(255, 255, 255))  # White background
+            #self.page_pixmap.fill(QColor(255, 255, 255))
+
+            scroll_area = self.parent()
+            if scroll_area and hasattr(scroll_area, 'viewport'):
+                bg_color = scroll_area.viewport().palette().color(QPalette.ColorRole.Base)
+            else:
+                bg_color = QColor(240, 240, 240)  # Light gray fallback
+
+            self.page_pixmap.fill(bg_color)
 
             painter = QPainter(self.page_pixmap)
+            # painter.setPen(QPen(QColor(255, 255, 255), 1))  # Light silver border
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
             # Render all pages
