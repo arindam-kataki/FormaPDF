@@ -495,6 +495,7 @@ class PDFCanvas(QLabel):
 
         return f"Page {current} of {total} | Zoom: {zoom}% | Fields: {fields}"
 
+
     def reset_view(self):
         """Reset zoom and position to defaults"""
         self.zoom_level = 1.0
@@ -921,19 +922,12 @@ class PDFCanvas(QLabel):
             field_count = len(self.field_manager.fields) + 1
             field_name = f"{field_type.lower()}_{field_count}"
 
-            # Create the field
-            new_field = FormField(
-                id=field_name,
-                name=field_name,
-                type=field_enum,
-                x=field_x,
-                y=field_y,
-                width=width,
-                height=height
-            )
+            # Create the field using FormField.create() method
+            field_id = f"{field_type}_{len(self.field_manager.fields) + 1}"
+            new_field = FormField.create(field_type, field_x, field_y, field_id)
 
             # Add to field manager
-            self.field_manager.add_field(new_field)
+            self.field_manager.fields.append(new_field)
 
             print(f"✅ Created field: {new_field.name} ({field_enum.value}) at ({field_x}, {field_y})")
             return new_field

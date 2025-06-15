@@ -51,6 +51,7 @@ class FieldPalette(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.field_buttons = {}
         self.selected_field_type = None
         self.init_ui()
 
@@ -87,7 +88,8 @@ class FieldPalette(QWidget):
             ("dropdown", "Dropdown", "📋", "Dropdown list with multiple options"),
             ("signature", "Signature", "✏️", "Digital signature capture area"),
             ("date", "Date Field", "📅", "Date picker input field"),
-            ("button", "Button", "🔘", "Clickable action button")
+            ("button", "Button", "🔘", "Clickable action button"),
+            ("number", "Number Field", "🔢", "Numeric input field")
         ]
 
         # Create buttons for each field type

@@ -431,6 +431,9 @@ class PDFViewerMainWindow(QMainWindow):
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect propertyChanged: {e}")
 
+            if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
+                self.field_palette.fieldRequested.connect(self._on_field_type_selected)
+
             print("✅ Signal connections setup completed")
 
         except Exception as e:
@@ -617,6 +620,17 @@ class PDFViewerMainWindow(QMainWindow):
         """Handle property change (placeholder)"""
         self.statusBar().showMessage(f"Property changed: {property_name}", 2000)
 
+    @pyqtSlot(str)
+    def _on_field_type_selected(self, field_type):
+        """Handle field type selection from palette"""
+        print(f"🎯 Field type selected from palette: {field_type}")
+
+        # Notify canvas about the selection
+        if hasattr(self.pdf_canvas, 'set_selected_field_type'):
+            self.pdf_canvas.set_selected_field_type(field_type)
+
+        # Update status bar
+        self.statusBar().showMessage(f"Selected {field_type} field - click on PDF to place", 3000)
 
     # Navigation and Zoom Methods
     @pyqtSlot()
