@@ -786,35 +786,242 @@ class PDFCanvas(QLabel):
             print(f"⚠️ Error drawing selection handles: {e}")
 
     def mousePressEvent(self, event):
+        """Handle mouse press events - place selected control or select existing field"""
         print("🖱️ Mouse press event started")
         print(f"   Button: {event.button()}")
         print(f"   Position: {event.position().toPoint()}")
-        
-        """Handle mouse press events"""
+
         if event.button() == Qt.MouseButton.LeftButton:
             self.setFocus()  # Enable keyboard events
-
             pos = event.position().toPoint()
-            selected_field = self.drag_handler.handle_mouse_press(
-                pos, self.selection_handler.get_selected_field()
-            )
+
+            # First, check if we clicked on an existing field
+            selected_field = None
+            try:
+                selected_field = self.drag_handler.handle_mouse_press(
+                    pos, self.selection_handler.get_selected_field()
+                )
+            except Exception as e:
+                print(f"⚠️ Error in drag handler: {e}")
 
             if selected_field:
-                self.selection_handler.select_field(selected_field)
-                self.fieldClicked.emit(selected_field.id)
-            else:
-                # Clear selection safely
-                try:  # ✅ Proper indentation
-                    self.selection_handler.clear_selection()
+                # Clicked on an existing field - select it
+                try:
+                    self.selection_handler.select_field(selected_field)
+                    print(f"✅ Selected existing field: {selected_field.id}")
+                    self._handle_field_clicked(selected_field.id)
                 except Exception as e:
-                    print(f"⚠️ Selection handler issue: {e}")
-                except AttributeError as e:
-                    print(f"⚠️ Selection handler issue: {e}")
-                    # Continue without clearing selection
+                    print(f"⚠️ Error selecting field: {e}")
+            else:
+                # Clicked on empty area - try to create a new field
+                new_field_created = self._try_create_field_at_position(pos.x(), pos.y())
 
-                self.positionClicked.emit(pos.x(), pos.y())
+                if not new_field_created:
+                    # No field was created, just clear selection
+                    try:
+                        self.selection_handler.clear_selection()
+                        print("✅ Cleared selection")
+                    except Exception as e:
+                        print(f"⚠️ Error clearing selection: {e}")
 
-            self.draw_overlay()
+            # Update display
+            try:
+                self.draw_overlay()
+            except Exception as e:
+                print(f"⚠️ Error drawing overlay: {e}")
+
+    def _try_create_field_at_position(self, x, y):
+        """Try to create a field at the specified position using the selected control type"""
+        try:
+            # Get the selected field type from the main window's field palette
+            field_type = self._get_selected_field_type()
+
+            if field_type:
+                # Create the field
+                new_field = self._create_field_at_position(x, y, field_type)
+                if new_field:
+                    print(f"✅ Created {field_type} field at ({x}, {y})")
+
+                    # Select the new field
+                    try:
+                        self.selection_handler.select_field(new_field)
+                        self._handle_field_clicked(new_field.id)
+                    except Exception as e:
+                        print(f"⚠️ Error selecting new field: {e}")
+
+                    return True
+            else:
+                print("ℹ️ No field type selected in palette")
+
+        except Exception as e:
+            print(f"⚠️ Error creating field: {e}")
+
+        return False
+
+    def _get_selected_field_type(self):
+        """Get the currently selected field type from the field palette"""
+        try:
+            # Get the main window
+            main_window = self._get_main_window()
+            if not main_window:
+                print("⚠️ Main window not found")
+                return None
+
+            # Check if field palette has a selected field type
+            if hasattr(main_window, 'field_palette'):
+                field_palette = main_window.field_palette
+
+                # Look for a selected field type property
+                if hasattr(field_palette, 'selected_field_type'):
+                    return field_palette.selected_field_type
+
+                # Look for highlighted button
+                if hasattr(field_palette, 'field_buttons'):
+                    for field_type, button in field_palette.field_buttons.items():
+                        if button.isChecked() or 'border-color: #0078d4' in button.styleSheet():
+                            return field_type
+
+                # Default to text field if nothing specific is selected
+                print("ℹ️ No specific field type selected, defaulting to TEXT")
+                return "text"
+
+        except Exception as e:
+            print(f"⚠️ Error getting selected field type: {e}")
+
+        return None
+
+    def _create_field_at_position(self, x, y, field_type):
+        """Create a new field at the specified position"""
+        try:
+            # Import field model components
+            from models.field_model import FormField, FieldType
+
+            # Map string field types to enum values
+            field_type_map = {
+                "text": FieldType.TEXT,
+                "signature": FieldType.SIGNATURE,
+                "checkbox": FieldType.CHECKBOX,
+                "radio": FieldType.RADIO,
+                "dropdown": FieldType.DROPDOWN,
+                "date": FieldType.DATE,
+                "number": FieldType.NUMBER
+            }
+
+            # Get the enum value
+            field_enum = field_type_map.get(field_type.lower(), FieldType.TEXT)
+
+            # Calculate field dimensions based on type
+            width, height = self._get_field_dimensions(field_enum)
+
+            # Center the field on the click position
+            field_x = x - width // 2
+            field_y = y - height // 2
+
+            # Create unique field name
+            field_count = len(self.field_manager.fields) + 1
+            field_name = f"{field_type.lower()}_{field_count}"
+
+            # Create the field
+            new_field = FormField(
+                name=field_name,
+                field_type=field_enum,
+                x=field_x,
+                y=field_y,
+                width=width,
+                height=height
+            )
+
+            # Add to field manager
+            self.field_manager.add_field(new_field)
+
+            print(f"✅ Created field: {new_field.name} ({field_enum.value}) at ({field_x}, {field_y})")
+            return new_field
+
+        except Exception as e:
+            print(f"⚠️ Error creating field: {e}")
+            return None
+
+    def _get_field_dimensions(self, field_type):
+        """Get default dimensions for different field types"""
+        try:
+            from models.field_model import FieldType
+
+            # Default dimensions based on field type
+            dimensions = {
+                FieldType.TEXT: (120, 25),
+                FieldType.SIGNATURE: (150, 40),
+                FieldType.CHECKBOX: (20, 20),
+                FieldType.RADIO: (20, 20),
+                FieldType.DROPDOWN: (120, 25),
+                FieldType.DATE: (100, 25),
+                FieldType.NUMBER: (80, 25)
+            }
+
+            return dimensions.get(field_type, (100, 25))  # Default fallback
+
+        except Exception as e:
+            print(f"⚠️ Error getting field dimensions: {e}")
+            return (100, 25)
+
+    def _get_main_window(self):
+        """Get the main window safely"""
+        try:
+            widget = self
+            while widget.parent():
+                widget = widget.parent()
+                # Look for main window characteristics
+                if (hasattr(widget, 'field_palette') and
+                        hasattr(widget, 'pdf_canvas') and
+                        hasattr(widget, 'on_field_clicked')):
+                    return widget
+            return None
+        except Exception as e:
+            print(f"⚠️ Error finding main window: {e}")
+            return None
+
+    def _handle_field_clicked(self, field_id):
+        """Handle field click without using signals"""
+        print(f"🎯 Field clicked: {field_id}")
+
+        # Update main window directly
+        main_window = self._get_main_window()
+        if main_window and hasattr(main_window, 'on_field_clicked'):
+            try:
+                main_window.on_field_clicked(field_id)
+            except Exception as e:
+                print(f"⚠️ Error calling main window field clicked handler: {e}")
+
+    # Alternative: Enhanced version that tracks selected field type
+    def set_selected_field_type(self, field_type):
+        """Set the currently selected field type for placement"""
+        self.selected_field_type = field_type
+        print(f"🎯 Selected field type for placement: {field_type}")
+
+    def get_selected_field_type(self):
+        """Get the currently selected field type"""
+        return getattr(self, 'selected_field_type', 'text')
+
+    # Method to add to your field palette to track selection
+    def on_field_button_clicked(self, field_type):
+        """Handle field button click in palette (add this to FieldPalette)"""
+        # Clear previous highlights
+        self.clear_highlights()
+
+        # Highlight selected button
+        self.highlight_field_type(field_type, True)
+
+        # Store selection
+        self.selected_field_type = field_type
+
+        # Notify canvas about selection
+        main_window = self._get_main_window()
+        if main_window and hasattr(main_window, 'pdf_canvas'):
+            main_window.pdf_canvas.set_selected_field_type(field_type)
+
+        print(f"🎯 Field type selected: {field_type}")
+
+        # Emit signal for other connections
+        self.fieldRequested.emit(field_type)
 
     def mouseMoveEvent(self, event):
         """Handle mouse move events"""

@@ -51,6 +51,7 @@ class FieldPalette(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.selected_field_type = None
         self.init_ui()
 
     def init_ui(self):
@@ -93,7 +94,8 @@ class FieldPalette(QWidget):
         self.field_buttons = {}
         for field_type, display_name, icon, description in field_types:
             button = FieldButton(field_type, display_name, icon, description)
-            button.clicked.connect(lambda checked, ft=field_type: self.fieldRequested.emit(ft))
+            # REPLACE the clicked.connect line with this:
+            button.clicked.connect(lambda checked, ft=field_type: self._on_field_button_clicked(ft))
             layout.addWidget(button)
             self.field_buttons[field_type] = button
 
@@ -136,6 +138,110 @@ class FieldPalette(QWidget):
         layout.addWidget(tips_group)
 
         self.setLayout(layout)
+
+    def _on_field_button_clicked(self, field_type):
+        """Handle field button click - track selection and emit signal"""
+        print(f"🎯 Field button clicked: {field_type}")
+
+        # Clear previous highlights
+        self.clear_highlights()
+
+        # Highlight selected button
+        self.highlight_field_type(field_type, True)
+
+        # Store the selected field type
+        self.selected_field_type = field_type
+
+        # Notify canvas about selection (if possible)
+        try:
+            # Try to find main window and notify canvas
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                if hasattr(main_window.pdf_canvas, 'set_selected_field_type'):
+                    main_window.pdf_canvas.set_selected_field_type(field_type)
+                    print(f"✅ Notified canvas of selection: {field_type}")
+        except Exception as e:
+            print(f"⚠️ Could not notify canvas: {e}")
+
+        # Emit the original signal for backward compatibility
+        self.fieldRequested.emit(field_type)
+
+    # 4. ADD THIS HELPER METHOD to FieldPalette class:
+    def _get_main_window(self):
+        """Get the main window safely"""
+        try:
+            widget = self
+            while widget.parent():
+                widget = widget.parent()
+                # Look for main window characteristics
+                if (hasattr(widget, 'field_palette') and
+                        hasattr(widget, 'pdf_canvas')):
+                    return widget
+            return None
+        except Exception as e:
+            print(f"⚠️ Error finding main window: {e}")
+            return None
+
+    # 5. ADD THIS METHOD to FieldPalette class (for getting selected type):
+    def get_selected_field_type(self):
+        """Get the currently selected field type"""
+        return self.selected_field_type
+
+    # 6. ADD THIS METHOD to FieldPalette class (for external selection):
+    def set_selected_field_type(self, field_type):
+        """Set the selected field type externally"""
+        if field_type in self.field_buttons:
+            self._on_field_button_clicked(field_type)
+
+    # 7. MAKE SURE THESE METHODS EXIST in FieldPalette class:
+    # (They should already be there based on your project files)
+    def clear_highlights(self):
+        """Clear all field type highlights"""
+        if hasattr(self, 'field_buttons'):
+            for field_type in self.field_buttons:
+                self.highlight_field_type(field_type, False)
+
+    def highlight_field_type(self, field_type: str, highlight: bool = True):
+        """Highlight a specific field type (e.g., when selected)"""
+        if not hasattr(self, 'field_buttons') or field_type not in self.field_buttons:
+            return
+
+        button = self.field_buttons[field_type]
+
+        if highlight:
+            # Apply highlighted style
+            button.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 8px 12px;
+                    border: 2px solid #0078d4;
+                    border-radius: 4px;
+                    background-color: #e3f2fd;
+                    color: #1565c0;
+                }
+                QPushButton:hover {
+                    background-color: #bbdefb;
+                    border-color: #1976d2;
+                }
+            """)
+        else:
+            # Reset to default style
+            button.setStyleSheet("""
+                QPushButton {
+                    text-align: left;
+                    padding: 8px 12px;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    background-color: #f8f9fa;
+                }
+                QPushButton:hover {
+                    background-color: #e9ecef;
+                    border-color: #0078d4;
+                }
+                QPushButton:pressed {
+                    background-color: #dee2e6;
+                }
+            """)
 
     def set_field_enabled(self, field_type: str, enabled: bool):
         """Enable or disable a specific field type button"""
