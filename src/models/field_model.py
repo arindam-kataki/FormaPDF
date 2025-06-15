@@ -30,12 +30,13 @@ class FormField:
     y: int
     width: int
     height: int
+    page_number: int = 0
     required: bool = False
     value: Any = ""
     properties: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def create(cls, field_type: str, x: int, y: int, field_id: Optional[str] = None) -> 'FormField':
+    def create(cls, field_type: str, x: int, y: int, field_id: Optional[str] = None, page_number:int = 0) -> 'FormField':
         """Create a new form field with default dimensions"""
         if field_id is None:
             field_id = f"{field_type}_{id(cls)}"
@@ -61,7 +62,8 @@ class FormField:
             x=x,
             y=y,
             width=width,
-            height=height
+            height=height,
+            page_number=page_number
         )
 
     def to_dict(self) -> Dict[str, Any]:
@@ -74,6 +76,7 @@ class FormField:
             'y': self.y,
             'width': self.width,
             'height': self.height,
+            'page_number': self.page_number,
             'required': self.required,
             'value': self.value,
             'properties': self.properties.copy()
@@ -90,6 +93,7 @@ class FormField:
             y=data['y'],
             width=data['width'],
             height=data['height'],
+            page_number=data.get('page_number', 0),
             required=data.get('required', False),
             value=data.get('value', ''),
             properties=data.get('properties', {})
@@ -192,3 +196,18 @@ class FieldManager:
             if field.id.split('_')[-1].isdigit():
                 counter = int(field.id.split('_')[-1])
                 self._field_counter = max(self._field_counter, counter)
+
+    def get_fields_for_page(self, page_number: int) -> List[FormField]:
+        """Get all fields for a specific page"""
+        return [field for field in self.fields if field.page_number == page_number]
+
+    def get_field_count_for_page(self, page_number: int) -> int:
+        """Get count of fields on a specific page"""
+        return len(self.get_fields_for_page(page_number))
+
+    def move_field_to_page(self, field: FormField, new_page: int) -> bool:
+        """Move a field to a different page"""
+        if field in self.fields:
+            field.page_number = new_page
+            return True
+        return False

@@ -1325,60 +1325,6 @@ class PDFCanvas(QLabel):
             except Exception as e:
                 print(f"⚠️ Error drawing overlay: {e}")
 
-    def deprecated_2_mousePressEvent(self, event):
-        """Handle mouse press events - place selected control or select existing field"""
-        print("🖱️ Mouse press event started")
-        print(f"   Button: {event.button()}")
-        print(f"   Position: {event.position().toPoint()}")
-
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.setFocus()  # Enable keyboard events
-            screen_pos = event.position().toPoint()
-
-            # ✅ ADD THIS: Transform screen coordinates to document coordinates
-            doc_x = screen_pos.x() / self.zoom_level
-            doc_y = screen_pos.y() / self.zoom_level
-            doc_pos = QPoint(int(doc_x), int(doc_y))
-
-            print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
-            print(f"   Document pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
-
-            # First, check if we clicked on an existing field
-            selected_field = None
-            try:
-                # ✅ CHANGE THIS: Use document coordinates for field detection
-                selected_field = self.drag_handler.handle_mouse_press(
-                    doc_pos, self.selection_handler.get_selected_field()
-                )
-            except Exception as e:
-                print(f"⚠️ Error in drag handler: {e}")
-
-            if selected_field:
-                # Clicked on an existing field - select it
-                try:
-                    self.selection_handler.select_field(selected_field)
-                    print(f"✅ Selected existing field: {selected_field.id}")
-                    self._handle_field_clicked(selected_field.id)
-                except Exception as e:
-                    print(f"⚠️ Error selecting field: {e}")
-            else:
-                # ✅ CHANGE THIS: Use document coordinates for field creation
-                new_field_created = self._try_create_field_at_position(doc_x, doc_y)
-
-                if not new_field_created:
-                    # No field was created, just clear selection
-                    try:
-                        self.selection_handler.clear_selection()
-                        print("✅ Cleared selection")
-                    except Exception as e:
-                        print(f"⚠️ Error clearing selection: {e}")
-
-            # Update display
-            try:
-                self.draw_overlay()
-            except Exception as e:
-                print(f"⚠️ Error drawing overlay: {e}")
-
     def screen_to_document_coordinates(self, screen_x, screen_y):
         """Convert screen coordinates to (page_num, doc_x, doc_y)"""
         if not hasattr(self, 'page_positions') or not self.page_positions:
@@ -1423,50 +1369,6 @@ class PDFCanvas(QLabel):
 
         return (int(screen_x), int(screen_y))
 
-    def deprecated_1_mousePressEvent(self, event):
-        """Handle mouse press events - place selected control or select existing field"""
-        print("🖱️ Mouse press event started")
-        print(f"   Button: {event.button()}")
-        print(f"   Position: {event.position().toPoint()}")
-
-        if event.button() == Qt.MouseButton.LeftButton:
-            self.setFocus()  # Enable keyboard events
-            pos = event.position().toPoint()
-
-            # First, check if we clicked on an existing field
-            selected_field = None
-            try:
-                selected_field = self.drag_handler.handle_mouse_press(
-                    pos, self.selection_handler.get_selected_field()
-                )
-            except Exception as e:
-                print(f"⚠️ Error in drag handler: {e}")
-
-            if selected_field:
-                # Clicked on an existing field - select it
-                try:
-                    self.selection_handler.select_field(selected_field)
-                    print(f"✅ Selected existing field: {selected_field.id}")
-                    self._handle_field_clicked(selected_field.id)
-                except Exception as e:
-                    print(f"⚠️ Error selecting field: {e}")
-            else:
-                # Clicked on empty area - try to create a new field
-                new_field_created = self._try_create_field_at_position(pos.x(), pos.y())
-
-                if not new_field_created:
-                    # No field was created, just clear selection
-                    try:
-                        self.selection_handler.clear_selection()
-                        print("✅ Cleared selection")
-                    except Exception as e:
-                        print(f"⚠️ Error clearing selection: {e}")
-
-            # Update display
-            try:
-                self.draw_overlay()
-            except Exception as e:
-                print(f"⚠️ Error drawing overlay: {e}")
 
     def _try_create_field_at_position(self, x, y, page_num):
         """Try to create a field at the specified position using the selected control type"""
@@ -1570,7 +1472,7 @@ class PDFCanvas(QLabel):
 
             # Create the field using FormField.create() method
             field_id = f"{field_type}_{len(self.field_manager.fields) + 1}"
-            new_field = FormField.create(field_type, field_x, field_y, field_id)
+            new_field = FormField.create(field_type, field_x, field_y, field_id, page_number=page_num)
 
             # Add to field manager
             self.field_manager.fields.append(new_field)
