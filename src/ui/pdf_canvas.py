@@ -238,7 +238,254 @@ class PDFCanvas(QLabel):
             traceback.print_exc()
             return False
 
+    # Enhanced render_page method with page moats
     def render_page(self):
+        """Render all PDF pages as continuous vertical view with simple spacing and borders"""
+        if not self.pdf_document:
+            return
+
+        # Import PyQt6 classes locally to avoid import issues
+        from PyQt6.QtGui import QColor, QPainter, QPen
+        from PyQt6.QtCore import Qt, QRect
+
+        try:
+            print(f"🎨 Rendering all {self.pdf_document.page_count} pages with simple moats")
+
+            # Simple spacing settings
+            top_margin = 10  # Gap from top
+            vertical_spacing = 15  # Gap between pages
+            horizontal_margin = 10  # Left/right gaps when fit-to-width
+
+            # Calculate page dimensions
+            page_heights = []
+            max_width = 0
+
+            # First pass: get dimensions of all pages
+            for page_num in range(self.pdf_document.page_count):
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+
+                rect = page.rect
+                page_width = int(rect.width * self.zoom_level)
+                page_height = int(rect.height * self.zoom_level)
+
+                page_heights.append(page_height)
+                max_width = max(max_width, page_width)
+
+            # Calculate total canvas dimensions
+            canvas_width = max_width + (2 * horizontal_margin)
+            total_height = top_margin + sum(page_heights) + (len(page_heights) - 1) * vertical_spacing + top_margin
+
+            # Create canvas with white background (no overall boundary)
+            self.page_pixmap = QPixmap(canvas_width, total_height)
+            self.page_pixmap.fill(QColor(255, 255, 255))  # White background
+
+            painter = QPainter(self.page_pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Render all pages
+            current_y = top_margin
+            self.page_positions = []
+
+            for page_num in range(self.pdf_document.page_count):
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+
+                # Render page to pixmap
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.tobytes("ppm")
+
+                page_pixmap = QPixmap()
+                page_pixmap.loadFromData(img_data)
+
+                # Calculate page position (centered horizontally with margins)
+                page_x = horizontal_margin
+                page_y = current_y
+
+                # Draw light silver border around page
+                border_rect = QRect(page_x - 1, page_y - 1,
+                                    page_pixmap.width() + 2, page_pixmap.height() + 2)
+                painter.setPen(QPen(QColor(200, 200, 200), 1))  # Light silver border
+                painter.drawRect(border_rect)
+
+                # Draw the page content
+                painter.drawPixmap(page_x, page_y, page_pixmap)
+
+                # Store page position for navigation
+                self.page_positions.append(page_y)
+
+                # Move to next page position
+                current_y += page_pixmap.height() + vertical_spacing
+
+                print(f"  ✅ Rendered page {page_num + 1} at y={page_y}")
+
+            painter.end()
+
+            # Set widget size to match the full document
+            self.setMinimumSize(self.page_pixmap.size())
+            self.resize(self.page_pixmap.size())
+
+            # Update the displayed pixmap
+            self.setPixmap(self.page_pixmap)
+
+            # Draw overlay (grid, fields, etc.)
+            self.draw_overlay()
+
+            print(f"✅ Simple continuous view rendered: {canvas_width}x{total_height} pixels")
+
+        except Exception as e:
+            print(f"❌ Error rendering simple continuous view: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def draw_page_number(self, painter, page_num, moat_x, moat_y, moat_w, moat_h):
+        """Draw page number indicator in the moat area"""
+        from PyQt6.QtGui import QColor, QPen, QFont
+
+        # Page number in top-right corner of moat
+        painter.setPen(QPen(QColor(120, 120, 120)))
+        painter.setFont(QFont("Arial", 10))
+
+        text = f"Page {page_num}"
+        text_rect = painter.fontMetrics().boundingRect(text)
+
+        # Position in top-right corner with some padding
+        text_x = moat_x + moat_w - text_rect.width() - 10
+        text_y = moat_y + text_rect.height() + 5
+
+        painter.drawText(text_x, text_y, text)
+
+    # Configuration method to customize moat appearance
+    def set_moat_settings(self, padding=20, border_width=2, spacing=40,
+                          background_color=None,
+                          page_color=None,
+                          border_color=None,
+                          show_shadow=True, show_page_numbers=True):
+        """Configure the appearance of page moats"""
+        from PyQt6.QtGui import QColor
+
+        self.moat_padding = padding
+        self.moat_border_width = border_width
+        self.moat_spacing = spacing
+        self.moat_background_color = background_color or QColor(240, 240, 240)
+        self.moat_page_color = page_color or QColor(255, 255, 255)
+        self.moat_border_color = border_color or QColor(180, 180, 180)
+        self.moat_show_shadow = show_shadow
+        self.moat_show_page_numbers = show_page_numbers
+
+        # Re-render with new settings
+        if self.pdf_document:
+            self.render_page()
+
+
+    def render_page_cards(self):
+        """Render pages as Material Design-style cards"""
+        if not self.pdf_document:
+            return
+
+        try:
+            # Card settings
+            card_margin = 30  # Space around each card
+            card_padding = 15  # Space inside each card
+            card_radius = 8  # Rounded corners
+            shadow_blur = 10  # Shadow blur radius
+
+            # Calculate dimensions
+            page_heights = []
+            max_width = 0
+
+            for page_num in range(self.pdf_document.page_count):
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+                rect = page.rect
+
+                page_width = int(rect.width * self.zoom_level)
+                page_height = int(rect.height * self.zoom_level)
+
+                page_heights.append(page_height)
+                max_width = max(max_width, page_width)
+
+            # Total canvas dimensions
+            canvas_width = max_width + (2 * (card_margin + card_padding))
+            total_height = sum(h + 2 * (card_margin + card_padding) for h in page_heights)
+
+            # Create canvas
+            self.page_pixmap = QPixmap(canvas_width, total_height)
+            self.page_pixmap.fill(QColor(250, 250, 250))  # Very light background
+
+            painter = QPainter(self.page_pixmap)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            current_y = 0
+            self.page_positions = []
+
+            for page_num in range(self.pdf_document.page_count):
+                # Render page content
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.tobytes("ppm")
+
+                page_pixmap = QPixmap()
+                page_pixmap.loadFromData(img_data)
+
+                # Card dimensions
+                card_x = card_margin
+                card_y = current_y + card_margin
+                card_w = page_pixmap.width() + (2 * card_padding)
+                card_h = page_pixmap.height() + (2 * card_padding)
+
+                # Draw card shadow
+                shadow_rect = QRect(card_x + 3, card_y + 3, card_w, card_h)
+                painter.fillRect(shadow_rect, QColor(0, 0, 0, 30))
+
+                # Draw card background
+                card_rect = QRect(card_x, card_y, card_w, card_h)
+                painter.fillRect(card_rect, QColor(255, 255, 255))
+
+                # Draw card border
+                painter.setPen(QPen(QColor(220, 220, 220), 1))
+                painter.drawRect(card_rect)
+
+                # Draw page content
+                content_x = card_x + card_padding
+                content_y = card_y + card_padding
+                painter.drawPixmap(content_x, content_y, page_pixmap)
+
+                # Store position
+                self.page_positions.append(content_y)
+
+                # Move to next card
+                current_y += card_h + card_margin
+
+            painter.end()
+
+            # Update display
+            self.setMinimumSize(self.page_pixmap.size())
+            self.resize(self.page_pixmap.size())
+            self.setPixmap(self.page_pixmap)
+            self.draw_overlay()
+
+        except Exception as e:
+            print(f"❌ Error rendering card-style pages: {e}")
+
+    # Method to toggle between rendering styles
+    def set_page_style(self, style="moat"):
+        """Set the page rendering style
+
+        Args:
+            style: "continuous", "moat", or "cards"
+        """
+        self.page_style = style
+
+        if style == "continuous":
+            self.render_page_original()  # Your existing method
+        elif style == "moat":
+            self.render_page()  # Enhanced method with moats
+        elif style == "cards":
+            self.render_page_cards()  # Card-style rendering
+
+    def render_page_original(self):
         """Render all PDF pages as continuous vertical view"""
         if not self.pdf_document:
             return
