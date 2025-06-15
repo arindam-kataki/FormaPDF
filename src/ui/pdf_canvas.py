@@ -239,6 +239,90 @@ class PDFCanvas(QLabel):
             return False
 
     def render_page(self):
+        """Render all PDF pages as continuous vertical view"""
+        if not self.pdf_document:
+            return
+
+        try:
+            print(f"🎨 Rendering all {self.pdf_document.page_count} pages for continuous view")
+
+            # Calculate total height needed for all pages
+            page_heights = []
+            max_width = 0
+
+            # First pass: get dimensions of all pages
+            for page_num in range(self.pdf_document.page_count):
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+
+                # Get page dimensions
+                rect = page.rect
+                page_width = int(rect.width * self.zoom_level)
+                page_height = int(rect.height * self.zoom_level)
+
+                page_heights.append(page_height)
+                max_width = max(max_width, page_width)
+
+            # Calculate total height with spacing between pages
+            page_spacing = 10  # pixels between pages
+            total_height = sum(page_heights) + (len(page_heights) - 1) * page_spacing
+
+            # Create one large pixmap to hold all pages
+            self.page_pixmap = QPixmap(max_width, total_height)
+            self.page_pixmap.fill(Qt.GlobalColor.white)
+
+            painter = QPainter(self.page_pixmap)
+
+            # Second pass: render all pages onto the large pixmap
+            current_y = 0
+            self.page_positions = []  # Store where each page starts
+
+            for page_num in range(self.pdf_document.page_count):
+                page = self.pdf_document[page_num]
+                mat = fitz.Matrix(self.zoom_level, self.zoom_level)
+
+                # Render page to pixmap
+                pix = page.get_pixmap(matrix=mat)
+                img_data = pix.tobytes("ppm")
+
+                # Convert to QPixmap
+                page_pixmap = QPixmap()
+                page_pixmap.loadFromData(img_data)
+
+                # Center the page horizontally if it's narrower than max_width
+                x_offset = (max_width - page_pixmap.width()) // 2
+
+                # Draw this page onto the large pixmap
+                painter.drawPixmap(x_offset, current_y, page_pixmap)
+
+                # Store page position for navigation
+                self.page_positions.append(current_y)
+
+                # Move to next page position
+                current_y += page_pixmap.height() + page_spacing
+
+                print(f"  ✅ Rendered page {page_num + 1}")
+
+            painter.end()
+
+            # Set widget size to match the full document
+            self.setMinimumSize(self.page_pixmap.size())
+            self.resize(self.page_pixmap.size())
+
+            # Update the displayed pixmap
+            self.setPixmap(self.page_pixmap)
+
+            # Draw overlay (grid, fields, etc.)
+            self.draw_overlay()
+
+            print(f"✅ Continuous view rendered: {max_width}x{total_height} pixels")
+
+        except Exception as e:
+            print(f"❌ Error rendering continuous view: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def deprecated_render_page(self):
         """Render current PDF page to pixmap"""
         print(f"🎨 Rendering page {self.current_page + 1}")
 
@@ -1044,6 +1128,69 @@ class PDFCanvas(QLabel):
 
             if was_dragging:
                 self.draw_overlay()
+
+
+    def get_current_page_from_scroll(self, scroll_position):
+        """Determine which page is currently visible based on scroll position"""
+        if not hasattr(self, 'page_positions') or not self.page_positions:
+            return 0
+
+        # Find the page that contains the current scroll position
+        for i, page_y in enumerate(self.page_positions):
+            if i == len(self.page_positions) - 1:
+                # Last page
+                return i
+            elif scroll_position >= page_y and scroll_position < self.page_positions[i + 1]:
+                return i
+
+        return 0
+
+
+    def scroll_to_page(self, page_number):
+        """Scroll to show a specific page"""
+        if (not hasattr(self, 'page_positions') or
+                not self.page_positions or
+                page_number >= len(self.page_positions)):
+            return
+
+        # Get the Y position of the requested page
+        target_y = self.page_positions[page_number]
+
+        # Get the scroll area (parent)
+        if hasattr(self.parent(), 'verticalScrollBar'):
+            scroll_bar = self.parent().verticalScrollBar()
+            scroll_bar.setValue(target_y)
+
+
+    def get_visible_page_numbers(self):
+        """Get list of page numbers currently visible in viewport"""
+        if not hasattr(self, 'page_positions') or not self.page_positions:
+            return [0]
+
+        # Get viewport info
+        if not hasattr(self.parent(), 'viewport'):
+            return [0]
+
+        viewport = self.parent().viewport()
+        scroll_bar = self.parent().verticalScrollBar()
+
+        viewport_top = scroll_bar.value()
+        viewport_bottom = viewport_top + viewport.height()
+
+        visible_pages = []
+
+        for i, page_y in enumerate(self.page_positions):
+            # Calculate page bottom
+            if i < len(self.page_positions) - 1:
+                page_bottom = self.page_positions[i + 1] - 10  # minus spacing
+            else:
+                page_bottom = self.page_pixmap.height()
+
+            # Check if page overlaps with viewport
+            if page_y <= viewport_bottom and page_bottom >= viewport_top:
+                visible_pages.append(i)
+
+        return visible_pages if visible_pages else [0]
 
 class SafeSelectionHandler:
     """Emergency fallback SelectionHandler that never crashes"""

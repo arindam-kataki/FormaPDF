@@ -66,6 +66,7 @@ class PDFViewerMainWindow(QMainWindow):
         self.current_pdf_path = None
         self.init_ui()
         self.setup_connections()
+        self.setup_scroll_tracking()
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -769,10 +770,41 @@ class PDFViewerMainWindow(QMainWindow):
         except Exception as e:
             self.statusBar().showMessage("Zoom to fit failed", 1000)
 
+    def deprecated_jump_to_page(self):
+        """Jump to specific page number"""
+        if not hasattr(self, 'page_spinbox'):
+            return
+
+        page_number = self.page_spinbox.value()
+
+        # Use continuous scrolling
+        if hasattr(self, 'jump_to_page_continuous'):
+            self.jump_to_page_continuous(page_number)
+        else:
+            # Fallback to old method
+            if hasattr(self.pdf_canvas, 'set_page'):
+                self.pdf_canvas.set_page(page_number - 1)
+                self.update_document_info()
+
+    def jump_to_page(self):
+        """Jump to specific page number"""
+        if not hasattr(self, 'page_spinbox'):
+            return
+
+        page_number = self.page_spinbox.value()
+
+        # Use continuous scrolling
+        if hasattr(self, 'jump_to_page_continuous'):
+            self.jump_to_page_continuous(page_number)
+        else:
+            # Fallback to old method
+            if hasattr(self.pdf_canvas, 'set_page'):
+                self.pdf_canvas.set_page(page_number - 1)
+                self.update_document_info()
 
     # Page and Zoom Control Methods
     @pyqtSlot(int)
-    def jump_to_page(self, page_number: int):
+    def deprecated_jump_to_page(self, page_number: int):
         """Jump to specific page number"""
         if hasattr(self.pdf_canvas, 'go_to_page'):
             if self.pdf_canvas.go_to_page(page_number):
@@ -996,6 +1028,42 @@ class PDFViewerMainWindow(QMainWindow):
         # Update page and zoom controls
         self.update_page_controls()
         self.update_zoom_controls()
+
+    def setup_scroll_tracking(self):
+        """Setup scroll tracking for continuous view"""
+        if hasattr(self, 'scroll_area'):
+            # Connect scroll bar to track current page
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            if v_scrollbar:
+                v_scrollbar.valueChanged.connect(self.update_current_page_from_scroll)
+
+    def update_current_page_from_scroll(self):
+        """Update current page info based on scroll position"""
+        if not hasattr(self.pdf_canvas, 'get_current_page_from_scroll'):
+            return
+
+        try:
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            scroll_position = v_scrollbar.value()
+
+            # Get current page from scroll position
+            current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_position)
+
+            # Update the canvas current_page for compatibility
+            self.pdf_canvas.current_page = current_page
+
+            # Update UI
+            self.update_document_info()
+
+        except Exception as e:
+            pass  # Fail silently
+
+    def jump_to_page_continuous(self, page_number):
+        """Jump to page in continuous view"""
+        if hasattr(self.pdf_canvas, 'scroll_to_page'):
+            # Convert to 0-based indexing
+            page_index = page_number - 1
+            self.pdf_canvas.scroll_to_page(page_index)
 
     def get_navigation_state(self) -> dict:
         """Get current navigation state for UI updates"""
