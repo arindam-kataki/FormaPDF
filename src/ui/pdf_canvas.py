@@ -7,8 +7,9 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import QLabel, QApplication
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette
-from PyQt6.QtCore import QObject, pyqtSignal, Qt
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor
+from PyQt6.QtCore import QObject, pyqtSignal, Qt, QRect
+from PyQt6.QtCore import QPoint
 
 # Try to import PyMuPDF
 try:
@@ -1089,6 +1090,40 @@ class PDFCanvas(QLabel):
             from PyQt6.QtGui import QPen, QBrush, QColor
             from PyQt6.QtCore import Qt
 
+            # ✅ NEW: Convert document coordinates to screen coordinates
+            page_num = getattr(field, 'page_number', 0)
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+            if not screen_coords:
+                return  # Field is on a page that's not currently rendered
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            print(
+                f"   Drawing field page {page_num} doc({field.x}, {field.y}) -> screen({screen_x}, {screen_y}) zoom={self.zoom_level}")
+
+            # Set up pen and brush
+            painter.setPen(QPen(QColor(0, 0, 255), 2))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 100)))
+
+            # Draw field rectangle using screen coordinates
+            painter.drawRect(int(screen_x), int(screen_y), int(screen_width), int(screen_height))
+
+            # Draw field type text using screen coordinates
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(int(screen_x + 5), int(screen_y + 15), f"{field.type.value}")
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field: {e}")
+
+    def deprecated_1_draw_field(self, painter, field):
+        """Draw a single field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+            from PyQt6.QtCore import Qt
+
             # Set up pen and brush
             painter.setPen(QPen(QColor(0, 0, 255), 2))
             painter.setBrush(QBrush(QColor(255, 255, 255, 100)))
@@ -1103,7 +1138,36 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing field: {e}")
 
-    def _draw_selection_handles(self, painter, field):
+    def deprecated_2_draw_field(self, painter, field):
+        """Draw a single field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+            from PyQt6.QtCore import Qt
+
+            # ✅ ADD THIS: Transform document coordinates to screen coordinates
+            screen_x = field.x * self.zoom_level
+            screen_y = field.y * self.zoom_level
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            print(
+                f"   Drawing field at doc({field.x}, {field.y}) -> screen({screen_x}, {screen_y}) zoom={self.zoom_level}")
+
+            # Set up pen and brush
+            painter.setPen(QPen(QColor(0, 0, 255), 2))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 100)))
+
+            # ✅ CHANGE THIS: Draw field rectangle using screen coordinates
+            painter.drawRect(int(screen_x), int(screen_y), int(screen_width), int(screen_height))
+
+            # ✅ CHANGE THIS: Draw field type text using screen coordinates
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(int(screen_x + 5), int(screen_y + 15), f"{field.type.value}")
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field: {e}")
+
+    def deprecated_1_draw_selection_handles(self, painter, field):
         """Draw selection handles around a field"""
         try:
             from PyQt6.QtGui import QPen, QBrush, QColor
@@ -1130,7 +1194,236 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
 
+    def deprecated_2_draw_selection_handles(self, painter, field):
+        """Draw selection handles around a field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            # ✅ ADD THIS: Transform to screen coordinates
+            screen_x = field.x * self.zoom_level
+            screen_y = field.y * self.zoom_level
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # Draw selection rectangle
+            painter.setPen(QPen(QColor(255, 0, 0), 2))
+            painter.setBrush(QBrush())
+            painter.drawRect(int(screen_x - 2), int(screen_y - 2),
+                             int(screen_width + 4), int(screen_height + 4))
+
+            # Draw corner handles
+            handle_size = 6
+            painter.setBrush(QBrush(QColor(255, 0, 0)))
+
+            positions = [
+                (screen_x - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y + screen_height - handle_size // 2)
+            ]
+
+            for pos_x, pos_y in positions:
+                painter.drawRect(int(pos_x), int(pos_y), handle_size, handle_size)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selection handles: {e}")
+
+    def _draw_selection_handles(self, painter, field):
+        """Draw selection handles around a field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            # ✅ NEW: Convert to screen coordinates
+            page_num = getattr(field, 'page_number', 0)
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+            if not screen_coords:
+                return
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # Draw selection rectangle
+            painter.setPen(QPen(QColor(255, 0, 0), 2))
+            painter.setBrush(QBrush())
+            painter.drawRect(int(screen_x - 2), int(screen_y - 2),
+                             int(screen_width + 4), int(screen_height + 4))
+
+            # Draw corner handles
+            handle_size = 6
+            painter.setBrush(QBrush(QColor(255, 0, 0)))
+
+            positions = [
+                (screen_x - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y + screen_height - handle_size // 2)
+            ]
+
+            for pos_x, pos_y in positions:
+                painter.drawRect(int(pos_x), int(pos_y), handle_size, handle_size)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selection handles: {e}")
+
     def mousePressEvent(self, event):
+        """Handle mouse press events - place selected control or select existing field"""
+        print("🖱️ Mouse press event started")
+        print(f"   Button: {event.button()}")
+        print(f"   Position: {event.position().toPoint()}")
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()  # Enable keyboard events
+            screen_pos = event.position().toPoint()
+
+            # ✅ NEW: Convert screen coordinates to page-relative document coordinates
+            doc_coords = self.screen_to_document_coordinates(screen_pos.x(), screen_pos.y())
+
+            if not doc_coords:
+                print("   Click was in margin/gap area - ignoring")
+                return
+
+            page_num, doc_x, doc_y = doc_coords
+            print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
+            print(f"   Page {page_num} doc pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
+
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            # First, check if we clicked on an existing field
+            selected_field = None
+            try:
+                selected_field = self.drag_handler.handle_mouse_press(
+                    doc_pos, self.selection_handler.get_selected_field()
+                )
+            except Exception as e:
+                print(f"⚠️ Error in drag handler: {e}")
+
+            if selected_field:
+                # Clicked on an existing field - select it
+                try:
+                    self.selection_handler.select_field(selected_field)
+                    print(f"✅ Selected existing field: {selected_field.id}")
+                    self._handle_field_clicked(selected_field.id)
+                except Exception as e:
+                    print(f"⚠️ Error selecting field: {e}")
+            else:
+                # Clicked on empty area - try to create a new field
+                new_field_created = self._try_create_field_at_position(doc_x, doc_y, page_num)
+
+                if not new_field_created:
+                    # No field was created, just clear selection
+                    try:
+                        self.selection_handler.clear_selection()
+                        print("✅ Cleared selection")
+                    except Exception as e:
+                        print(f"⚠️ Error clearing selection: {e}")
+
+            # Update display
+            try:
+                self.draw_overlay()
+            except Exception as e:
+                print(f"⚠️ Error drawing overlay: {e}")
+
+    def deprecated_2_mousePressEvent(self, event):
+        """Handle mouse press events - place selected control or select existing field"""
+        print("🖱️ Mouse press event started")
+        print(f"   Button: {event.button()}")
+        print(f"   Position: {event.position().toPoint()}")
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()  # Enable keyboard events
+            screen_pos = event.position().toPoint()
+
+            # ✅ ADD THIS: Transform screen coordinates to document coordinates
+            doc_x = screen_pos.x() / self.zoom_level
+            doc_y = screen_pos.y() / self.zoom_level
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
+            print(f"   Document pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
+
+            # First, check if we clicked on an existing field
+            selected_field = None
+            try:
+                # ✅ CHANGE THIS: Use document coordinates for field detection
+                selected_field = self.drag_handler.handle_mouse_press(
+                    doc_pos, self.selection_handler.get_selected_field()
+                )
+            except Exception as e:
+                print(f"⚠️ Error in drag handler: {e}")
+
+            if selected_field:
+                # Clicked on an existing field - select it
+                try:
+                    self.selection_handler.select_field(selected_field)
+                    print(f"✅ Selected existing field: {selected_field.id}")
+                    self._handle_field_clicked(selected_field.id)
+                except Exception as e:
+                    print(f"⚠️ Error selecting field: {e}")
+            else:
+                # ✅ CHANGE THIS: Use document coordinates for field creation
+                new_field_created = self._try_create_field_at_position(doc_x, doc_y)
+
+                if not new_field_created:
+                    # No field was created, just clear selection
+                    try:
+                        self.selection_handler.clear_selection()
+                        print("✅ Cleared selection")
+                    except Exception as e:
+                        print(f"⚠️ Error clearing selection: {e}")
+
+            # Update display
+            try:
+                self.draw_overlay()
+            except Exception as e:
+                print(f"⚠️ Error drawing overlay: {e}")
+
+    def screen_to_document_coordinates(self, screen_x, screen_y):
+        """Convert screen coordinates to (page_num, doc_x, doc_y)"""
+        if not hasattr(self, 'page_positions') or not self.page_positions:
+            return None
+
+        # Find which page was clicked
+        for page_num, page_top in enumerate(self.page_positions):
+            # Get page height (accounting for zoom)
+            page = self.pdf_document[page_num]
+            page_height = int(page.rect.height * self.zoom_level)
+            page_bottom = page_top + page_height
+
+            if page_top <= screen_y <= page_bottom:
+                # Click is within this page
+                # Convert to page-relative coordinates
+                page_relative_x = screen_x - 10  # Remove horizontal margin
+                page_relative_y = screen_y - page_top
+
+                # Convert to document coordinates (remove zoom)
+                doc_x = page_relative_x / self.zoom_level
+                doc_y = page_relative_y / self.zoom_level
+
+                return (page_num, doc_x, doc_y)
+
+        return None  # Click was in gap/margin area
+
+    def document_to_screen_coordinates(self, page_num, doc_x, doc_y):
+        """Convert document coordinates back to screen coordinates"""
+        if not hasattr(self, 'page_positions') or page_num >= len(self.page_positions):
+            return None
+
+        # Get page top position
+        page_top = self.page_positions[page_num]
+
+        # Convert document to page-relative screen coordinates
+        page_relative_x = doc_x * self.zoom_level
+        page_relative_y = doc_y * self.zoom_level
+
+        # Add page layout offsets
+        screen_x = page_relative_x + 10  # Add horizontal margin
+        screen_y = page_relative_y + page_top
+
+        return (int(screen_x), int(screen_y))
+
+    def deprecated_1_mousePressEvent(self, event):
         """Handle mouse press events - place selected control or select existing field"""
         print("🖱️ Mouse press event started")
         print(f"   Button: {event.button()}")
@@ -1175,7 +1468,7 @@ class PDFCanvas(QLabel):
             except Exception as e:
                 print(f"⚠️ Error drawing overlay: {e}")
 
-    def _try_create_field_at_position(self, x, y):
+    def _try_create_field_at_position(self, x, y, page_num):
         """Try to create a field at the specified position using the selected control type"""
         try:
             # Get the selected field type from the main window's field palette
@@ -1183,7 +1476,7 @@ class PDFCanvas(QLabel):
 
             if field_type:
                 # Create the field
-                new_field = self._create_field_at_position(x, y, field_type)
+                new_field = self._create_field_at_position(x, y, field_type, page_num)
                 if new_field:
                     print(f"✅ Created {field_type} field at ({x}, {y})")
 
@@ -1243,7 +1536,7 @@ class PDFCanvas(QLabel):
 
         return None
 
-    def _create_field_at_position(self, x, y, field_type):
+    def _create_field_at_position(self, x, y, field_type, page_num):
         """Create a new field at the specified position"""
         try:
             # Import field model components

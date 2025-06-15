@@ -100,7 +100,7 @@ class DragHandler(QObject):
 
         return None
 
-    def handle_mouse_move(self, pos: QPoint) -> bool:
+    def deprecated_handle_mouse_move(self, pos: QPoint) -> bool:
         """
         Handle mouse move event
         Returns True if a drag operation is in progress
@@ -112,6 +112,36 @@ class DragHandler(QObject):
 
         dx = pos.x() - self.drag_state.start_pos.x()
         dy = pos.y() - self.drag_state.start_pos.y()
+
+        if self.drag_state.mode == DragMode.MOVE:
+            self._handle_move_operation(dx, dy)
+        elif self.drag_state.mode == DragMode.RESIZE:
+            self._handle_resize_operation(dx, dy)
+
+        return True
+
+    def handle_mouse_move(self, pos: QPoint) -> bool:
+        """
+        Handle mouse move event
+        Returns True if a drag operation is in progress
+        """
+        if not self.drag_state.is_active() or not self.drag_state.start_pos:
+            # Update cursor based on position
+            self._update_cursor_for_position(pos)
+            return False
+
+        # ✅ ADD THIS: If you need zoom-aware drag sensitivity
+        # Convert screen movement to document movement
+        screen_dx = pos.x() - self.drag_state.start_pos.x()
+        screen_dy = pos.y() - self.drag_state.start_pos.y()
+
+        # If pos is in screen coordinates, convert delta to document space
+        # doc_dx = screen_dx / self.zoom_level  # Uncomment if needed
+        # doc_dy = screen_dy / self.zoom_level  # Uncomment if needed
+
+        # For now, assume pos is already in document coordinates
+        dx = screen_dx
+        dy = screen_dy
 
         if self.drag_state.mode == DragMode.MOVE:
             self._handle_move_operation(dx, dy)
