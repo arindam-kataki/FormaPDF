@@ -138,12 +138,12 @@ class FieldManager:
         self.fields: List[FormField] = []
         self._field_counter = 0
 
-    def add_field(self, field_type: str, x: int, y: int) -> FormField:
+    def add_field(self, field_type: str, x: int, y: int, page_number: int = 0) -> FormField:
         """Add a new field to the collection"""
         self._field_counter += 1
         field_id = f"{field_type}_{self._field_counter}"
 
-        field = FormField.create(field_type, x, y, field_id)
+        field = FormField.create(field_type, x, y, field_id, page_number)  # ← Add page_number
         self.fields.append(field)
         return field
 

@@ -346,6 +346,18 @@ class PDFCanvas(QLabel):
 
             print(f"✅ Simple continuous view rendered: {canvas_width}x{total_height} pixels")
 
+            # ADD THESE LINES:
+            # Setup scroll tracking after successful rendering
+            self.setup_scroll_tracking()
+
+            # Initialize current_page and visible pages tracking
+            if not hasattr(self, 'current_page'):
+                self.current_page = 0
+            if not hasattr(self, '_last_visible_pages'):
+                self._last_visible_pages = [0]
+
+            print("✅ PDF rendering complete with scroll tracking")
+
         except Exception as e:
             print(f"❌ Error rendering simple continuous view: {e}")
             import traceback
@@ -1604,7 +1616,6 @@ class PDFCanvas(QLabel):
 
         return (int(screen_x), int(screen_y))
 
-
     def _try_create_field_at_position(self, x, y, page_num):
         """Try to create a field at the specified position using the selected control type"""
         try:
@@ -1612,18 +1623,15 @@ class PDFCanvas(QLabel):
             field_type = self._get_selected_field_type()
 
             if field_type:
-                # Create the field
+                # Create the field WITH page number
                 new_field = self._create_field_at_position(x, y, field_type, page_num)
                 if new_field:
-                    print(f"✅ Created {field_type} field at ({x}, {y})")
+                    print(f"✅ Created {field_type} field at ({x}, {y}) on page {page_num}")
 
                     # Select the new field
                     try:
-                        print(f"⚠️ Error selecting new field: 0")
-                        # self.selection_handler.select_field(new_field)
-                        print(f"⚠️ Error selecting new field: 1")
+                        self.selection_handler.select_field(new_field)
                         self._handle_field_clicked(new_field.id)
-                        print(f"⚠️ Error selecting new field: 2")
                     except Exception as e:
                         print(f"⚠️ Error selecting new field: {e}")
 
@@ -1705,9 +1713,8 @@ class PDFCanvas(QLabel):
             field_count = len(self.field_manager.fields) + 1
             field_name = f"{field_type.lower()}_{field_count}"
 
-            # Create the field using FormField.create() method
-            field_id = f"{field_type}_{len(self.field_manager.fields) + 1}"
-            new_field = FormField.create(field_type, field_x, field_y, field_id, page_num)
+            # Create the field using field manager (which now accepts page_number)
+            new_field = self.field_manager.add_field(field_type, field_x, field_y, page_num)
 
             # Add to field manager
             self.field_manager.fields.append(new_field)
