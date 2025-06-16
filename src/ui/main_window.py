@@ -1084,8 +1084,13 @@ class PDFViewerMainWindow(QMainWindow):
 
             # DEBUG: Show scroll tracking is working
             old_page = getattr(self.pdf_canvas, 'current_page', -1)
-            print(
-                f"📜 MAIN: Scroll tracking: position={scroll_position}, detected_page={current_page}, old_page={old_page}")
+            #print(
+            #clear
+            # f"📜 MAIN: Scroll tracking: position={scroll_position}, detected_page={current_page}, old_page={old_page}")
+
+            if old_page != current_page:
+                print(f"📜 MAIN: Page changed {old_page} → {current_page}, redrawing fields")
+                self.pdf_canvas.draw_overlay()  # Force field redraw
 
             # Update the canvas current_page for compatibility
             self.pdf_canvas.current_page = current_page

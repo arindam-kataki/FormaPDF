@@ -232,6 +232,8 @@ class PDFCanvas(QLabel):
             # Update styling
             self.setStyleSheet("border: none; background-color: transparent;")
 
+            self.debug_widget_setup()
+
             return True
 
         except Exception as e:
@@ -348,7 +350,7 @@ class PDFCanvas(QLabel):
 
             # ADD THESE LINES:
             # Setup scroll tracking after successful rendering
-            self.setup_scroll_tracking()
+            #self.setup_scroll_tracking()
 
             # Initialize current_page and visible pages tracking
             if not hasattr(self, 'current_page'):
@@ -693,6 +695,10 @@ class PDFCanvas(QLabel):
                 visible_pages = self.get_visible_page_numbers()
                 print(f"🎨 Drawing fields for visible pages: {visible_pages}")
 
+                # DEBUG: Check what fields exist per page
+                total_fields = len(self.field_manager.fields) if self.field_manager else 0
+                print(f"🎨 Total fields in manager: {total_fields}")
+
                 # Render fields for each visible page
                 for page_num in visible_pages:
                     self.field_renderer.render_fields(
@@ -807,16 +813,6 @@ class PDFCanvas(QLabel):
 
         except Exception as e:
             print(f"⚠️ Error updating current page from scroll: {e}")
-
-    def setup_scroll_tracking(self):
-        """Setup scroll tracking to update current page using timer"""
-        from PyQt6.QtCore import QTimer
-
-        # Create a timer to periodically check scroll position
-        self.scroll_timer = QTimer()
-        self.scroll_timer.timeout.connect(self.update_current_page_from_scroll)
-        self.scroll_timer.start(100)  # Check every 100ms
-        print("✅ Timer-based scroll tracking started")
 
     def cleanup_scroll_tracking(self):
         """Clean up scroll tracking timer"""
@@ -1717,7 +1713,7 @@ class PDFCanvas(QLabel):
             new_field = self.field_manager.add_field(field_type, field_x, field_y, page_num)
 
             # Add to field manager
-            self.field_manager.fields.append(new_field)
+            # self.field_manager.fields.append(new_field)
 
             print(f"✅ Created field: {new_field.name} ({field_enum.value}) at ({field_x}, {field_y})")
             return new_field
@@ -1832,11 +1828,11 @@ class PDFCanvas(QLabel):
             print("⚠️ No page_positions for scroll tracking")
             return 0
 
-        print(f"🔍 Scroll tracking: position={scroll_position}, page_positions={self.page_positions}")
+       # print(f"🔍 Scroll tracking: position={scroll_position}, page_positions={self.page_positions}")
 
         # Handle edge case: if scroll position is at or near the top
         if scroll_position <= self.page_positions[0] + 10:  # Small tolerance for top
-            print(f"✅ Scroll tracking: at top, returning page 0")
+            #print(f"✅ Scroll tracking: at top, returning page 0")
             return 0
 
         # Find the page that contains the current scroll position
@@ -1846,13 +1842,13 @@ class PDFCanvas(QLabel):
 
             # Check if scroll position is within this page's range
             if page_top <= scroll_position < page_bottom:
-                print(
-                    f"✅ Scroll tracking: detected page {i} (position {scroll_position} between {page_top} and {page_bottom})")
+                #print(
+                 #   f"✅ Scroll tracking: detected page {i} (position {scroll_position} between {page_top} and {page_bottom})")
                 return i
 
         # If we get here, we're on the last page or past the last page position
         last_page = len(self.page_positions) - 1
-        print(f"✅ Scroll tracking: detected last page {last_page}")
+        #print(f"✅ Scroll tracking: detected last page {last_page}")
         return last_page
 
     def scroll_to_page(self, page_number):
@@ -1870,36 +1866,62 @@ class PDFCanvas(QLabel):
             scroll_bar = self.parent().verticalScrollBar()
             scroll_bar.setValue(target_y)
 
+    def debug_widget_setup(self):
+        """Debug how the PDF canvas is connected to scroll area"""
+        print("🔍 Widget hierarchy:")
+        widget = self
+        level = 0
+
+        while widget and level < 5:  # Prevent infinite loop
+            print(f"   Level {level}: {type(widget).__name__}")
+            if hasattr(widget, 'verticalScrollBar'):
+                print(f"     - Has verticalScrollBar: {widget.verticalScrollBar()}")
+            if hasattr(widget, 'viewport'):
+                print(f"     - Has viewport: {widget.viewport()}")
+            if hasattr(widget, 'height'):
+                print(f"     - Height: {widget.height()}")
+
+            widget = widget.parent()
+            level += 1
 
     def get_visible_page_numbers(self):
-        """Get list of page numbers currently visible in viewport"""
+        """Get visible pages - direct access method"""
         if not hasattr(self, 'page_positions') or not self.page_positions:
             return [0]
 
-        # Get viewport info
-        if not hasattr(self.parent(), 'viewport'):
+        # Direct access: self -> QWidget -> QScrollArea
+        try:
+            scroll_area = self.parent().parent()  # Level 2 from your hierarchy
+
+            if not hasattr(scroll_area, 'viewport') or not hasattr(scroll_area, 'verticalScrollBar'):
+                print(f"⚠️ Direct access failed, not a QScrollArea")
+                return [0]
+
+            viewport = scroll_area.viewport()
+            scroll_bar = scroll_area.verticalScrollBar()
+
+            viewport_top = scroll_bar.value()
+            viewport_bottom = viewport_top + viewport.height()
+
+            print(f"🔍 Viewport: top={viewport_top}, bottom={viewport_bottom}")
+
+            visible_pages = []
+            for i, page_y in enumerate(self.page_positions):
+                if i < len(self.page_positions) - 1:
+                    page_bottom = self.page_positions[i + 1] - 15
+                else:
+                    page_bottom = page_y + 800  # Estimate
+
+                if page_y <= viewport_bottom and page_bottom >= viewport_top:
+                    visible_pages.append(i)
+
+            result = visible_pages if visible_pages else [0]
+            print(f"🎨 Visible pages: {result}")
+            return result
+
+        except Exception as e:
+            print(f"⚠️ Error getting visible pages: {e}")
             return [0]
-
-        viewport = self.parent().viewport()
-        scroll_bar = self.parent().verticalScrollBar()
-
-        viewport_top = scroll_bar.value()
-        viewport_bottom = viewport_top + viewport.height()
-
-        visible_pages = []
-
-        for i, page_y in enumerate(self.page_positions):
-            # Calculate page bottom
-            if i < len(self.page_positions) - 1:
-                page_bottom = self.page_positions[i + 1] - 10  # minus spacing
-            else:
-                page_bottom = self.page_pixmap.height()
-
-            # Check if page overlaps with viewport
-            if page_y <= viewport_bottom and page_bottom >= viewport_top:
-                visible_pages.append(i)
-
-        return visible_pages if visible_pages else [0]
 
 class SafeSelectionHandler:
     """Emergency fallback SelectionHandler that never crashes"""
