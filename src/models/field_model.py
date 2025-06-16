@@ -161,12 +161,41 @@ class FieldManager:
                 return field
         return None
 
-    def get_field_at_position(self, x: int, y: int) -> Optional[FormField]:
-        """Get the topmost field at given position"""
+    def get_field_at_position(self, x: int, y: int, page_number: Optional[int] = None, tolerance: int = 2) -> Optional[
+        FormField]:
+        """Get the topmost field at given position with improved detection"""
+        print(f"🔍 Checking for field at position ({x}, {y}) on page {page_number}")
+
+        # Filter fields by page if specified
+        if page_number is not None:
+            fields_to_check = [f for f in self.fields if f.page_number == page_number]
+            print(f"   Checking {len(fields_to_check)} fields on page {page_number}")
+        else:
+            fields_to_check = self.fields
+            print(f"   Checking all {len(fields_to_check)} fields")
+
         # Check fields in reverse order (topmost first)
-        for field in reversed(self.fields):
-            if field.contains_point(x, y):
-                return field
+        for i, field in enumerate(reversed(fields_to_check)):
+            try:
+                # Add some tolerance for edge detection
+                field_left = field.x - tolerance
+                field_right = field.x + field.width + tolerance
+                field_top = field.y - tolerance
+                field_bottom = field.y + field.height + tolerance
+
+                if (field_left <= x <= field_right and
+                        field_top <= y <= field_bottom):
+                    print(f"✅ Found field: {field.name} at ({field.x}, {field.y}) on page {field.page_number}")
+                    return field
+                else:
+                    print(
+                        f"   Field {field.name}: ({field.x}, {field.y}, {field.width}x{field.height}) on page {field.page_number} - no match")
+
+            except Exception as e:
+                print(f"⚠️ Error checking field {i}: {e}")
+                continue
+
+        print("   No field found at position")
         return None
 
     def duplicate_field(self, field: FormField) -> Optional[FormField]:

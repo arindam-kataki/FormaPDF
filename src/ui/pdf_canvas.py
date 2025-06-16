@@ -22,15 +22,14 @@ except ImportError:
 
 # Try to import field management components
 try:
-    from models.field_model import FormField, FieldType
+    from models.field_model import FormField, FieldType, FieldManager
     from ui.field_renderer import FieldRenderer
     from ui.drag_handler import DragHandler, SelectionHandler, WorkingSelectionHandler
     from ui.selection_handler import SelectionHandler
-    from managers.field_manager import FieldManager
     FIELD_COMPONENTS_AVAILABLE = True
 except ImportError:
     print("⚠️ Field management components not available - using minimal versions")
-    FIELD_COMPONENTS_AVAILABLE = False
+    FIELD_COMPONENTS_AVAILABLE = True
 
 
 class MinimalFieldManager:
@@ -134,7 +133,7 @@ class PDFCanvas(QLabel):
             try:
                 self.field_manager = FieldManager()
                 self.selection_handler = WorkingSelectionHandler(self.field_manager)
-                self.drag_handler = DragHandler()
+                self.drag_handler = DragHandler(self.field_manager)
                 self.field_renderer = FieldRenderer()
             except Exception as e:
                 print(f"⚠️ Error initializing full handlers: {e}")
@@ -1124,6 +1123,46 @@ class PDFCanvas(QLabel):
             from PyQt6.QtGui import QPen, QBrush, QColor
             from PyQt6.QtCore import Qt
 
+            # Convert document coordinates to screen coordinates
+            page_num = getattr(field, 'page_number', 0)
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+            if not screen_coords:
+                return  # Field is on a page that's not currently rendered
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # CRITICAL: Convert ALL coordinates to integers
+            screen_x = int(screen_x)
+            screen_y = int(screen_y)
+            screen_width = int(screen_width)
+            screen_height = int(screen_height)
+
+            print(
+                f"   Drawing field page {page_num} doc({field.x}, {field.y}) -> screen({screen_x}, {screen_y}) zoom={self.zoom_level}")
+
+            # Set up pen and brush
+            painter.setPen(QPen(QColor(0, 0, 255), 2))
+            painter.setBrush(QBrush(QColor(255, 255, 255, 100)))
+
+            # Draw field rectangle using integer coordinates
+            painter.drawRect(screen_x, screen_y, screen_width, screen_height)
+
+            # Draw field type text using integer coordinates
+            painter.setPen(QPen(QColor(0, 0, 0)))
+            painter.drawText(screen_x + 5, screen_y + 15, f"{field.type.value}")
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field: {e}")
+
+    def _deprecated_draw_field(self, painter, field):
+        """Draw a single field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+            from PyQt6.QtCore import Qt
+
             # ✅ NEW: Convert document coordinates to screen coordinates
             page_num = getattr(field, 'page_number', 0)
             screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
@@ -1135,8 +1174,8 @@ class PDFCanvas(QLabel):
             screen_width = field.width * self.zoom_level
             screen_height = field.height * self.zoom_level
 
-            print(
-                f"   Drawing field page {page_num} doc({field.x}, {field.y}) -> screen({screen_x}, {screen_y}) zoom={self.zoom_level}")
+            #print(
+             #   f"   Drawing field page {page_num} doc({field.x}, {field.y}) -> screen({screen_x}, {screen_y}) zoom={self.zoom_level}")
 
             # Set up pen and brush
             painter.setPen(QPen(QColor(0, 0, 255), 2))
@@ -1262,7 +1301,7 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
 
-    def _draw_selection_handles(self, painter, field):
+    def _deprecated_3_draw_selection_handles(self, painter, field):
         """Draw selection handles around a field"""
         try:
             from PyQt6.QtGui import QPen, QBrush, QColor
@@ -1301,8 +1340,52 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
 
+    def _draw_selection_handles(self, painter, field):
+        """Draw selection handles around a field"""
+        try:
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            # Convert document coordinates to screen coordinates
+            page_num = getattr(field, 'page_number', 0)
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+            if not screen_coords:
+                return  # Field is on a page that's not currently rendered
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # Convert ALL coordinates to integers
+            screen_x = int(screen_x)
+            screen_y = int(screen_y)
+            screen_width = int(screen_width)
+            screen_height = int(screen_height)
+
+            # Draw selection rectangle
+            painter.setPen(QPen(QColor(255, 0, 0), 2))
+            painter.setBrush(QBrush())
+            painter.drawRect(screen_x - 2, screen_y - 2, screen_width + 4, screen_height + 4)
+
+            # Draw corner handles
+            handle_size = 6
+            painter.setBrush(QBrush(QColor(255, 0, 0)))
+
+            positions = [
+                (screen_x - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),
+                (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),
+                (screen_x + screen_width - handle_size // 2, screen_y + screen_height - handle_size // 2)
+            ]
+
+            for pos_x, pos_y in positions:
+                painter.drawRect(int(pos_x), int(pos_y), handle_size, handle_size)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selection handles: {e}")
+
     def mousePressEvent(self, event):
-        """Handle mouse press events - place selected control or select existing field"""
+        """Handle mouse press events - prioritize field selection over creation"""
         print("🖱️ Mouse press event started")
         print(f"   Button: {event.button()}")
         print(f"   Position: {event.position().toPoint()}")
@@ -1311,7 +1394,7 @@ class PDFCanvas(QLabel):
             self.setFocus()  # Enable keyboard events
             screen_pos = event.position().toPoint()
 
-            # ✅ NEW: Convert screen coordinates to page-relative document coordinates
+            # Convert screen coordinates to page-relative document coordinates
             doc_coords = self.screen_to_document_coordinates(screen_pos.x(), screen_pos.y())
 
             if not doc_coords:
@@ -1324,34 +1407,58 @@ class PDFCanvas(QLabel):
 
             doc_pos = QPoint(int(doc_x), int(doc_y))
 
-            # First, check if we clicked on an existing field
-            selected_field = None
+            # PRIORITY 1: Check if we clicked directly on an existing field using field manager
+            clicked_field = None
             try:
-                selected_field = self.drag_handler.handle_mouse_press(
-                    doc_pos, self.selection_handler.get_selected_field()
-                )
+                if hasattr(self, 'field_manager') and self.field_manager:
+                    clicked_field = self.field_manager.get_field_at_position(doc_x, doc_y, page_number=page_num)
+                    print(f"   Field manager found field: {clicked_field.name if clicked_field else 'None'}")
             except Exception as e:
-                print(f"⚠️ Error in drag handler: {e}")
+                print(f"⚠️ Error checking field manager: {e}")
 
-            if selected_field:
-                # Clicked on an existing field - select it
+            # PRIORITY 2: If field manager didn't find anything, try drag handler
+            if not clicked_field:
                 try:
-                    self.selection_handler.select_field(selected_field)
-                    print(f"✅ Selected existing field: {selected_field.id}")
-                    self._handle_field_clicked(selected_field.id)
+                    clicked_field = self.drag_handler.handle_mouse_press(
+                        doc_pos, self.selection_handler.get_selected_field()
+                    )
+                    print(f"   Drag handler found field: {clicked_field.name if clicked_field else 'None'}")
+                except Exception as e:
+                    print(f"⚠️ Error in drag handler: {e}")
+
+            # If we found a field, select it and STOP HERE
+            if clicked_field:
+                try:
+                    self.selection_handler.select_field(clicked_field)
+                    print(f"✅ Selected existing field: {clicked_field.id}")
+                    self._handle_field_clicked(clicked_field.id)
+
+                    # Force redraw to show selection
+                    self.draw_overlay()
+                    return  # CRITICAL: Exit here, don't create new field
+
                 except Exception as e:
                     print(f"⚠️ Error selecting field: {e}")
-            else:
-                # Clicked on empty area - try to create a new field
+
+            # PRIORITY 3: Only create new field if no existing field was found
+            # AND we have a field type selected for placement
+            field_type = self._get_selected_field_type() if hasattr(self, '_get_selected_field_type') else None
+            if field_type and field_type != 'none':
+                print(f"   No existing field found, attempting to create {field_type} field")
                 new_field_created = self._try_create_field_at_position(doc_x, doc_y, page_num)
 
-                if not new_field_created:
-                    # No field was created, just clear selection
-                    try:
-                        self.selection_handler.clear_selection()
-                        print("✅ Cleared selection")
-                    except Exception as e:
-                        print(f"⚠️ Error clearing selection: {e}")
+                if new_field_created:
+                    print(f"✅ Created new {field_type} field")
+                else:
+                    print(f"❌ Failed to create {field_type} field")
+            else:
+                print("   No field type selected for placement, just clearing selection")
+                # Clear selection if no field was clicked and no field type is selected
+                try:
+                    self.selection_handler.clear_selection()
+                    print("✅ Cleared selection")
+                except Exception as e:
+                    print(f"⚠️ Error clearing selection: {e}")
 
             # Update display
             try:

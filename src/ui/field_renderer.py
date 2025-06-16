@@ -46,12 +46,18 @@ class FieldRenderer:
             bg_color = self.normal_bg_color
             pen_width = 1
 
-        # Draw field background
-        painter.fillRect(field.x, field.y, field.width, field.height, bg_color)
+        # CRITICAL: Convert all coordinates to integers
+        x = int(field.x)
+        y = int(field.y)
+        width = int(field.width)
+        height = int(field.height)
 
-        # Draw field border
+        # Draw field background with integer coordinates
+        painter.fillRect(x, y, width, height, bg_color)
+
+        # Draw field border with integer coordinates
         painter.setPen(QPen(border_color, pen_width))
-        painter.drawRect(field.x, field.y, field.width, field.height)
+        painter.drawRect(x, y, width, height)
 
         # Draw field content
         self.render_field_content(painter, field)
@@ -86,7 +92,7 @@ class FieldRenderer:
     def _render_text_field(self, painter: QPainter, field: FormField):
         """Render text field content"""
         value = field.value if field.value else "Text Field"
-        painter.drawText(field.x + 5, field.y + field.height // 2 + 4, str(value))
+        painter.drawText(int(field.x + 5), int(field.y + field.height // 2 + 4), str(value))
 
     def _render_checkbox_field(self, painter: QPainter, field: FormField):
         """Render checkbox field content"""
@@ -110,39 +116,39 @@ class FieldRenderer:
     def _render_dropdown_field(self, painter: QPainter, field: FormField):
         """Render dropdown field content"""
         text = field.value if field.value else "Select Option"
-        painter.drawText(field.x + 5, field.y + field.height // 2 + 4, f"{text} ▼")
+        painter.drawText(int(field.x + 5), int(field.y + field.height // 2 + 4), f"{text} ▼")
 
     def _render_signature_field(self, painter: QPainter, field: FormField):
         """Render signature field content"""
-        painter.drawText(field.x + 5, field.y + field.height // 2 + 4, "Signature Area")
+        painter.drawText(int(field.x + 5), int(field.y + field.height // 2 + 4), "Signature Area")
 
         # Draw signature line
         line_y = field.y + field.height - 10
         painter.setPen(QPen(QColor(150, 150, 150), 1))
-        painter.drawLine(field.x + 10, line_y, field.x + field.width - 10, line_y)
+        painter.drawLine(int(field.x + 10), line_y, int(field.x + field.width - 10), line_y)
 
     def _render_date_field(self, painter: QPainter, field: FormField):
         """Render date field content"""
         value = field.value if field.value else "DD/MM/YYYY"
-        painter.drawText(field.x + 5, field.y + field.height // 2 + 4, str(value))
+        painter.drawText(int(field.x + 5), int(field.y + field.height // 2 + 4), str(value))
 
     def _render_button_field(self, painter: QPainter, field: FormField):
         """Render button field content"""
         # Draw button-like appearance
         painter.setPen(QPen(QColor(100, 100, 100), 1))
         painter.setBrush(QBrush(QColor(240, 240, 240)))
-        painter.drawRect(field.x + 1, field.y + 1, field.width - 2, field.height - 2)
+        painter.drawRect(int(field.x + 1), int(field.y + 1), int(field.width - 2), int(field.height - 2))
 
         # Draw button text
         painter.setPen(QPen(QColor(0, 0, 0)))
         text = field.value if field.value else "Button"
-        painter.drawText(field.x + 5, field.y + field.height // 2 + 4, str(text))
+        painter.drawText(int(field.x + 5), int(field.y + field.height // 2 + 4), str(text))
 
     def _render_radio_field(self, painter: QPainter, field: FormField):
         """Render radio button field content"""
         radio_size = min(field.width - 4, field.height - 4, 16)
-        radio_x = field.x + (field.width - radio_size) // 2
-        radio_y = field.y + (field.height - radio_size) // 2
+        radio_x = int(field.x + (field.width - radio_size) // 2)
+        radio_y = int(field.y + (field.height - radio_size) // 2)
 
         # Draw radio button circle
         painter.drawEllipse(radio_x, radio_y, radio_size, radio_size)
@@ -167,7 +173,7 @@ class FieldRenderer:
         # Position text above the field if there's space, otherwise inside
         text_rect = painter.fontMetrics().boundingRect(field.name)
         text_y = field.y - 2 if field.y > text_rect.height() else field.y + 12
-        painter.drawText(field.x + 2, text_y, field.name)
+        painter.drawText(int(field.x + 2), int(text_y), field.name)
 
     def render_resize_handles(self, painter: QPainter, field: FormField):
         """Render resize handles around selected field"""
@@ -203,22 +209,26 @@ class FieldHighlighter:
     def highlight_field_hover(painter: QPainter, field: FormField):
         """Add hover effect to field"""
         hover_color = QColor(0, 120, 215, 50)
-        painter.fillRect(field.x, field.y, field.width, field.height, hover_color)
+        painter.fillRect(int(field.x), int(field.y), int(field.width), int(field.height), hover_color)
 
     @staticmethod
     def highlight_field_error(painter: QPainter, field: FormField):
         """Add error highlighting to field"""
         error_color = QColor(255, 0, 0)
         painter.setPen(QPen(error_color, 2, Qt.PenStyle.DashLine))
-        painter.drawRect(field.x, field.y, field.width, field.height)
+        painter.drawRect(int(field.x), int(field.y), int(field.width), int(field.height))
+
+class FieldPreviewRenderer:
+    """Renders field previews for drag operations"""
 
     @staticmethod
-    def highlight_field_required(painter: QPainter, field: FormField):
-        """Add required field indicator"""
-        if field.required:
-            painter.setPen(QPen(QColor(255, 0, 0)))
-            painter.setFont(QFont("Arial", 12, QFont.Weight.Bold))
-            painter.drawText(field.x + field.width - 10, field.y + 12, "*")
+    def render_drag_preview(painter: QPainter, field: FormField, opacity: float = 0.7):
+        """Render semi-transparent preview during drag"""
+        preview_color = QColor(0, 120, 215, int(255 * opacity))
+        painter.fillRect(int(field.x), int(field.y), int(field.width), int(field.height), preview_color)
+
+        painter.setPen(QPen(QColor(0, 120, 215), 2, Qt.PenStyle.DashLine))
+        painter.drawRect(int(field.x), int(field.y), int(field.width), int(field.height))
 
 
 class FieldPreviewRenderer:
