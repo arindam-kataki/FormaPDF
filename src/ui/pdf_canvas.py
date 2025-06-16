@@ -772,7 +772,7 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"Error drawing overlay: {e}")
 
-    def update_current_page_from_scroll(self):
+    def deprecated_1_update_current_page_from_scroll(self):
         """Update current page based on scroll position and trigger field redraw for multiple pages"""
         if not hasattr(self.parent(), 'verticalScrollBar'):
             return

@@ -1082,14 +1082,23 @@ class PDFViewerMainWindow(QMainWindow):
             # Get current page from scroll position
             current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_position)
 
+            # DEBUG: Show scroll tracking is working
+            old_page = getattr(self.pdf_canvas, 'current_page', -1)
+            print(
+                f"📜 MAIN: Scroll tracking: position={scroll_position}, detected_page={current_page}, old_page={old_page}")
+
             # Update the canvas current_page for compatibility
             self.pdf_canvas.current_page = current_page
+
+            # ALSO call the canvas method to update field rendering
+            if hasattr(self.pdf_canvas, 'update_current_page_from_scroll'):
+                self.pdf_canvas.update_current_page_from_scroll()
 
             # Update UI
             self.update_document_info()
 
         except Exception as e:
-            pass  # Fail silently
+            print(f"⚠️ Error in main window scroll tracking: {e}")
 
     def jump_to_page_continuous(self, page_number):
         """Jump to page in continuous view"""
