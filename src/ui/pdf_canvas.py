@@ -659,7 +659,7 @@ class PDFCanvas(QLabel):
         self.render_page()
 
     def draw_overlay(self):
-        """Draw overlay with fields and grid"""
+        """Draw overlay with fields and grid for all visible pages"""
         if not self.page_pixmap:
             return
 
@@ -672,21 +672,25 @@ class PDFCanvas(QLabel):
             if self.show_grid:
                 self._draw_grid(painter)
 
-            # Draw fields if available
+            # Draw fields if available - HANDLE MULTIPLE VISIBLE PAGES
             if self.field_renderer and hasattr(self.field_renderer, 'render_fields'):
-                # Pass the current page and selected field to the renderer
                 selected_field = self.selection_handler.get_selected_field() if hasattr(self,
                                                                                         'selection_handler') else None
 
-                # NEW: Pass coordinate transformation function and zoom info for multi-page support
-                self.field_renderer.render_fields(
-                    painter,
-                    self.field_manager.fields,
-                    selected_field,
-                    self.current_page,
-                    zoom_level=self.zoom_level,
-                    coord_transform_func=self.document_to_screen_coordinates
-                )
+                # Get ALL visible pages, not just current_page
+                visible_pages = self.get_visible_page_numbers()
+                print(f"🎨 Drawing fields for visible pages: {visible_pages}")
+
+                # Render fields for each visible page
+                for page_num in visible_pages:
+                    self.field_renderer.render_fields(
+                        painter,
+                        self.field_manager.fields,
+                        selected_field,
+                        page_num,  # Use each visible page
+                        zoom_level=self.zoom_level,
+                        coord_transform_func=self.document_to_screen_coordinates
+                    )
 
             painter.end()
 
@@ -755,6 +759,58 @@ class PDFCanvas(QLabel):
 
         except Exception as e:
             print(f"Error drawing overlay: {e}")
+
+    def update_current_page_from_scroll(self):
+        """Update current page based on scroll position and trigger field redraw for multiple pages"""
+        if not hasattr(self.parent(), 'verticalScrollBar'):
+            return
+
+        try:
+            scroll_bar = self.parent().verticalScrollBar()
+            scroll_position = scroll_bar.value()
+
+            # Get all visible pages
+            visible_pages = self.get_visible_page_numbers()
+
+            # Determine primary current page (usually the first visible or most visible)
+            new_current_page = visible_pages[0] if visible_pages else 0
+
+            # Check if the visible page set changed
+            old_visible_pages = getattr(self, '_last_visible_pages', [])
+
+            if visible_pages != old_visible_pages:
+                print(f"📄 Visible pages changed: {old_visible_pages} → {visible_pages}")
+
+                # Update tracking
+                self._last_visible_pages = visible_pages
+                self.current_page = new_current_page
+
+                # Force field redraw for new visible page set
+                self.draw_overlay()
+
+            elif not hasattr(self, 'current_page'):
+                # Initialize if doesn't exist
+                self.current_page = new_current_page
+                self._last_visible_pages = visible_pages
+
+        except Exception as e:
+            print(f"⚠️ Error updating current page from scroll: {e}")
+
+    def setup_scroll_tracking(self):
+        """Setup scroll tracking to update current page using timer"""
+        from PyQt6.QtCore import QTimer
+
+        # Create a timer to periodically check scroll position
+        self.scroll_timer = QTimer()
+        self.scroll_timer.timeout.connect(self.update_current_page_from_scroll)
+        self.scroll_timer.start(100)  # Check every 100ms
+        print("✅ Timer-based scroll tracking started")
+
+    def cleanup_scroll_tracking(self):
+        """Clean up scroll tracking timer"""
+        if hasattr(self, 'scroll_timer'):
+            self.scroll_timer.stop()
+            print("✅ Scroll tracking timer stopped")
 
     def _draw_grid(self, painter):
         """Draw grid overlay"""
