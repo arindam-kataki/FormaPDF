@@ -1826,22 +1826,34 @@ class PDFCanvas(QLabel):
             if was_dragging:
                 self.draw_overlay()
 
-
     def get_current_page_from_scroll(self, scroll_position):
         """Determine which page is currently visible based on scroll position"""
         if not hasattr(self, 'page_positions') or not self.page_positions:
+            print("⚠️ No page_positions for scroll tracking")
+            return 0
+
+        print(f"🔍 Scroll tracking: position={scroll_position}, page_positions={self.page_positions}")
+
+        # Handle edge case: if scroll position is at or near the top
+        if scroll_position <= self.page_positions[0] + 10:  # Small tolerance for top
+            print(f"✅ Scroll tracking: at top, returning page 0")
             return 0
 
         # Find the page that contains the current scroll position
-        for i, page_y in enumerate(self.page_positions):
-            if i == len(self.page_positions) - 1:
-                # Last page
-                return i
-            elif scroll_position >= page_y and scroll_position < self.page_positions[i + 1]:
+        for i in range(len(self.page_positions) - 1):  # Note: -1 to avoid index error
+            page_top = self.page_positions[i]
+            page_bottom = self.page_positions[i + 1]
+
+            # Check if scroll position is within this page's range
+            if page_top <= scroll_position < page_bottom:
+                print(
+                    f"✅ Scroll tracking: detected page {i} (position {scroll_position} between {page_top} and {page_bottom})")
                 return i
 
-        return 0
-
+        # If we get here, we're on the last page or past the last page position
+        last_page = len(self.page_positions) - 1
+        print(f"✅ Scroll tracking: detected last page {last_page}")
+        return last_page
 
     def scroll_to_page(self, page_number):
         """Scroll to show a specific page"""
