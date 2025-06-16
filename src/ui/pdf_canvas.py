@@ -677,6 +677,44 @@ class PDFCanvas(QLabel):
                 # Pass the current page and selected field to the renderer
                 selected_field = self.selection_handler.get_selected_field() if hasattr(self,
                                                                                         'selection_handler') else None
+
+                # NEW: Pass coordinate transformation function and zoom info for multi-page support
+                self.field_renderer.render_fields(
+                    painter,
+                    self.field_manager.fields,
+                    selected_field,
+                    self.current_page,
+                    zoom_level=self.zoom_level,
+                    coord_transform_func=self.document_to_screen_coordinates
+                )
+
+            painter.end()
+
+            # Update the displayed pixmap
+            self.setPixmap(overlay_pixmap)
+
+        except Exception as e:
+            print(f"Error drawing overlay: {e}")
+
+    def deprecated_2_draw_overlay(self):
+        """Draw overlay with fields and grid"""
+        if not self.page_pixmap:
+            return
+
+        try:
+            # Create a copy of the pixmap to draw on
+            overlay_pixmap = self.page_pixmap.copy()
+            painter = QPainter(overlay_pixmap)
+
+            # Draw grid if enabled
+            if self.show_grid:
+                self._draw_grid(painter)
+
+            # Draw fields if available
+            if self.field_renderer and hasattr(self.field_renderer, 'render_fields'):
+                # Pass the current page and selected field to the renderer
+                selected_field = self.selection_handler.get_selected_field() if hasattr(self,
+                                                                                        'selection_handler') else None
                 self.field_renderer.render_fields(
                     painter,
                     self.field_manager.fields,
@@ -692,7 +730,7 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"Error drawing overlay: {e}")
 
-    def deprecated_draw_overlay(self):
+    def deprecated_1_draw_overlay(self):
         """Draw overlay with fields and grid"""
         if not self.page_pixmap:
             return
@@ -1102,17 +1140,17 @@ class PDFCanvas(QLabel):
             painter = QPainter(self)
 
             # Draw all fields
-            if hasattr(self, 'field_manager') and self.field_manager:
-                for field in self.field_manager.fields:
-                    self._draw_field(painter, field)
+            #if hasattr(self, 'field_manager') and self.field_manager:
+            #    for field in self.field_manager.fields:
+            #        self._draw_field(painter, field)
 
             # Draw selection handles for selected field
-            if (hasattr(self, 'selection_handler') and 
-                self.selection_handler and 
-                hasattr(self.selection_handler, 'selected_field') and
-                self.selection_handler.selected_field):
+            #if (hasattr(self, 'selection_handler') and
+            #    self.selection_handler and
+            #    hasattr(self.selection_handler, 'selected_field') and
+            #    self.selection_handler.selected_field):
 
-                self._draw_selection_handles(painter, self.selection_handler.selected_field)
+            #    self._draw_selection_handles(painter, self.selection_handler.selected_field)
 
         except Exception as e:
             print(f"⚠️ Error in paintEvent: {e}")
