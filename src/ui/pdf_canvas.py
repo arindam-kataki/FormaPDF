@@ -96,9 +96,11 @@ class PDFCanvas(QLabel):
     """PDF Canvas widget for displaying and interacting with PDF documents"""
 
     # Signals
-    fieldClicked = pyqtSignal(str)
-    positionClicked = pyqtSignal(int, int)
-    selectionChanged = pyqtSignal(object)
+    fieldMoved = pyqtSignal(str, int, int)  # field_id, x, y
+    fieldResized = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
+    fieldClicked = pyqtSignal(str)  # field_id
+    positionClicked = pyqtSignal(int, int)  # x, y
+    selectionChanged = pyqtSignal(object)  # field or None
 
     def __init__(self):
         super().__init__()
@@ -153,6 +155,36 @@ class PDFCanvas(QLabel):
         self.field_renderer = None
 
     def _setup_signal_connections(self):
+        """Setup internal signal connections"""
+        try:
+            # Connect drag handler signals to PDF canvas signals
+            self.drag_handler.fieldMoved.connect(self.fieldMoved)
+            self.drag_handler.fieldResized.connect(self.fieldResized)
+
+            # Connect cursor changes
+            self.drag_handler.cursorChanged.connect(
+                lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
+            )
+
+            # Connect selection handler signals - ONLY if they exist and are real signals
+            if hasattr(self.selection_handler, 'selectionChanged'):
+                selection_signal = self.selection_handler.selectionChanged
+                # Check if it's a real PyQt signal (not our fake one)
+                if hasattr(selection_signal, 'connect') and callable(selection_signal.connect):
+                    try:
+                        selection_signal.connect(self.selectionChanged)
+                        selection_signal.connect(self._on_selection_changed)
+                    except Exception as e:
+                        print(f"⚠️ Could not connect selection signals: {e}")
+                else:
+                    print("ℹ️ Using fake selection signals (callback-based)")
+
+            print("✅ Signal connections established")
+
+        except Exception as e:
+            print(f"⚠️ Error in signal connections: {e}")
+
+    def _deprecated__setup_signal_connections(self):
         """Setup internal signal connections"""
         try:
             # Connect drag handler signals

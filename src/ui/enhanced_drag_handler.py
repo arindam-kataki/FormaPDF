@@ -8,14 +8,11 @@ from enum import Enum
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QObject
 from PyQt6.QtGui import QCursor
 
-try:
-    from models.field_model import FormField, FieldManager
-    from utils.geometry_utils import (
-        ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
-    )
-except ImportError as e:
-    print(f"⚠️ Import error in enhanced_drag_handler: {e}")
-    # Provide minimal fallbacks if needed
+# Import dependencies - these MUST work for enhanced drag handler to function
+from models.field_model import FormField, FieldManager
+from utils.geometry_utils import (
+    ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
+)
 
 class DragMode(Enum):
     """Enumeration of drag operation modes"""
