@@ -14,7 +14,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QFileDialog, QMessageBox, QApplication
 )
 from PyQt6.QtGui import QAction, QKeySequence, QFont
-from PyQt6.QtCore import Qt, pyqtSlot, QSettings
+from PyQt6.QtCore import Qt, pyqtSlot, QSettings, QRect
 
 # Safe imports with fallbacks
 try:
@@ -457,6 +457,9 @@ class PDFViewerMainWindow(QMainWindow):
                     print(f"📋 Calling pdf_canvas.load_pdf({file_path})")
                     result = self.pdf_canvas.load_pdf(file_path)
                     print(f"📋 load_pdf returned: {result}")
+
+                    self.update_page_controls()
+                    self.update_zoom_controls()
 
                     if result:
                         print("✅ PDF loading succeeded")
@@ -922,6 +925,68 @@ class PDFViewerMainWindow(QMainWindow):
 
     def update_page_controls(self):
         """Update page number controls based on current document"""
+        print("🔧 update_page_controls called")
+
+        try:
+            # Debug the condition checks
+            has_canvas = hasattr(self, 'pdf_canvas')
+            has_document = has_canvas and hasattr(self.pdf_canvas, 'pdf_document')
+            document_exists = has_document and self.pdf_canvas.pdf_document is not None
+
+            print(f"  📋 has_canvas: {has_canvas}")
+            print(f"  📋 has_document: {has_document}")
+            print(f"  📋 document_exists: {document_exists}")
+
+            if document_exists:
+                # Try to get page count
+                try:
+                    page_count = self.pdf_canvas.pdf_document.page_count
+                    print(f"  📋 page_count: {page_count}")
+                except Exception as e:
+                    print(f"  ❌ Error getting page_count: {e}")
+                    page_count = None
+
+                if page_count and page_count > 0:
+                    current_page = getattr(self.pdf_canvas, 'current_page', 0) + 1
+                    total_pages = page_count
+
+                    print(f"  📋 Setting page controls: {current_page} of {total_pages}")
+
+                    # Update page spinbox (prevent signal loops)
+                    if hasattr(self, 'page_spinbox'):
+                        self.page_spinbox.blockSignals(True)
+                        self.page_spinbox.setMaximum(total_pages)
+                        self.page_spinbox.setValue(current_page)
+                        self.page_spinbox.blockSignals(False)
+                        print(f"  ✅ Updated page_spinbox: max={total_pages}, value={current_page}")
+
+                    # Update page count label
+                    if hasattr(self, 'page_count_label'):
+                        self.page_count_label.setText(f"of {total_pages}")
+                        print(f"  ✅ Updated page_count_label: 'of {total_pages}'")
+
+                    return  # Success, exit early
+
+            # Fallback case - no document loaded or error
+            print("  📋 Falling back to 'no document' state")
+            if hasattr(self, 'page_spinbox'):
+                self.page_spinbox.blockSignals(True)
+                self.page_spinbox.setMaximum(1)
+                self.page_spinbox.setValue(1)
+                self.page_spinbox.blockSignals(False)
+                print("  ⚠️ Set page_spinbox to default (1 of 1)")
+
+            if hasattr(self, 'page_count_label'):
+                self.page_count_label.setText("of 1")
+                print("  ⚠️ Set page_count_label to 'of 1'")
+
+        except Exception as e:
+            print(f"❌ Error in update_page_controls: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def deprecated_update_page_controls(self):
+        """Update page number controls based on current document"""
         try:
             if hasattr(self.pdf_canvas, 'pdf_document') and self.pdf_canvas.pdf_document:
                 current_page = getattr(self.pdf_canvas, 'current_page', 0) + 1
@@ -1103,6 +1168,8 @@ class PDFViewerMainWindow(QMainWindow):
             if old_page != current_page or self._should_force_redraw():
                 print(f"📜 Rendering: pages {start_page}-{end_page}, viewport: {viewport_rect}")
                 self.pdf_canvas.draw_controls_and_overlay(start_page, end_page, viewport_rect)
+                # ADD THIS: Update toolbar when page changes
+                self.update_page_controls()
 
             # Update UI
             self.update_document_info()

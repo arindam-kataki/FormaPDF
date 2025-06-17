@@ -5,6 +5,7 @@ Complete working version for displaying PDFs with scrolling and field support
 
 import sys
 from pathlib import Path
+from typing import List
 
 from PyQt6.QtWidgets import QLabel, QApplication
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
@@ -2060,7 +2061,7 @@ class PDFCanvas(QLabel):
             if was_dragging:
                 self.draw_overlay()
 
-    def get_current_page_from_scroll(self, scroll_position):
+    def deprecated_get_current_page_from_scroll(self, scroll_position):
         """Determine which page is currently visible based on scroll position"""
         if not hasattr(self, 'page_positions') or not self.page_positions:
             print("⚠️ No page_positions for scroll tracking")
@@ -2160,6 +2161,185 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error getting visible pages: {e}")
             return [0]
+
+    def get_page_at_y_position(self, y_position):
+        """Get page number at given Y position"""
+        if not self.pdf_document or not hasattr(self, 'page_positions'):
+            return 0
+
+        try:
+            for page_num, page_top in enumerate(self.page_positions):
+                # Get page height (accounting for zoom)
+                page = self.pdf_document[page_num]
+                page_height = int(page.rect.height * self.zoom_level)
+                page_bottom = page_top + page_height
+
+                if page_top <= y_position <= page_bottom:
+                    return page_num
+
+            # If not found, return last page
+            return len(self.page_positions) - 1 if self.page_positions else 0
+        except:
+            return 0
+
+    def get_current_page_from_scroll(self, scroll_y):
+        """Get current page based on scroll position"""
+        if not self.pdf_document:
+            return 0
+
+        # Simple approach: find the page that occupies most of the viewport
+        return self.get_page_at_y_position(scroll_y + 100)  # Add offset for better detection
+
+    def _render_field_normal(self, painter, field, zoom_level, page_offset_y=0, field_rect=None, *args):
+        """Render field at normal zoom level"""
+        try:
+            # Use provided field_rect if available, otherwise calculate it
+            if field_rect is not None:
+                x, y, width, height = field_rect.x(), field_rect.y(), field_rect.width(), field_rect.height()
+            else:
+                # Calculate field position and size
+                x = field.rect.x0 * zoom_level
+                y = (field.rect.y0 * zoom_level) + page_offset_y
+                width = (field.rect.x1 - field.rect.x0) * zoom_level
+                height = (field.rect.y1 - field.rect.y0) * zoom_level
+
+            # Draw field border
+            from PyQt6.QtCore import Qt, QRect
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            field_rect = QRect(int(x), int(y), int(width), int(height))
+
+            # Set field appearance based on type
+            if hasattr(field, 'field_type'):
+                if field.field_type == 'text':
+                    painter.setPen(QPen(QColor(0, 0, 255), 1))  # Blue border
+                    painter.setBrush(QBrush(QColor(255, 255, 255, 50)))  # Semi-transparent white
+                elif field.field_type == 'checkbox':
+                    painter.setPen(QPen(QColor(0, 128, 0), 1))  # Green border
+                    painter.setBrush(QBrush(QColor(255, 255, 255, 50)))
+                else:
+                    painter.setPen(QPen(QColor(128, 128, 128), 1))  # Gray border
+                    painter.setBrush(QBrush(QColor(255, 255, 255, 50)))
+            else:
+                painter.setPen(QPen(QColor(128, 128, 128), 1))
+                painter.setBrush(QBrush(QColor(255, 255, 255, 50)))
+
+            # Draw the field rectangle
+            painter.drawRect(field_rect)
+
+            # Draw field value if it has one
+            if hasattr(field, 'value') and field.value:
+                painter.setPen(QPen(QColor(0, 0, 0)))  # Black text
+                painter.drawText(field_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                                 str(field.value))
+
+        except Exception as e:
+            print(f"❌ Error rendering field: {e}")
+
+    def _render_field_zoomed(self, painter, field, zoom_level, page_offset_y=0, field_rect=None, *args):
+        """Render field at zoomed level"""
+        self._render_field_normal(painter, field, zoom_level, page_offset_y, field_rect, *args)
+
+    def _render_field_selected(self, painter, field, zoom_level, page_offset_y=0, field_rect=None, *args):
+        """Render selected field with highlight"""
+        try:
+            # First render normal field
+            self._render_field_normal(painter, field, zoom_level, page_offset_y, field_rect, *args)
+
+            # Add selection highlight
+            from PyQt6.QtCore import Qt, QRect
+            from PyQt6.QtGui import QPen, QBrush, QColor
+
+            # Use provided field_rect if available, otherwise calculate it
+            if field_rect is not None:
+                selection_rect = field_rect
+            else:
+                x = field.rect.x0 * zoom_level
+                y = (field.rect.y0 * zoom_level) + page_offset_y
+                width = (field.rect.x1 - field.rect.x0) * zoom_level
+                height = (field.rect.y1 - field.rect.y0) * zoom_level
+                selection_rect = QRect(int(x), int(y), int(width), int(height))
+
+            # Draw selection highlight
+            painter.setPen(QPen(QColor(255, 0, 0), 2))  # Red border for selection
+            painter.setBrush(QBrush(QColor(255, 0, 0, 30)))  # Semi-transparent red
+            painter.drawRect(selection_rect)
+
+        except Exception as e:
+            print(f"❌ Error rendering selected field: {e}")
+
+    def _render_field_detailed(self, painter, field, zoom_level, page_offset_y=0, field_rect=None, *args, **kwargs):
+        """Render field with detailed view (high zoom level)"""
+        try:
+            # Use provided field_rect if available, otherwise calculate it
+            if field_rect is not None:
+                x, y, width, height = field_rect.x(), field_rect.y(), field_rect.width(), field_rect.height()
+            else:
+                # Calculate field position and size
+                x = field.rect.x0 * zoom_level
+                y = (field.rect.y0 * zoom_level) + page_offset_y
+                width = (field.rect.x1 - field.rect.x0) * zoom_level
+                height = (field.rect.y1 - field.rect.y0) * zoom_level
+
+            # Draw field border
+            from PyQt6.QtCore import Qt, QRect
+            from PyQt6.QtGui import QPen, QBrush, QColor, QFont
+
+            field_rect = QRect(int(x), int(y), int(width), int(height))
+
+            # More detailed rendering for high zoom
+            if hasattr(field, 'field_type'):
+                if field.field_type == 'text':
+                    # Text field - blue border, white background
+                    painter.setPen(QPen(QColor(0, 0, 255), 2))  # Thicker border for detail
+                    painter.setBrush(QBrush(QColor(255, 255, 255, 80)))
+                elif field.field_type == 'checkbox':
+                    # Checkbox - green border
+                    painter.setPen(QPen(QColor(0, 128, 0), 2))
+                    painter.setBrush(QBrush(QColor(240, 255, 240, 80)))
+                elif field.field_type == 'signature':
+                    # Signature field - purple border
+                    painter.setPen(QPen(QColor(128, 0, 128), 2))
+                    painter.setBrush(QBrush(QColor(255, 240, 255, 80)))
+                else:
+                    # Default field
+                    painter.setPen(QPen(QColor(128, 128, 128), 2))
+                    painter.setBrush(QBrush(QColor(255, 255, 255, 80)))
+            else:
+                painter.setPen(QPen(QColor(128, 128, 128), 2))
+                painter.setBrush(QBrush(QColor(255, 255, 255, 80)))
+
+            # Draw the field rectangle
+            painter.drawRect(field_rect)
+
+            # Draw field label/name at high zoom
+            if hasattr(field, 'name') and field.name and zoom_level > 1.5:
+                painter.setPen(QPen(QColor(100, 100, 100)))
+                font = QFont()
+                font.setPointSize(max(8, int(10 * zoom_level)))
+                painter.setFont(font)
+
+                # Draw field name above the field
+                label_rect = QRect(int(x), int(y - 20 * zoom_level), int(width), int(15 * zoom_level))
+                painter.drawText(label_rect, Qt.AlignmentFlag.AlignLeft, field.name)
+
+            # Draw field value if it has one
+            if hasattr(field, 'value') and field.value:
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                font = QFont()
+                font.setPointSize(max(8, int(12 * zoom_level)))
+                painter.setFont(font)
+                painter.drawText(field_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                                 str(field.value))
+
+            # Draw field border highlight for better visibility at high zoom
+            if zoom_level > 2.0:
+                painter.setPen(QPen(QColor(255, 255, 0, 100), 1))  # Yellow highlight
+                painter.setBrush(QBrush())  # No fill
+                painter.drawRect(field_rect.adjusted(-2, -2, 2, 2))
+
+        except Exception as e:
+            print(f"❌ Error rendering detailed field: {e}")
 
 class SafeSelectionHandler:
     """Emergency fallback SelectionHandler that never crashes"""
