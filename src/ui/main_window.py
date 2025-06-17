@@ -67,6 +67,22 @@ class PDFViewerMainWindow(QMainWindow):
         self.init_ui()
         self.setup_connections()
         self.setup_scroll_tracking()
+        self.setup_scroll_timer()
+
+    def setup_scroll_timer(self):
+        """Setup timer-based scroll rendering"""
+        from PyQt6.QtCore import QTimer
+
+        # Create timer for scroll rendering
+        self.scroll_timer = QTimer()
+        self.scroll_timer.setSingleShot(True)  # Only fire once per scroll session
+        self.scroll_timer.timeout.connect(self.render_after_scroll)
+
+        # Flags to track what needs updating
+        self.needs_scroll_update = False
+        self.needs_zoom_update = False
+
+        print("✅ Timer-based scroll rendering initialized")
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -1127,13 +1143,110 @@ class PDFViewerMainWindow(QMainWindow):
         self.update_page_controls()
         self.update_zoom_controls()
 
-    def setup_scroll_tracking(self):
+    def depecated_setup_scroll_tracking(self):
         """Setup scroll tracking for continuous view"""
         if hasattr(self, 'scroll_area'):
             # Connect scroll bar to track current page
             v_scrollbar = self.scroll_area.verticalScrollBar()
             if v_scrollbar:
                 v_scrollbar.valueChanged.connect(self.update_current_page_from_scroll)
+
+    def setup_scroll_tracking(self):
+        """Setup scroll tracking for continuous view with timer-based rendering"""
+        if hasattr(self, 'scroll_area'):
+            # Connect scroll bar to mark dirty flag instead of immediate rendering
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            if v_scrollbar:
+                v_scrollbar.valueChanged.connect(self.mark_scroll_dirty)
+
+            h_scrollbar = self.scroll_area.horizontalScrollBar()
+            if h_scrollbar:
+                h_scrollbar.valueChanged.connect(self.mark_scroll_dirty)
+
+            print("✅ Timer-based scroll tracking connected")
+
+    def mark_scroll_dirty(self):
+        """Mark that scrolling occurred - will render after scroll stops"""
+        self.needs_scroll_update = True
+
+        # Restart timer - will fire 150ms after scrolling stops
+        self.scroll_timer.stop()
+        self.scroll_timer.start(150)
+
+    def render_after_scroll(self):
+        """Render controls after scrolling stops - timer callback"""
+        try:
+            if not self.needs_scroll_update:
+                return
+
+            print("🎨 Timer render: updating page tracking and controls")
+
+            # Update current page tracking first
+            self.update_page_tracking_from_scroll()
+
+            # Render all controls using reliable method
+            self.pdf_canvas.draw_overlay()
+
+            # Update toolbar if page changed
+            self.update_page_controls()
+            self.update_document_info()
+
+            # Clear flags
+            self.needs_scroll_update = False
+            self.needs_zoom_update = False
+
+        except Exception as e:
+            print(f"⚠️ Error in timer render: {e}")
+            # Fallback to simple render
+            self.pdf_canvas.draw_overlay()
+
+    def update_page_tracking_from_scroll(self):
+        """Update current page tracking without rendering"""
+        try:
+            # Get scroll position
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            scroll_y = v_scrollbar.value()
+
+            # Calculate current page
+            current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_y)
+            old_page = getattr(self.pdf_canvas, 'current_page', -1)
+
+            # Update page tracking
+            self.pdf_canvas.current_page = current_page
+
+            if old_page != current_page:
+                print(f"📄 Page changed: {old_page} → {current_page}")
+
+        except Exception as e:
+            print(f"⚠️ Error updating page tracking: {e}")
+
+    def on_zoom_changed(self, new_zoom_level: float):
+        """Handle zoom level changes with timer-based rendering"""
+        old_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+
+        print(f"🔍 Zoom changed: {old_zoom:.1f}x → {new_zoom_level:.1f}x")
+
+        # Update canvas zoom
+        self.pdf_canvas.set_zoom(new_zoom_level)
+
+        # Mark for timer-based update instead of immediate render
+        self.needs_zoom_update = True
+        self.needs_scroll_update = True
+
+        # Start timer for zoom update
+        self.scroll_timer.stop()
+        self.scroll_timer.start(100)
+
+        # Note: zoom focus point maintenance removed for simplicity
+
+    def mark_zoom_dirty(self):
+        """Mark that zoom changed - will render after zoom stabilizes"""
+        self.needs_zoom_update = True
+        self.needs_scroll_update = True  # Also update scroll-related rendering
+
+        # Restart timer with shorter delay for zoom (more responsive)
+        self.scroll_timer.stop()
+        self.scroll_timer.start(100)
 
     def update_current_page_from_scroll(self):
         """Update current page and render controls - with viewport calculation"""

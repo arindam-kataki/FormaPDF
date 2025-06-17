@@ -128,6 +128,8 @@ class PDFCanvas(QLabel):
         # Setup signal connections
         self._setup_signal_connections()
 
+        self._rendering_in_progress = False
+
     def _init_handlers(self):
         """Initialize field and interaction handlers"""
         if FIELD_COMPONENTS_AVAILABLE:
@@ -916,7 +918,14 @@ class PDFCanvas(QLabel):
         if not self.page_pixmap:
             return
 
+        # Prevent concurrent rendering conflicts
+        if getattr(self, '_rendering_in_progress', False):
+            return
+
         try:
+
+            self._rendering_in_progress = True
+
             # Create a copy of the pixmap to draw on
             overlay_pixmap = self.page_pixmap.copy()
             painter = QPainter(overlay_pixmap)
@@ -950,6 +959,9 @@ class PDFCanvas(QLabel):
                     )
 
             painter.end()
+
+            # Update the displayed pixmap
+            self.setPixmap(overlay_pixmap)
 
             # Update the displayed pixmap
             self.setPixmap(overlay_pixmap)
