@@ -17,12 +17,6 @@ except ImportError as e:
     print(f"⚠️ Import error in enhanced_drag_handler: {e}")
     # Provide minimal fallbacks if needed
 
-from models.field_model import FormField, FieldManager
-from utils.geometry_utils import (
-    ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
-)
-
-
 class DragMode(Enum):
     """Enumeration of drag operation modes"""
     NONE = "none"
