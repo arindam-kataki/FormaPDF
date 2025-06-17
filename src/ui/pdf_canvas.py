@@ -923,7 +923,6 @@ class PDFCanvas(QLabel):
             return
 
         try:
-
             self._rendering_in_progress = True
 
             # Create a copy of the pixmap to draw on
@@ -960,14 +959,14 @@ class PDFCanvas(QLabel):
 
             painter.end()
 
-            # Update the displayed pixmap
-            self.setPixmap(overlay_pixmap)
-
-            # Update the displayed pixmap
+            # Update the displayed pixmap (REMOVE DUPLICATE)
             self.setPixmap(overlay_pixmap)
 
         except Exception as e:
             print(f"Error drawing overlay: {e}")
+        finally:
+            # CRITICAL: Always reset the flag
+            self._rendering_in_progress = False
 
     def deprecated_2_draw_overlay(self):
         """Draw overlay with fields and grid"""
