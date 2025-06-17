@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtWidgets import QLabel, QApplication
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
 from PyQt6.QtCore import QObject, pyqtSignal, Qt, QRect
 from PyQt6.QtCore import QPoint
 
@@ -671,6 +671,244 @@ class PDFCanvas(QLabel):
         self.zoom_level = zoom_level
         # Re-render with new zoom level
         self.render_page()
+
+    def _filter_fields_in_zoomed_viewport(self, fields: List[FormField], viewport_rect: QRect,
+                                          page_num: int, zoom_level: float) -> List[FormField]:
+        """Filter fields considering zoom level and viewport"""
+        visible_fields = []
+
+        for field in fields:
+            # Convert field document coordinates to zoomed screen coordinates
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+            if screen_coords:
+                screen_x, screen_y = screen_coords
+
+                # Calculate field dimensions at current zoom
+                field_width = int(field.width * zoom_level)
+                field_height = int(field.height * zoom_level)
+
+                # Create field rectangle in screen coordinates
+                field_rect = QRect(screen_x, screen_y, field_width, field_height)
+
+                # Add tolerance for fields partially visible
+                tolerance = max(5, int(10 * zoom_level))  # Scale tolerance with zoom
+                expanded_viewport = viewport_rect.adjusted(-tolerance, -tolerance, tolerance, tolerance)
+
+                # Check intersection with expanded viewport
+                if expanded_viewport.intersects(field_rect):
+                    visible_fields.append(field)
+                    print(f"     Field {field.id}: visible at zoom {zoom_level:.1f}x")
+
+        return visible_fields
+
+    def _draw_grid_in_viewport_zoomed(self, painter: QPainter, viewport_rect: QRect, zoom_level: float):
+        """Draw grid scaled appropriately for zoom level"""
+        if not self.show_grid:
+            return
+
+        # Scale grid size with zoom level
+        scaled_grid_size = int(self.grid_size * zoom_level)
+
+        # At very high zoom, might want larger grid spacing
+        if zoom_level > 3.0:
+            scaled_grid_size = int(scaled_grid_size * 2)  # Double spacing at high zoom
+
+        # At very low zoom, might want to skip grid entirely
+        if zoom_level < 0.3:
+            return  # Grid would be too dense to be useful
+
+        pen = QPen(Qt.GlobalColor.lightGray, 1)
+        painter.setPen(pen)
+
+        # Draw vertical lines with zoom-scaled spacing
+        start_x = (viewport_rect.left() // scaled_grid_size) * scaled_grid_size
+        for x in range(start_x, viewport_rect.right() + scaled_grid_size, scaled_grid_size):
+            if viewport_rect.left() <= x <= viewport_rect.right():
+                painter.drawLine(x, viewport_rect.top(), x, viewport_rect.bottom())
+
+        # Draw horizontal lines with zoom-scaled spacing
+        start_y = (viewport_rect.top() // scaled_grid_size) * scaled_grid_size
+        for y in range(start_y, viewport_rect.bottom() + scaled_grid_size, scaled_grid_size):
+            if viewport_rect.top() <= y <= viewport_rect.bottom():
+                painter.drawLine(viewport_rect.left(), y, viewport_rect.right(), y)
+
+    def _render_field_at_zoom(self, painter: QPainter, field: FormField,
+                              selected_field: FormField, zoom_level: float):
+        """Render field with zoom-appropriate detail level"""
+
+        # Get screen coordinates
+        page_num = getattr(field, 'page_number', 0)
+        screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
+
+        if not screen_coords:
+            return
+
+        screen_x, screen_y = screen_coords
+        field_width = int(field.width * zoom_level)
+        field_height = int(field.height * zoom_level)
+
+        # Adjust rendering detail based on zoom level
+        if zoom_level < 0.5:
+            # Low zoom: simple rectangles only
+            self._render_field_simple(painter, screen_x, screen_y, field_width, field_height, field)
+        elif zoom_level < 2.0:
+            # Medium zoom: normal detail
+            self._render_field_normal(painter, screen_x, screen_y, field_width, field_height, field)
+        else:
+            # High zoom: full detail including borders, text, etc.
+            self._render_field_detailed(painter, screen_x, screen_y, field_width, field_height, field)
+
+        # Draw selection handles if selected (scale with zoom)
+        if field == selected_field:
+            self._draw_selection_handles_zoomed(painter, screen_x, screen_y,
+                                                field_width, field_height, zoom_level)
+
+    def _draw_selection_handles_zoomed(self, painter: QPainter, x: int, y: int,
+                                       width: int, height: int, zoom_level: float):
+        """Draw selection handles scaled appropriately for zoom"""
+
+        # Scale handle size with zoom, but keep readable
+        base_handle_size = 8
+        handle_size = max(6, min(16, int(base_handle_size * zoom_level)))
+
+        # Draw selection rectangle
+        painter.setPen(QPen(QColor(255, 0, 0), max(1, int(2 * zoom_level))))
+        painter.setBrush(QBrush())
+        painter.drawRect(x - 2, y - 2, width + 4, height + 4)
+
+        # Draw corner handles
+        painter.setBrush(QBrush(QColor(255, 0, 0)))
+
+        positions = [
+            (x - handle_size // 2, y - handle_size // 2),  # Top-left
+            (x + width - handle_size // 2, y - handle_size // 2),  # Top-right
+            (x - handle_size // 2, y + height - handle_size // 2),  # Bottom-left
+            (x + width - handle_size // 2, y + height - handle_size // 2)  # Bottom-right
+        ]
+
+        for pos_x, pos_y in positions:
+            painter.drawRect(pos_x, pos_y, handle_size, handle_size)
+
+    def update_current_page_from_scroll(self):
+        """Update current page and render controls with zoom awareness"""
+        try:
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            h_scrollbar = self.scroll_area.horizontalScrollBar()
+
+            scroll_x = h_scrollbar.value()
+            scroll_y = v_scrollbar.value()
+            viewport_width = self.scroll_area.viewport().width()
+            viewport_height = self.scroll_area.viewport().height()
+
+            # Get current zoom level
+            zoom_level = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+
+            # Calculate viewport rectangle in canvas coordinates (already zoom-scaled)
+            viewport_rect = QRect(scroll_x, scroll_y, viewport_width, viewport_height)
+
+            # Determine visible page range (zoom affects page positions)
+            start_page = self.pdf_canvas.get_page_at_y_position(scroll_y)
+            end_page = self.pdf_canvas.get_page_at_y_position(scroll_y + viewport_height)
+
+            # Update current page
+            current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_y)
+            self.pdf_canvas.current_page = current_page
+
+            print(f"📜 Scroll update: zoom={zoom_level:.1f}x, pages={start_page}-{end_page}")
+
+            # Render controls for visible area with zoom consideration
+            self.pdf_canvas.draw_controls_and_overlay(start_page, end_page, viewport_rect)
+
+            # Update UI
+            self.update_document_info()
+
+        except Exception as e:
+            print(f"⚠️ Error in scroll update: {e}")
+
+    def on_zoom_changed(self, new_zoom_level: float):
+        """Handle zoom level changes"""
+        old_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+
+        print(f"🔍 Zoom changed: {old_zoom:.1f}x → {new_zoom_level:.1f}x")
+
+        # Update canvas zoom
+        self.pdf_canvas.set_zoom(new_zoom_level)
+
+        # Force full re-render at new zoom (don't use viewport method here)
+        self.pdf_canvas.draw_overlay()  # Full redraw needed when zoom changes
+
+        # Update scroll position to maintain focus point
+        self._maintain_zoom_focus_point(old_zoom, new_zoom_level)
+
+    def get_rendering_strategy_for_zoom(self, zoom_level: float) -> str:
+        """Determine rendering strategy based on zoom level"""
+        if zoom_level < 0.3:
+            return "ultra_low_detail"  # Just colored rectangles
+        elif zoom_level < 0.7:
+            return "low_detail"  # Simple borders, no text
+        elif zoom_level < 1.5:
+            return "normal_detail"  # Standard rendering
+        elif zoom_level < 3.0:
+            return "high_detail"  # Enhanced borders, full text
+        else:
+            return "ultra_high_detail"  # All decorations, crisp text
+
+    def draw_controls_and_overlay(self, start_page: int, end_page: int, viewport_rect: QRect):
+        """
+        Draw controls with zoom-aware viewport handling
+
+        Args:
+            start_page: First visible page (0-based)
+            end_page: Last visible page (0-based, inclusive)
+            viewport_rect: Bounding rectangle in canvas coordinates (already zoom-scaled)
+        """
+        if not self.page_pixmap:
+            return
+
+        try:
+            zoom_level = getattr(self, 'zoom_level', 1.0)
+            print(f"🎨 Drawing controls for pages {start_page}-{end_page} at zoom {zoom_level:.1f}x")
+            print(f"   Viewport: {viewport_rect} (canvas coords)")
+
+            # Create overlay copy
+            overlay_pixmap = self.page_pixmap.copy()
+            painter = QPainter(overlay_pixmap)
+
+            # Scale grid size with zoom
+            if self.show_grid:
+                self._draw_grid_in_viewport_zoomed(painter, viewport_rect, zoom_level)
+
+            # Draw fields with zoom-aware filtering
+            if self.field_renderer and hasattr(self, 'field_manager'):
+                selected_field = self.selection_handler.get_selected_field() if hasattr(self,
+                                                                                        'selection_handler') else None
+
+                total_fields_rendered = 0
+                for page_num in range(start_page, end_page + 1):
+                    # Get fields on this page
+                    page_fields = [f for f in self.field_manager.fields
+                                   if getattr(f, 'page_number', 0) == page_num]
+
+                    # Filter fields visible in zoomed viewport
+                    visible_fields = self._filter_fields_in_zoomed_viewport(
+                        page_fields, viewport_rect, page_num, zoom_level
+                    )
+
+                    print(f"   Page {page_num}: {len(visible_fields)}/{len(page_fields)} fields in zoomed viewport")
+
+                    # Render visible fields at current zoom
+                    for field in visible_fields:
+                        self._render_field_at_zoom(painter, field, selected_field, zoom_level)
+                        total_fields_rendered += 1
+
+                print(f"✅ Rendered {total_fields_rendered} fields at {zoom_level:.1f}x zoom")
+
+            painter.end()
+            self.setPixmap(overlay_pixmap)
+
+        except Exception as e:
+            print(f"❌ Error in draw_controls_and_overlay: {e}")
 
     def draw_overlay(self):
         """Draw overlay with fields and grid for all visible pages"""

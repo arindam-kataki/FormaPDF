@@ -1071,6 +1071,63 @@ class PDFViewerMainWindow(QMainWindow):
                 v_scrollbar.valueChanged.connect(self.update_current_page_from_scroll)
 
     def update_current_page_from_scroll(self):
+        """Update current page and render controls - with viewport calculation"""
+        try:
+            # Get scroll and viewport information
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+            h_scrollbar = self.scroll_area.horizontalScrollBar()
+
+            scroll_x = h_scrollbar.value()
+            scroll_y = v_scrollbar.value()
+            viewport_width = self.scroll_area.viewport().width()
+            viewport_height = self.scroll_area.viewport().height()
+
+            # Create viewport rectangle in canvas coordinates
+            viewport_rect = QRect(scroll_x, scroll_y, viewport_width, viewport_height)
+
+            # Calculate visible page range
+            start_page = self.pdf_canvas.get_page_at_y_position(scroll_y)
+            end_page = self.pdf_canvas.get_page_at_y_position(scroll_y + viewport_height)
+
+            # Ensure valid page range
+            max_page = self.pdf_canvas.get_page_count() - 1
+            start_page = max(0, min(start_page, max_page))
+            end_page = max(start_page, min(end_page, max_page))
+
+            # Update current page tracking
+            current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_y)
+            old_page = getattr(self.pdf_canvas, 'current_page', -1)
+            self.pdf_canvas.current_page = current_page
+
+            # Only render if page changed or significant scroll
+            if old_page != current_page or self._should_force_redraw():
+                print(f"📜 Rendering: pages {start_page}-{end_page}, viewport: {viewport_rect}")
+                self.pdf_canvas.draw_controls_and_overlay(start_page, end_page, viewport_rect)
+
+            # Update UI
+            self.update_document_info()
+
+        except Exception as e:
+            print(f"⚠️ Error in scroll update: {e}")
+            # Fallback to simple update
+            self.pdf_canvas.draw_overlay()
+
+    def _should_force_redraw(self):
+        """Determine if we should force a redraw (throttling)"""
+        import time
+        current_time = time.time()
+
+        if not hasattr(self, '_last_redraw_time'):
+            self._last_redraw_time = 0
+
+        # Force redraw every 100ms max (10 FPS)
+        if current_time - self._last_redraw_time > 0.1:
+            self._last_redraw_time = current_time
+            return True
+
+        return False
+
+    def deprecated_update_current_page_from_scroll(self):
         """Update current page info based on scroll position"""
         if not hasattr(self.pdf_canvas, 'get_current_page_from_scroll'):
             return
