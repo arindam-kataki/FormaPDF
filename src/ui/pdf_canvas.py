@@ -25,7 +25,9 @@ except ImportError:
 try:
     from models.field_model import FormField, FieldType, FieldManager
     from ui.field_renderer import FieldRenderer
-    from ui.drag_handler import DragHandler, SelectionHandler, WorkingSelectionHandler
+    #from ui.drag_handler import DragHandler, SelectionHandler, WorkingSelectionHandler
+    from ui.enhanced_drag_handler import EnhancedDragHandler as DragHandler
+    from ui.drag_handler import WorkingSelectionHandler, SelectionHandler
     from ui.selection_handler import SelectionHandler
     FIELD_COMPONENTS_AVAILABLE = True
 except ImportError:
@@ -152,6 +154,49 @@ class PDFCanvas(QLabel):
         self.field_renderer = None
 
     def _setup_signal_connections(self):
+        """Setup internal signal connections"""
+        try:
+            # Connect drag handler signals
+            self.drag_handler.fieldMoved.connect(self.fieldMoved)
+            self.drag_handler.fieldResized.connect(self.fieldResized)
+
+            # Connect cursor changes
+            self.drag_handler.cursorChanged.connect(
+                lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
+            )
+
+            # Connect selection handler signals - ONLY if they exist and are real signals
+            if hasattr(self.selection_handler, 'selectionChanged'):
+                selection_signal = self.selection_handler.selectionChanged
+                # Check if it's a real PyQt signal (not our fake one)
+                if hasattr(selection_signal, 'connect') and callable(selection_signal.connect):
+                    try:
+                        selection_signal.connect(self.selectionChanged)
+                        selection_signal.connect(self._on_selection_changed)
+                    except Exception as e:
+                        print(f"⚠️ Could not connect selection signals: {e}")
+                else:
+                    print("ℹ️ Using fake selection signals (callback-based)")
+
+            print("✅ Signal connections established")
+
+        except Exception as e:
+            print(f"⚠️ Error in signal connections: {e}")
+
+    def _on_selection_changed(self, field):
+        """Handle selection changes from selection handler"""
+        try:
+            # Update display when selection changes
+            if hasattr(self, 'draw_overlay'):
+                self.draw_overlay()
+
+            # Emit field clicked signal if field is selected
+            if field and hasattr(self, 'fieldClicked'):
+                self.fieldClicked.emit(field.id)
+        except Exception as e:
+            print(f"⚠️ Error in _on_selection_changed: {e}")
+
+    def _deprecated_1_setup_signal_connections(self):
         """Setup signal connections with error handling"""
         try:
             # Connect drag handler signals
@@ -1274,6 +1319,79 @@ class PDFCanvas(QLabel):
             super().wheelEvent(event)
 
     def keyPressEvent(self, event):
+        """Enhanced key press event with field manipulation shortcuts"""
+        key = event.key()
+        modifiers = event.modifiers()
+
+        # Get selected fields from drag handler
+        selected_fields = self.drag_handler.get_selected_fields()
+
+        if not selected_fields:
+            super().keyPressEvent(event)
+            return
+
+        # Movement shortcuts
+        move_distance = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
+
+        if key == Qt.Key.Key_Left:
+            self.drag_handler.handle_keyboard_move(-move_distance, 0)
+            self.draw_overlay()
+            event.accept()
+        elif key == Qt.Key.Key_Right:
+            self.drag_handler.handle_keyboard_move(move_distance, 0)
+            self.draw_overlay()
+            event.accept()
+        elif key == Qt.Key.Key_Up:
+            self.drag_handler.handle_keyboard_move(0, -move_distance)
+            self.draw_overlay()
+            event.accept()
+        elif key == Qt.Key.Key_Down:
+            self.drag_handler.handle_keyboard_move(0, move_distance)
+            self.draw_overlay()
+            event.accept()
+
+        # Delete selected fields
+        elif key == Qt.Key.Key_Delete or key == Qt.Key.Key_Backspace:
+            for field in selected_fields:
+                try:
+                    self.field_manager.remove_field(field)
+                except Exception as e:
+                    print(f"⚠️ Error deleting field: {e}")
+
+            self.drag_handler.clear_selection()
+            self.selection_handler.clear_selection()
+            self.draw_overlay()
+            event.accept()
+
+        # Copy/Paste shortcuts
+        elif key == Qt.Key.Key_C and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # TODO: Implement copy functionality
+            print("📋 Copy functionality (to be implemented)")
+            event.accept()
+
+        elif key == Qt.Key.Key_V and modifiers & Qt.KeyboardModifier.ControlModifier:
+            # TODO: Implement paste functionality
+            print("📋 Paste functionality (to be implemented)")
+            event.accept()
+
+        # Select all
+        elif key == Qt.Key.Key_A and modifiers & Qt.KeyboardModifier.ControlModifier:
+            for field in self.field_manager.fields:
+                self.drag_handler.select_field(field, add_to_selection=True)
+            self.draw_overlay()
+            event.accept()
+
+        # Escape to clear selection
+        elif key == Qt.Key.Key_Escape:
+            self.drag_handler.clear_selection()
+            self.selection_handler.clear_selection()
+            self.draw_overlay()
+            event.accept()
+
+        else:
+            super().keyPressEvent(event)
+
+    def deprecated_1_keyPressEvent(self, event):
         """Enhanced keyboard event handling for fields, scrolling, and zoom"""
         key = event.key()
         modifiers = event.modifiers()
@@ -1737,6 +1855,76 @@ class PDFCanvas(QLabel):
             print(f"⚠️ Error drawing selection handles: {e}")
 
     def mousePressEvent(self, event):
+        """Enhanced mouse press event with multi-selection support"""
+        print("🖱️ Enhanced mouse press event started")
+        print(f"   Button: {event.button()}")
+        print(f"   Position: {event.position().toPoint()}")
+        print(f"   Modifiers: {event.modifiers()}")
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()  # Enable keyboard events
+            screen_pos = event.position().toPoint()
+            modifiers = event.modifiers()
+
+            # Convert screen coordinates to document coordinates
+            doc_coords = self.screen_to_document_coordinates(screen_pos.x(), screen_pos.y())
+
+            if not doc_coords:
+                print("   Click was in margin/gap area - ignoring")
+                return
+
+            page_num, doc_x, doc_y = doc_coords
+            print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
+            print(f"   Page {page_num} doc pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
+
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            # Use enhanced drag handler with modifier support
+            clicked_field = None
+            try:
+                clicked_field = self.drag_handler.handle_mouse_press(doc_pos, modifiers)
+                print(f"   Enhanced drag handler result: {clicked_field.name if clicked_field else 'None'}")
+            except Exception as e:
+                print(f"⚠️ Error in enhanced drag handler: {e}")
+
+            # Update selection handler
+            if clicked_field:
+                try:
+                    # For multi-selection, don't change selection handler's primary selection
+                    if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                        self.selection_handler.select_field(clicked_field)
+
+                    print(f"✅ Field interaction: {clicked_field.id}")
+                    self._handle_field_clicked(clicked_field.id)
+
+                    # Force redraw to show selection
+                    self.draw_overlay()
+                    return
+
+                except Exception as e:
+                    print(f"⚠️ Error in field selection: {e}")
+
+            # Handle field creation for empty areas (existing logic)
+            # Only create new field if no existing field was found AND no modifiers
+            if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                selected_field_type = self.get_selected_field_type()
+                if selected_field_type and selected_field_type != 'select':
+                    try:
+                        self.create_field_at_position(doc_x, doc_y, page_num, selected_field_type)
+                        return
+                    except Exception as e:
+                        print(f"⚠️ Error creating field: {e}")
+
+            # Handle empty space click (clear selection if not holding Ctrl)
+            if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                try:
+                    self.selection_handler.clear_selection()
+                    self.drag_handler.clear_selection()
+                    self.draw_overlay()
+                except Exception as e:
+                    print(f"⚠️ Error clearing selection: {e}")
+
+    def deprecated_1_mousePressEvent(self, event):
         """Handle mouse press events - prioritize field selection over creation"""
         print("🖱️ Mouse press event started")
         print(f"   Button: {event.button()}")
@@ -2056,6 +2244,27 @@ class PDFCanvas(QLabel):
         self.fieldRequested.emit(field_type)
 
     def mouseMoveEvent(self, event):
+        """Enhanced mouse move event with improved drag handling"""
+        pos = event.position().toPoint()
+
+        # Convert to document coordinates for drag handler
+        doc_coords = self.screen_to_document_coordinates(pos.x(), pos.y())
+        if doc_coords:
+            page_num, doc_x, doc_y = doc_coords
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            # Update drag handler zoom level
+            self.drag_handler.set_zoom_level(self.zoom_level)
+
+            is_dragging = self.drag_handler.handle_mouse_move(doc_pos)
+
+            if is_dragging:
+                self.draw_overlay()
+        else:
+            # Still update cursor for areas outside document
+            self.drag_handler.handle_mouse_move(pos)
+
+    def deprecated_1_mouseMoveEvent(self, event):
         """Handle mouse move events"""
         pos = event.position().toPoint()
         is_dragging = self.drag_handler.handle_mouse_move(pos)
@@ -2064,6 +2273,33 @@ class PDFCanvas(QLabel):
             self.draw_overlay()
 
     def mouseReleaseEvent(self, event):
+        """Enhanced mouse release event"""
+        if event.button() == Qt.MouseButton.LeftButton:
+            pos = event.position().toPoint()
+
+            # Convert to document coordinates
+            doc_coords = self.screen_to_document_coordinates(pos.x(), pos.y())
+            if doc_coords:
+                page_num, doc_x, doc_y = doc_coords
+                doc_pos = QPoint(int(doc_x), int(doc_y))
+
+                was_dragging = self.drag_handler.handle_mouse_release(doc_pos)
+
+                if was_dragging:
+                    print("✅ Drag operation completed")
+                    self.draw_overlay()
+
+                    # Notify main window of changes
+                    main_window = self._get_main_window()
+                    if main_window and hasattr(main_window, 'on_field_moved'):
+                        try:
+                            selected_fields = self.drag_handler.get_selected_fields()
+                            for field in selected_fields:
+                                main_window.on_field_moved(field.id, field.x, field.y)
+                        except Exception as e:
+                            print(f"⚠️ Error notifying main window: {e}")
+
+    def deprecated_1_mouseReleaseEvent(self, event):
         """Handle mouse release events"""
         if event.button() == Qt.MouseButton.LeftButton:
             pos = event.position().toPoint()
