@@ -1488,7 +1488,7 @@ class PDFCanvas(QLabel):
                 except Exception as e:
                     print(f"⚠️ Error deleting field: {e}")
 
-            self.drag_handler.clear_selection()
+            self.enhanced_drag_handler.clear_selection()
             self.selection_handler.clear_selection()
             self.draw_overlay()
             event.accept()
@@ -1513,7 +1513,7 @@ class PDFCanvas(QLabel):
 
         # Escape to clear selection
         elif key == Qt.Key.Key_Escape:
-            self.drag_handler.clear_selection()
+            self.enhanced_drag_handler.clear_selection()
             self.selection_handler.clear_selection()
             self.draw_overlay()
             event.accept()
@@ -2049,7 +2049,7 @@ class PDFCanvas(QLabel):
             if not (modifiers & Qt.KeyboardModifier.ControlModifier):
                 try:
                     self.selection_handler.clear_selection()
-                    self.drag_handler.clear_selection()
+                    self.enhanced_drag_handler.clear_selection()
                     self.draw_overlay()
                 except Exception as e:
                     print(f"⚠️ Error clearing selection: {e}")
