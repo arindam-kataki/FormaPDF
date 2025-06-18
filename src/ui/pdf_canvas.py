@@ -1018,6 +1018,143 @@ class PDFCanvas(QLabel):
 
             # Draw fields if available - HANDLE MULTIPLE VISIBLE PAGES
             if self.field_renderer and hasattr(self.field_renderer, 'render_fields'):
+                # Get primary selected field
+                primary_selected_field = self.selection_handler.get_selected_field() if hasattr(self,
+                                                                                                'selection_handler') else None
+
+                # Get ALL selected fields from drag handler for counting
+                multi_selected_fields = []
+                if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
+                    multi_selected_fields = self.drag_handler.get_selected_fields()
+
+                # Get ALL visible pages
+                visible_pages = self.get_visible_page_numbers()
+                print(f"🎨 Drawing fields for visible pages: {visible_pages}")
+
+                # DEBUG: Check what fields exist per page
+                total_fields = len(self.field_manager.fields) if self.field_manager else 0
+                print(f"🎨 Total fields in manager: {total_fields}")
+                print(f"🎨 Multi-selected fields: {len(multi_selected_fields)}")
+
+                # Render fields for each visible page (WITHOUT multi_selected_fields parameter)
+                for page_num in visible_pages:
+                    self.field_renderer.render_fields(
+                        painter,
+                        self.field_manager.fields,
+                        primary_selected_field,
+                        page_num,
+                        zoom_level=self.zoom_level,
+                        coord_transform_func=self.document_to_screen_coordinates
+                    )
+
+            # ✅ Draw selection handles for all selected fields AFTER field rendering
+            self._draw_selection_handles(painter)
+
+            painter.end()
+
+            # Update the displayed pixmap
+            self.setPixmap(overlay_pixmap)
+
+        except Exception as e:
+            print(f"Error drawing overlay: {e}")
+        finally:
+            # CRITICAL: Always reset the flag
+            self._rendering_in_progress = False
+
+    def _draw_selection_handles(self, painter):
+        """Draw selection handles for all selected fields"""
+        try:
+            # Get all selected fields from drag handler
+            selected_fields = []
+            if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
+                selected_fields = self.drag_handler.get_selected_fields()
+
+            # Also include the primary selected field from selection handler
+            if hasattr(self, 'selection_handler'):
+                primary_field = self.selection_handler.get_selected_field()
+                if primary_field and primary_field not in selected_fields:
+                    selected_fields.append(primary_field)
+
+            print(f"🎨 Drawing selection handles for {len(selected_fields)} fields")
+
+            # Draw selection for each selected field
+            for i, field in enumerate(selected_fields):
+                # Use different colors for multi-selection
+                if len(selected_fields) > 1:
+                    # Multi-selection: use blue for all
+                    self._draw_field_selection_handles(painter, field, QColor(0, 120, 255), i)
+                else:
+                    # Single selection: use red
+                    self._draw_field_selection_handles(painter, field, QColor(255, 0, 0), 0)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selection handles: {e}")
+
+    def _draw_field_selection_handles(self, painter, field, color, index):
+        """Draw selection handles for a single field"""
+        try:
+            # Convert field coordinates to screen coordinates
+            screen_coords = self.document_to_screen_coordinates(field.page_number, field.x, field.y)
+            if not screen_coords:
+                return
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # Draw selection rectangle with specified color
+            pen_width = 3 if index == 0 else 2  # Primary selection slightly thicker
+            painter.setPen(QPen(color, pen_width))
+            painter.setBrush(QBrush())
+            painter.drawRect(int(screen_x - 2), int(screen_y - 2),
+                             int(screen_width + 4), int(screen_height + 4))
+
+            # Draw corner handles
+            handle_size = 8
+            painter.setBrush(QBrush(color))
+
+            # Corner positions
+            corners = [
+                (screen_x - handle_size // 2, screen_y - handle_size // 2),  # Top-left
+                (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),  # Top-right
+                (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),  # Bottom-left
+                (screen_x + screen_width - handle_size // 2, screen_y + screen_height - handle_size // 2)
+                # Bottom-right
+            ]
+
+            for corner_x, corner_y in corners:
+                painter.drawRect(int(corner_x), int(corner_y), handle_size, handle_size)
+
+            # Optional: Draw field ID for debugging multi-selection
+            if len(self.drag_handler.get_selected_fields()) > 1:
+                painter.setPen(QPen(QColor(0, 0, 0)))
+                painter.drawText(int(screen_x + 5), int(screen_y + 15), f"{field.id}")
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field selection handles: {e}")
+
+    def deprecated_2_draw_overlay(self):
+        """Draw overlay with fields and grid for all visible pages"""
+        if not self.page_pixmap:
+            return
+
+        # Prevent concurrent rendering conflicts
+        if getattr(self, '_rendering_in_progress', False):
+            return
+
+        try:
+            self._rendering_in_progress = True
+
+            # Create a copy of the pixmap to draw on
+            overlay_pixmap = self.page_pixmap.copy()
+            painter = QPainter(overlay_pixmap)
+
+            # Draw grid if enabled
+            if self.show_grid:
+                self._draw_grid(painter)
+
+            # Draw fields if available - HANDLE MULTIPLE VISIBLE PAGES
+            if self.field_renderer and hasattr(self.field_renderer, 'render_fields'):
                 selected_field = self.selection_handler.get_selected_field() if hasattr(self,
                                                                                         'selection_handler') else None
 
@@ -1812,7 +1949,7 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
 
-    def _draw_selection_handles(self, painter, field):
+    def _deprecated_draw_selection_handles(self, painter, field):
         """Draw selection handles around a field"""
         try:
             from PyQt6.QtGui import QPen, QBrush, QColor
@@ -2628,6 +2765,64 @@ class PDFCanvas(QLabel):
 
         except Exception as e:
             print(f"❌ Error rendering detailed field: {e}")
+
+    def draw_selected_fields(self, painter):
+        """Draw selection handles for all selected fields"""
+        try:
+            # Get all selected fields from drag handler
+            selected_fields = []
+            if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
+                selected_fields = self.drag_handler.get_selected_fields()
+
+            # Also include the primary selected field from selection handler
+            if hasattr(self, 'selection_handler'):
+                primary_field = self.selection_handler.get_selected_field()
+                if primary_field and primary_field not in selected_fields:
+                    selected_fields.append(primary_field)
+
+            # Draw selection for each selected field
+            for field in selected_fields:
+                self._draw_field_selection(painter, field)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing selected fields: {e}")
+
+    def _draw_field_selection(self, painter, field):
+        """Draw selection handles for a single field"""
+        try:
+            # Convert field coordinates to screen coordinates
+            screen_coords = self.document_to_screen_coordinates(field.page_number, field.x, field.y)
+            if not screen_coords:
+                return
+
+            screen_x, screen_y = screen_coords
+            screen_width = field.width * self.zoom_level
+            screen_height = field.height * self.zoom_level
+
+            # Draw selection rectangle
+            painter.setPen(QPen(QColor(0, 120, 255), 2))  # Blue selection
+            painter.setBrush(QBrush())
+            painter.drawRect(int(screen_x - 2), int(screen_y - 2),
+                             int(screen_width + 4), int(screen_height + 4))
+
+            # Draw corner handles
+            handle_size = 8
+            painter.setBrush(QBrush(QColor(0, 120, 255)))
+
+            # Corner positions
+            corners = [
+                (screen_x - handle_size // 2, screen_y - handle_size // 2),  # Top-left
+                (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),  # Top-right
+                (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),  # Bottom-left
+                (screen_x + screen_width - handle_size // 2, screen_y + screen_height - handle_size // 2)
+                # Bottom-right
+            ]
+
+            for corner_x, corner_y in corners:
+                painter.drawRect(int(corner_x), int(corner_y), handle_size, handle_size)
+
+        except Exception as e:
+            print(f"⚠️ Error drawing field selection: {e}")
 
 class SafeSelectionHandler:
     """Emergency fallback SelectionHandler that never crashes"""

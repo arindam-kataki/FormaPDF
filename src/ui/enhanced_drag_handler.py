@@ -138,19 +138,19 @@ class EnhancedDragHandler(QObject):
         clicked_field = self.field_manager.get_field_at_position(pos.x(), pos.y())
 
         if clicked_field:
-            # Handle multi-selection with Ctrl+Click
             if modifiers & Qt.KeyboardModifier.ControlModifier and self.multi_selection_enabled:
+                # Multi-select mode: toggle the clicked field
                 self._handle_multi_selection(clicked_field)
                 self._prepare_multi_move_operation()
             else:
-                # Single field selection
+                # Single select mode: clear others and select this one
                 self.selected_fields.clear()
                 self.selected_fields.add(clicked_field)
                 self._prepare_move_operation(clicked_field)
 
             return clicked_field
 
-        # Clicked on empty space - clear multi-selection if not holding Ctrl
+            # Clicked empty space
         if not (modifiers & Qt.KeyboardModifier.ControlModifier):
             self.selected_fields.clear()
 
@@ -244,11 +244,25 @@ class EnhancedDragHandler(QObject):
             print(f"⚠️ Error updating page number for {field.id}: {e}")
 
     def _handle_multi_selection(self, clicked_field: FormField):
-        """Handle Ctrl+Click multi-selection"""
+        """Handle Ctrl+Click multi-selection with toggle support"""
+
+        # Check if we're starting selection on a different page
+        if self.selected_fields:
+            first_selected_page = list(self.selected_fields)[0].page_number
+            if clicked_field.page_number != first_selected_page:
+                # Clear selection and start fresh on new page
+                print(f"🔄 Switching from page {first_selected_page} to page {clicked_field.page_number}")
+                self.selected_fields.clear()
+                self.selected_fields.add(clicked_field)
+                return
+
+        # Toggle behavior: if already selected, remove it; if not selected, add it
         if clicked_field in self.selected_fields:
             self.selected_fields.remove(clicked_field)
+            print(f"➖ Removed {clicked_field.id} from selection ({len(self.selected_fields)} remaining)")
         else:
             self.selected_fields.add(clicked_field)
+            print(f"➕ Added {clicked_field.id} to selection ({len(self.selected_fields)} total)")
 
     def _prepare_move_operation(self, field: FormField):
         """Prepare for moving a single field"""
@@ -273,6 +287,35 @@ class EnhancedDragHandler(QObject):
         self.drag_state.start_field_size = (field.width, field.height)
 
     def _handle_move_operation(self, dx: int, dy: int):
+        """Handle single field movement with WORKING page constraints"""
+        if not self.drag_state.target_field or not self.drag_state.start_field_pos:
+            return
+
+        field = self.drag_state.target_field
+        start_x, start_y = self.drag_state.start_field_pos
+
+        # Calculate proposed new position
+        adjusted_dx = dx / self.zoom_level if self.zoom_level != 1.0 else dx
+        adjusted_dy = dy / self.zoom_level if self.zoom_level != 1.0 else dy
+
+        proposed_x = start_x + adjusted_dx
+        proposed_y = start_y + adjusted_dy
+
+        # ✅ APPLY CONSTRAINTS BEFORE UPDATING
+        page_bounds = self._get_page_bounds(field.page_number)
+
+        # Constrain to page boundaries
+        final_x = max(0, min(proposed_x, page_bounds['width'] - field.width))
+        final_y = max(0, min(proposed_y, page_bounds['height'] - field.height))
+
+        # Apply grid snapping to final constrained position
+        if self.snap_to_grid:
+            final_x, final_y = GridUtils.snap_to_grid(final_x, final_y, self.grid_size)
+
+        # Update field position with constrained coordinates
+        field.move_to(int(final_x), int(final_y))
+
+    def _deprecated_handle_move_operation(self, dx: int, dy: int):
         """Handle single field movement with cross-page support"""
         if not self.drag_state.target_field or not self.drag_state.start_field_pos:
             return
@@ -521,6 +564,33 @@ class EnhancedDragHandler(QObject):
         """Check if a field is currently selected"""
         return field in self.selected_fields
 
+    def _get_page_bounds(self, page_number: int):
+        """Get the boundaries for a specific page"""
+        try:
+            # Simple approach: assume standard page size
+            # A4 dimensions in points (72 points per inch)
+            page_width = 595  # A4 width in points (8.27 inches * 72)
+            page_height = 842  # A4 height in points (11.69 inches * 72)
+
+            # Apply zoom to get actual pixel dimensions
+            page_width = int(page_width * self.zoom_level)
+            page_height = int(page_height * self.zoom_level)
+
+            return {
+                'x': 0,
+                'y': 0,
+                'width': page_width,
+                'height': page_height
+            }
+        except Exception as e:
+            print(f"⚠️ Error getting page bounds: {e}")
+            # Fallback dimensions
+            return {
+                'x': 0,
+                'y': 0,
+                'width': int(595 * self.zoom_level),
+                'height': int(842 * self.zoom_level)
+            }
 
 # For backward compatibility, keep the original DragHandler available
 class DragHandler(EnhancedDragHandler):
