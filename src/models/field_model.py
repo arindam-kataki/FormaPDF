@@ -7,6 +7,8 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from enum import Enum
 
+from PyQt6.QtCore import QRect
+
 
 class FieldType(Enum):
     """Enumeration of supported field types"""
@@ -139,6 +141,15 @@ class FormField:
         if not isinstance(other, FormField):
             return False
         return self.id == other.id
+
+    def get_screen_rect(self, zoom_level):
+        """Get field rectangle in screen coordinates"""
+        return QRect(
+            int(self.x * zoom_level),
+            int(self.y * zoom_level),
+            int(self.width * zoom_level),
+            int(self.height * zoom_level)
+        )
 
 class FieldManager:
     """Manages a collection of form fields"""

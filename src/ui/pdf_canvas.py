@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import QLabel, QApplication
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
 from PyQt6.QtCore import QObject, pyqtSignal, Qt, QRect
 from PyQt6.QtCore import QPoint
+from .enhanced_drag_handler import EnhancedDragHandler
 
 # Try to import PyMuPDF
 try:
@@ -131,8 +132,8 @@ class PDFCanvas(QLabel):
         # Setup signal connections
         self._setup_signal_connections()
 
-        if hasattr(self, 'drag_handler'):
-            self.drag_handler.pdf_canvas_ref = self
+        if hasattr(self, 'enhanced_drag_handler'):
+            self.enhanced_drag_handler.pdf_canvas_ref = self
 
         self._rendering_in_progress = False
 
@@ -142,7 +143,8 @@ class PDFCanvas(QLabel):
             try:
                 self.field_manager = FieldManager()
                 self.selection_handler = WorkingSelectionHandler(self.field_manager)
-                self.drag_handler = DragHandler(self.field_manager)
+                #self.drag_handler = DragHandler(self.field_manager)
+                self.enhanced_drag_handler = EnhancedDragHandler(self, self.field_manager)
                 self.field_renderer = FieldRenderer()
             except Exception as e:
                 print(f"⚠️ Error initializing full handlers: {e}")
@@ -154,20 +156,29 @@ class PDFCanvas(QLabel):
         """Initialize minimal handlers as fallback"""
         self.field_manager = MinimalFieldManager()
         self.selection_handler = MinimalSelectionHandler()
-        self.drag_handler = MinimalDragHandler()
+        #self.drag_handler = MinimalDragHandler()
+        self.enhanced_drag_handler = EnhancedDragHandler(self, self.field_manager)
         self.field_renderer = None
 
     def _setup_signal_connections(self):
         """Setup internal signal connections"""
         try:
             # Connect drag handler signals to PDF canvas signals
-            self.drag_handler.fieldMoved.connect(self.fieldMoved)
-            self.drag_handler.fieldResized.connect(self.fieldResized)
+            if hasattr(self.enhanced_drag_handler, 'fieldMoved'):
+                self.enhanced_drag_handler.fieldMoved.connect(self.fieldMoved)
+            if hasattr(self.enhanced_drag_handler, 'fieldResized'):
+                self.enhanced_drag_handler.fieldResized.connect(self.fieldResized)
+
+            # Connect cursor changes (if enhanced handler supports it)
+            if hasattr(self.enhanced_drag_handler, 'cursorChanged'):
+                self.enhanced_drag_handler.cursorChanged.connect(
+                    lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
+                )
 
             # Connect cursor changes
-            self.drag_handler.cursorChanged.connect(
-                lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
-            )
+            #self.drag_handler.cursorChanged.connect(
+            #    lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
+            #)
 
             # Connect selection handler signals - ONLY if they exist and are real signals
             if hasattr(self.selection_handler, 'selectionChanged'):
@@ -187,35 +198,6 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error in signal connections: {e}")
 
-    def _deprecated__setup_signal_connections(self):
-        """Setup internal signal connections"""
-        try:
-            # Connect drag handler signals
-            self.drag_handler.fieldMoved.connect(self.fieldMoved)
-            self.drag_handler.fieldResized.connect(self.fieldResized)
-
-            # Connect cursor changes
-            self.drag_handler.cursorChanged.connect(
-                lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
-            )
-
-            # Connect selection handler signals - ONLY if they exist and are real signals
-            if hasattr(self.selection_handler, 'selectionChanged'):
-                selection_signal = self.selection_handler.selectionChanged
-                # Check if it's a real PyQt signal (not our fake one)
-                if hasattr(selection_signal, 'connect') and callable(selection_signal.connect):
-                    try:
-                        selection_signal.connect(self.selectionChanged)
-                        selection_signal.connect(self._on_selection_changed)
-                    except Exception as e:
-                        print(f"⚠️ Could not connect selection signals: {e}")
-                else:
-                    print("ℹ️ Using fake selection signals (callback-based)")
-
-            print("✅ Signal connections established")
-
-        except Exception as e:
-            print(f"⚠️ Error in signal connections: {e}")
 
     def _on_selection_changed(self, field):
         """Handle selection changes from selection handler"""
@@ -754,9 +736,14 @@ class PDFCanvas(QLabel):
             return
 
         self.zoom_level = zoom_level
+
+        # ✅ ADD THIS LINE - Update enhanced drag handler zoom level
+        if hasattr(self, 'enhanced_drag_handler'):
+            self.enhanced_drag_handler.set_zoom_level(zoom_level)
+
         # Re-render with new zoom level
         self.render_page()
-        #self.update_drag_handler_for_document()
+        # self.update_drag_handler_for_document()
 
     def _filter_fields_in_zoomed_viewport(self, fields: List[FormField], viewport_rect: QRect,
                                           page_num: int, zoom_level: float) -> List[FormField]:
@@ -997,7 +984,11 @@ class PDFCanvas(QLabel):
             print(f"❌ Error in draw_controls_and_overlay: {e}")
 
     def draw_overlay(self):
+
         """Draw overlay with fields and grid for all visible pages"""
+        if hasattr(self, 'enhanced_drag_handler') and self.enhanced_drag_handler.is_dragging:
+            return  # Skip expensive redraw during drag - overlay handles it!
+
         if not self.page_pixmap:
             return
 
@@ -1463,7 +1454,7 @@ class PDFCanvas(QLabel):
         modifiers = event.modifiers()
 
         # Get selected fields from drag handler
-        selected_fields = self.drag_handler.get_selected_fields()
+        selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
         if not selected_fields:
             super().keyPressEvent(event)
@@ -1473,19 +1464,19 @@ class PDFCanvas(QLabel):
         move_distance = 10 if modifiers & Qt.KeyboardModifier.ShiftModifier else 1
 
         if key == Qt.Key.Key_Left:
-            self.drag_handler.handle_keyboard_move(-move_distance, 0)
+            self.enhanced_drag_handler.handle_keyboard_move(-move_distance, 0)
             self.draw_overlay()
             event.accept()
         elif key == Qt.Key.Key_Right:
-            self.drag_handler.handle_keyboard_move(move_distance, 0)
+            self.enhanced_drag_handler.handle_keyboard_move(move_distance, 0)
             self.draw_overlay()
             event.accept()
         elif key == Qt.Key.Key_Up:
-            self.drag_handler.handle_keyboard_move(0, -move_distance)
+            self.enhanced_drag_handler.handle_keyboard_move(0, -move_distance)
             self.draw_overlay()
             event.accept()
         elif key == Qt.Key.Key_Down:
-            self.drag_handler.handle_keyboard_move(0, move_distance)
+            self.enhanced_drag_handler.handle_keyboard_move(0, move_distance)
             self.draw_overlay()
             event.accept()
 
@@ -2021,7 +2012,7 @@ class PDFCanvas(QLabel):
             # Use enhanced drag handler with modifier support
             clicked_field = None
             try:
-                clicked_field = self.drag_handler.handle_mouse_press(doc_pos, modifiers)
+                clicked_field = self.enhanced_drag_handler.handle_mouse_press(doc_pos, modifiers)
                 print(f"   Enhanced drag handler result: {clicked_field.name if clicked_field else 'None'}")
             except Exception as e:
                 print(f"⚠️ Error in enhanced drag handler: {e}")
@@ -2440,15 +2431,15 @@ class PDFCanvas(QLabel):
             doc_pos = QPoint(int(doc_x), int(doc_y))
 
             # Update drag handler zoom level
-            self.drag_handler.set_zoom_level(self.zoom_level)
+            self.enhanced_drag_handler.set_zoom_level(self.zoom_level)
+            is_dragging = self.enhanced_drag_handler.handle_mouse_move(doc_pos)
 
-            is_dragging = self.drag_handler.handle_mouse_move(doc_pos)
-
-            if is_dragging:
-                self.draw_overlay()
+            #if is_dragging:
+            #    self.draw_overlay()
         else:
             # Still update cursor for areas outside document
-            self.drag_handler.handle_mouse_move(pos)
+            if hasattr(self, 'enhanced_drag_handler'):
+                self.enhanced_drag_handler.handle_mouse_move(pos)
 
     def mouseReleaseEvent(self, event):
         """Enhanced mouse release event"""
@@ -2461,7 +2452,7 @@ class PDFCanvas(QLabel):
                 page_num, doc_x, doc_y = doc_coords
                 doc_pos = QPoint(int(doc_x), int(doc_y))
 
-                was_dragging = self.drag_handler.handle_mouse_release(doc_pos)
+                was_dragging = self.enhanced_drag_handler.handle_mouse_release(doc_pos)
 
                 if was_dragging:
                     print("✅ Drag operation completed")
@@ -2471,20 +2462,13 @@ class PDFCanvas(QLabel):
                     main_window = self._get_main_window()
                     if main_window and hasattr(main_window, 'on_field_moved'):
                         try:
-                            selected_fields = self.drag_handler.get_selected_fields()
+                            selected_fields = self.enhanced_drag_handler.get_selected_fields()
                             for field in selected_fields:
                                 main_window.on_field_moved(field.id, field.x, field.y)
                         except Exception as e:
                             print(f"⚠️ Error notifying main window: {e}")
 
-    def deprecated_1_mouseReleaseEvent(self, event):
-        """Handle mouse release events"""
-        if event.button() == Qt.MouseButton.LeftButton:
-            pos = event.position().toPoint()
-            was_dragging = self.drag_handler.handle_mouse_release(pos)
 
-            if was_dragging:
-                self.draw_overlay()
 
     def deprecated_get_current_page_from_scroll(self, scroll_position):
         """Determine which page is currently visible based on scroll position"""
