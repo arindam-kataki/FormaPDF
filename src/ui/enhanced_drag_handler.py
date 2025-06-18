@@ -203,11 +203,17 @@ class EnhancedDragHandler(QObject):
             # Emit final position signals
             if self.drag_state.mode == DragMode.MOVE and self.drag_state.target_field:
                 field = self.drag_state.target_field
+                # ✅ UPDATE PAGE NUMBER based on final Y position
+                self._update_field_page_number(field, field.x, field.y)  # Pass x, y
                 self.fieldMoved.emit(field.id, field.x, field.y)
             elif self.drag_state.mode == DragMode.RESIZE and self.drag_state.target_field:
                 field = self.drag_state.target_field
                 self.fieldResized.emit(field.id, field.x, field.y, field.width, field.height)
             elif self.drag_state.mode == DragMode.MULTI_SELECT:
+                # ✅ ADD: Update page numbers for all moved fields
+                for field in self.selected_fields:
+                    self._update_field_page_number(field, field.x, field.y)  # Pass x, y
+
                 moved_fields = [(f.id, f.x, f.y) for f in self.selected_fields]
                 self.multipleFieldsMoved.emit(moved_fields)
 
@@ -218,6 +224,24 @@ class EnhancedDragHandler(QObject):
         self._update_cursor_for_position(pos)
 
         return was_dragging
+
+    def _update_field_page_number(self, field):
+        """Update field's page number based on Y position"""
+        try:
+            # Simple logic: assume each page is ~800 pixels high at 1x zoom
+            page_height = 800 * self.zoom_level
+            page_gap = 20  # Gap between pages
+
+            # Calculate which page based on Y position
+            total_page_height = page_height + page_gap
+            new_page = max(0, int(field.y / total_page_height))
+
+            if new_page != field.page_number:
+                print(f"🔄 Field {field.id}: page {field.page_number} → page {new_page} (y={field.y})")
+                field.page_number = new_page
+
+        except Exception as e:
+            print(f"⚠️ Error updating page number for {field.id}: {e}")
 
     def _handle_multi_selection(self, clicked_field: FormField):
         """Handle Ctrl+Click multi-selection"""
@@ -263,6 +287,8 @@ class EnhancedDragHandler(QObject):
         new_x = start_x + adjusted_dx
         new_y = start_y + adjusted_dy
 
+
+
         # ENABLE CROSS-PAGE DRAGGING: Only apply minimal constraints
         # Allow movement across the entire document area
         new_x = max(-50, new_x)  # Small left margin
@@ -270,8 +296,8 @@ class EnhancedDragHandler(QObject):
         # No right/bottom limits - allow dragging to any page
 
         # Apply grid snapping
-        if self.snap_to_grid:
-            new_x, new_y = GridUtils.snap_to_grid(new_x, new_y, self.grid_size)
+        #if self.snap_to_grid:
+        #    new_x, new_y = GridUtils.snap_to_grid(new_x, new_y, self.grid_size)
 
         # Update field position
         field.move_to(int(new_x), int(new_y))
@@ -352,10 +378,10 @@ class EnhancedDragHandler(QObject):
                 new_y = start_y + adjusted_dy
 
                 # Apply boundary constraints
-                new_x, new_y = BoundaryConstraints.constrain_position(
-                    new_x, new_y, field.width, field.height,
-                    self.canvas_width, self.canvas_height
-                )
+                #new_x, new_y = BoundaryConstraints.constrain_position(
+                #    new_x, new_y, field.width, field.height,
+                #    self.canvas_width, self.canvas_height
+                #)
 
                 # Apply grid snapping
                 if self.snap_to_grid:

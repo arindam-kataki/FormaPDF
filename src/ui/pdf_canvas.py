@@ -277,31 +277,7 @@ class PDFCanvas(QLabel):
             padding: 20px;
         """)
 
-    def update_drag_handler_for_document(self):
-        """Update drag handler settings for the loaded document"""
-        if not hasattr(self, 'drag_handler'):
-            return
 
-        try:
-            # Calculate total document dimensions
-            if hasattr(self, 'pdf_document') and self.pdf_document:
-                total_width = max(800, self.width())
-
-                # Calculate total height including all pages and gaps
-                total_height = 0
-                for page_num in range(self.pdf_document.page_count):
-                    page = self.pdf_document[page_num]
-                    page_height = int(page.rect.height * self.zoom_level)
-                    total_height += page_height + 20  # Add gap between pages
-
-                total_height += 100  # Extra margin at bottom
-
-                # Update drag handler
-                self.drag_handler.set_canvas_size(total_width, total_height)
-                print(f"🎯 Updated drag handler for {self.pdf_document.page_count} pages: {total_width}x{total_height}")
-
-        except Exception as e:
-            print(f"⚠️ Error updating drag handler for document: {e}")
 
     def load_pdf(self, pdf_path: str) -> bool:
         """Load PDF document"""
@@ -341,7 +317,7 @@ class PDFCanvas(QLabel):
             self.setStyleSheet("border: none; background-color: transparent;")
 
             self.debug_widget_setup()
-            self.update_drag_handler_for_document()
+            #self.update_drag_handler_for_document()
 
             return True
 
@@ -780,7 +756,7 @@ class PDFCanvas(QLabel):
         self.zoom_level = zoom_level
         # Re-render with new zoom level
         self.render_page()
-        self.update_drag_handler_for_document()
+        #self.update_drag_handler_for_document()
 
     def _filter_fields_in_zoomed_viewport(self, fields: List[FormField], viewport_rect: QRect,
                                           page_num: int, zoom_level: float) -> List[FormField]:
@@ -1134,42 +1110,6 @@ class PDFCanvas(QLabel):
 
         except Exception as e:
             print(f"Error drawing overlay: {e}")
-
-    def deprecated_1_update_current_page_from_scroll(self):
-        """Update current page based on scroll position and trigger field redraw for multiple pages"""
-        if not hasattr(self.parent(), 'verticalScrollBar'):
-            return
-
-        try:
-            scroll_bar = self.parent().verticalScrollBar()
-            scroll_position = scroll_bar.value()
-
-            # Get all visible pages
-            visible_pages = self.get_visible_page_numbers()
-
-            # Determine primary current page (usually the first visible or most visible)
-            new_current_page = visible_pages[0] if visible_pages else 0
-
-            # Check if the visible page set changed
-            old_visible_pages = getattr(self, '_last_visible_pages', [])
-
-            if visible_pages != old_visible_pages:
-                print(f"📄 Visible pages changed: {old_visible_pages} → {visible_pages}")
-
-                # Update tracking
-                self._last_visible_pages = visible_pages
-                self.current_page = new_current_page
-
-                # Force field redraw for new visible page set
-                self.draw_overlay()
-
-            elif not hasattr(self, 'current_page'):
-                # Initialize if doesn't exist
-                self.current_page = new_current_page
-                self._last_visible_pages = visible_pages
-
-        except Exception as e:
-            print(f"⚠️ Error updating current page from scroll: {e}")
 
     def cleanup_scroll_tracking(self):
         """Clean up scroll tracking timer"""
@@ -2140,34 +2080,7 @@ class PDFCanvas(QLabel):
 
         return False
 
-    def get_page_at_position(self, y_position: float) -> Optional[int]:
-        """Determine which page a Y position corresponds to"""
-        try:
-            if not hasattr(self, 'page_positions') or not self.page_positions:
-                return 0  # Default to first page
 
-            # Find which page this Y position falls on
-            for page_num, page_top in enumerate(self.page_positions):
-                if page_num + 1 < len(self.page_positions):
-                    page_bottom = self.page_positions[page_num + 1]
-                else:
-                    # Last page - use page height
-                    if hasattr(self, 'pdf_document') and self.pdf_document:
-                        page = self.pdf_document[page_num]
-                        page_height = int(page.rect.height * self.zoom_level)
-                        page_bottom = page_top + page_height
-                    else:
-                        page_bottom = page_top + 800  # Fallback
-
-                if page_top <= y_position < page_bottom:
-                    return page_num
-
-            # If beyond all pages, put on last page
-            return len(self.page_positions) - 1 if self.page_positions else 0
-
-        except Exception as e:
-            print(f"⚠️ Error determining page at position: {e}")
-            return 0
 
     def create_field_at_position(self, x: float, y: float, page_number: int, field_type: str):
         """Create a new field at the specified position"""
@@ -2399,14 +2312,6 @@ class PDFCanvas(QLabel):
         else:
             # Still update cursor for areas outside document
             self.drag_handler.handle_mouse_move(pos)
-
-    def deprecated_1_mouseMoveEvent(self, event):
-        """Handle mouse move events"""
-        pos = event.position().toPoint()
-        is_dragging = self.drag_handler.handle_mouse_move(pos)
-
-        if is_dragging:
-            self.draw_overlay()
 
     def mouseReleaseEvent(self, event):
         """Enhanced mouse release event"""
