@@ -3,13 +3,14 @@ Enhanced Drag Handler
 Manages drag and drop operations for form fields with improved functionality
 """
 
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Any
 from enum import Enum
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QObject
 from PyQt6.QtGui import QCursor
 
 # Import dependencies - these MUST work for enhanced drag handler to function
 from models.field_model import FormField, FieldManager
+from ui.drag_overlay import DragOverlay
 from utils.geometry_utils import (
     ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
 )
@@ -67,7 +68,145 @@ class DragState:
         return (dx + dy) >= self.drag_threshold
 
 
-class EnhancedDragHandler(QObject):
+class EnhancedDragHandler:
+    """
+    Enhanced drag handler that works with the transparent overlay
+    """
+
+    def __init__(self, canvas, field_manager):
+        self.canvas = canvas
+        self.field_manager = field_manager
+        self.selected_fields = []
+        self.is_dragging = False
+        self.drag_start_pos = QPoint()
+        self.zoom_level = 1.0
+
+        # Create drag overlay
+        self.drag_overlay = DragOverlay(canvas)
+        self.drag_overlay.hide()  # Initially hidden
+
+    def set_zoom_level(self, zoom_level: float):
+        """Update zoom level for drag calculations"""
+        self.zoom_level = zoom_level
+
+    def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier) -> Optional[Any]:
+        """
+        Handle mouse press - detect field clicks and prepare for dragging
+
+        Returns:
+            Field object if clicked, None otherwise
+        """
+        clicked_field = self.field_manager.get_field_at_position(
+            pos.x(), pos.y(), self.canvas.current_page
+        )
+
+        if clicked_field:
+            # Handle multi-selection with Ctrl
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if clicked_field in self.selected_fields:
+                    self.selected_fields.remove(clicked_field)
+                else:
+                    self.selected_fields.append(clicked_field)
+            else:
+                # Single selection
+                self.selected_fields = [clicked_field]
+
+            # Prepare for potential drag
+            self.drag_start_pos = pos
+
+            print(f"🎯 Enhanced drag handler: {len(self.selected_fields)} fields selected")
+
+        return clicked_field
+
+    def handle_mouse_move(self, pos: QPoint) -> bool:
+        """
+        Handle mouse move - start/update dragging
+
+        Returns:
+            bool: True if currently dragging
+        """
+        if not self.selected_fields:
+            return False
+
+        # Check if we should start dragging
+        if not self.is_dragging:
+            drag_distance = (pos - self.drag_start_pos).manhattanLength()
+            if drag_distance > 5:  # Start drag after 5 pixel threshold
+                self.start_drag()
+
+        # Update drag if in progress
+        if self.is_dragging:
+            self.drag_overlay.update_drag(pos)
+
+        return self.is_dragging
+
+    def start_drag(self):
+        """Start drag operation using overlay"""
+        if not self.selected_fields:
+            return
+
+        print(f"🚀 Starting drag operation with {len(self.selected_fields)} fields")
+
+        self.is_dragging = True
+        self.drag_overlay.start_drag(
+            self.selected_fields,
+            self.drag_start_pos,
+            self.zoom_level
+        )
+
+    def handle_mouse_release(self, pos: QPoint) -> bool:
+        """
+        Handle mouse release - end dragging and apply changes
+
+        Returns:
+            bool: True if drag was ended
+        """
+        if not self.is_dragging:
+            return False
+
+        # End drag operation
+        was_dragging = self.drag_overlay.end_drag()
+
+        if was_dragging:
+            # Apply drag changes to actual fields
+            self.apply_drag_changes(pos)
+
+        self.is_dragging = False
+        return was_dragging
+
+    def apply_drag_changes(self, final_pos: QPoint):
+        """Apply drag offset to actual field positions"""
+        if not self.selected_fields:
+            return
+
+        # Calculate final drag offset
+        drag_offset = final_pos - self.drag_start_pos
+
+        # Apply offset to each field
+        for field in self.selected_fields:
+            # Convert screen offset to document coordinates
+            doc_offset_x = drag_offset.x() / self.zoom_level
+            doc_offset_y = drag_offset.y() / self.zoom_level
+
+            # Update field position
+            field.x += doc_offset_x
+            field.y += doc_offset_y
+
+            print(f"✅ Moved field {field.name} by ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+    def clear_selection(self):
+        """Clear field selection"""
+        self.selected_fields.clear()
+        if self.is_dragging:
+            self.drag_overlay.cancel_drag()
+            self.is_dragging = False
+
+    def get_selected_fields(self) -> List[Any]:
+        """Get currently selected fields"""
+        return self.selected_fields.copy()
+
+
+class Deprecated_EnhancedDragHandler(QObject):
     """Enhanced drag handler with multi-selection and improved functionality"""
 
     # Signals for drag operations
