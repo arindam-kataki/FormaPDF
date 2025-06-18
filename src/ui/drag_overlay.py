@@ -85,6 +85,51 @@ class DragOverlay(QWidget):
         self.update()
 
     def update_ghost_positions(self):
+        """Calculate ghost positions for all dragged fields with proper page offset"""
+        if not self.is_dragging or not self.drag_fields:
+            return
+
+        # Calculate drag offset
+        drag_offset = self.current_drag_pos - self.drag_start_pos
+
+        # Get canvas reference
+        canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
+
+        # Update ghost position for each field
+        for field in self.drag_fields:
+            if canvas and hasattr(canvas, 'document_to_screen_coordinates'):
+                # ✅ USE CANVAS METHOD FOR ACCURATE SCREEN COORDINATES
+                screen_coords = canvas.document_to_screen_coordinates(
+                    field.page_number, field.x, field.y
+                )
+
+                if screen_coords:
+                    field_screen_x, field_screen_y = screen_coords
+
+                    # Apply drag offset to screen coordinates
+                    ghost_pos = QPoint(
+                        int(field_screen_x + drag_offset.x()),
+                        int(field_screen_y + drag_offset.y())
+                    )
+
+                    self.ghost_positions[field.id] = ghost_pos
+                    print(
+                        f"🎯 Ghost for {field.name} on page {field.page_number}: screen({field_screen_x}, {field_screen_y}) + offset({drag_offset.x()}, {drag_offset.y()}) = ghost({ghost_pos.x()}, {ghost_pos.y()})")
+                else:
+                    print(f"⚠️ Could not get screen coordinates for {field.name} on page {field.page_number}")
+            else:
+                # Fallback to simple calculation
+                field_rect = field.get_screen_rect(self.zoom_level) if hasattr(field, 'get_screen_rect') else QRect(0,
+                                                                                                                    0,
+                                                                                                                    100,
+                                                                                                                    30)
+                ghost_pos = QPoint(
+                    field_rect.x() + drag_offset.x(),
+                    field_rect.y() + drag_offset.y()
+                )
+                self.ghost_positions[field.id] = ghost_pos
+
+    def deprecated_update_ghost_positions(self):
         """Calculate ghost positions for all dragged fields"""
         if not self.is_dragging or not self.drag_fields:
             return

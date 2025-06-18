@@ -89,13 +89,102 @@ class EnhancedDragHandler:
         """Update zoom level for drag calculations"""
         self.zoom_level = zoom_level
 
-    def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier) -> Optional[Any]:
+    def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier, page_num: int = None) -> Optional[Any]:
         """
         Handle mouse press - detect field clicks and prepare for dragging
 
         Returns:
             Field object if clicked, None otherwise
         """
+
+        # ✅ DETERMINE WHICH PAGE TO SEARCH - USE PROVIDED PAGE_NUM FIRST
+        if page_num is not None:
+            # Use the page number passed from mousePressEvent (this is most accurate)
+            search_page = page_num
+            print(f"🔍 Using provided page number: {search_page}")
+        else:
+            # Fallback to canvas current page with update
+            if hasattr(self.canvas, 'update_current_page_from_scroll'):
+                self.canvas.update_current_page_from_scroll()
+
+            search_page = getattr(self.canvas, 'current_page', 0)
+            print(f"🔍 Using canvas current page: {search_page}")
+
+        print(f"🔍 Enhanced drag handler: Looking for field at {pos} on page {search_page}")
+
+        # ✅ SINGLE FIELD LOOKUP WITH CORRECT PAGE
+        clicked_field = self.field_manager.get_field_at_position(
+            pos.x(), pos.y(), search_page
+        )
+
+        if clicked_field:
+
+            print(f"✅ Found field {clicked_field.name} on page {clicked_field.page_number}")
+
+            # ✅ ADDITIONAL SAFETY CHECK: Ensure field is on current page
+            if clicked_field.page_number != search_page:
+                print(
+                    f"⚠️ Field {clicked_field.name} is on page {clicked_field.page_number}, but current page is {search_page}. Ignoring click.")
+                return None
+
+            # ✅ WHEN MULTI-SELECTING, PREVENT CROSS-PAGE SELECTION
+            if self.selected_fields and modifiers & Qt.KeyboardModifier.ControlModifier:
+                # Check if we're trying to multi-select across pages
+                first_selected_page = self.selected_fields[0].page_number if self.selected_fields else search_page
+                if first_selected_page != search_page:
+                    print(
+                        f"🔄 Switching from page {first_selected_page} to page {search_page}, clearing previous selection")
+                    self.selected_fields.clear()
+
+            # Handle multi-selection with Ctrl
+            if modifiers & Qt.KeyboardModifier.ControlModifier:
+                if clicked_field in self.selected_fields:
+                    self.selected_fields.remove(clicked_field)
+                else:
+                    self.selected_fields.append(clicked_field)
+            else:
+                # Single selection
+                self.selected_fields = [clicked_field]
+
+            # Prepare for potential drag
+            self.drag_start_pos = pos
+
+            print(f"🎯 Enhanced drag handler: {len(self.selected_fields)} fields selected")
+        else:
+            print(f"❌ No field found at {pos} on page {search_page}")
+            # ✅ DEBUG: Show what fields exist on this page
+            fields_on_page = [f for f in self.field_manager.fields if f.page_number == search_page]
+            print(f"   Available fields on page {search_page}: {len(fields_on_page)}")
+            for field in fields_on_page:
+                print(f"   - {field.name} at ({field.x}, {field.y})")
+
+        return clicked_field
+
+    def deprecated_2_handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier) -> Optional[Any]:
+        """
+        Handle mouse press - detect field clicks and prepare for dragging
+
+        Returns:
+            Field object if clicked, None otherwise
+        """
+
+        if hasattr(self.canvas, 'update_current_page_from_scroll'):
+            self.canvas.update_current_page_from_scroll()
+
+        current_page = getattr(self.canvas, 'current_page', 0)
+        print(f"🔍 Enhanced drag handler: Looking for field at {pos} on page {current_page}")
+
+        # ✅ FORCE UPDATE CURRENT PAGE BEFORE FIELD LOOKUP:
+        if hasattr(self.canvas, 'update_current_page_from_scroll'):
+            self.canvas.update_current_page_from_scroll()
+            updated_page = getattr(self.canvas, 'current_page', 0)
+            print(f"📄 Updated current page to: {updated_page}")
+            current_page = updated_page
+
+        clicked_field = self.field_manager.get_field_at_position(
+            pos.x(), pos.y(), current_page
+        )
+
         clicked_field = self.field_manager.get_field_at_position(
             pos.x(), pos.y(), self.canvas.current_page
         )
@@ -170,6 +259,19 @@ class EnhancedDragHandler:
         if was_dragging:
             # Apply drag changes to actual fields
             self.apply_drag_changes(pos)
+
+            # ✅ CLEAR SELECTION AFTER DRAG ENDS
+            print("🧹 Clearing selection after drag completion")
+            field_count = len(self.selected_fields)
+            self.selected_fields.clear()
+
+            # Also clear canvas selection handler
+            if hasattr(self.canvas, 'selection_handler') and self.canvas.selection_handler:
+                try:
+                    self.canvas.selection_handler.clear_selection()
+                    print("🧹 Cleared canvas selection handler")
+                except Exception as e:
+                    print(f"⚠️ Error clearing canvas selection: {e}")
 
         self.is_dragging = False
         return was_dragging
@@ -248,8 +350,7 @@ class Deprecated_EnhancedDragHandler(QObject):
         self.grid_size = grid_size
         self.snap_to_grid = snap_to_grid
 
-    def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier) -> \
-    Optional[FormField]:
+    def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier = Qt.KeyboardModifier.NoModifier, page_num: int = None) -> Optional[FormField]:
         """
         Enhanced mouse press handler with multi-selection support
         Returns the field that should be selected
@@ -257,6 +358,15 @@ class Deprecated_EnhancedDragHandler(QObject):
         self.drag_state.reset()
         self.drag_state.start_pos = pos
         self.drag_state.current_pos = pos
+
+        if page_num is not None:
+            search_page = page_num
+            print(f"🔍 Using provided page number: {search_page}")
+        else:
+            search_page = getattr(self.canvas, 'current_page', 0)
+            print(f"🔍 Using canvas current page: {search_page}")
+
+        print(f"🔍 Enhanced drag handler: Looking for field at {pos} on page {search_page}")
 
         # Get currently selected field(s)
         selected_field = self.selection_handler.get_selected_field() if self.selection_handler else None
@@ -274,9 +384,10 @@ class Deprecated_EnhancedDragHandler(QObject):
                 return selected_field
 
         # Check if clicking on a field
-        clicked_field = self.field_manager.get_field_at_position(pos.x(), pos.y())
+        clicked_field = self.field_manager.get_field_at_position(pos.x(), pos.y(), search_page)
 
         if clicked_field:
+            print(f"✅ Found field {clicked_field.name} on page {clicked_field.page_number}")
             if modifiers & Qt.KeyboardModifier.ControlModifier and self.multi_selection_enabled:
                 # Multi-select mode: toggle the clicked field
                 self._handle_multi_selection(clicked_field)
@@ -288,6 +399,9 @@ class Deprecated_EnhancedDragHandler(QObject):
                 self._prepare_move_operation(clicked_field)
 
             return clicked_field
+
+        else:
+            print(f"❌ No field found at {pos} on page {search_page}")
 
             # Clicked empty space
         if not (modifiers & Qt.KeyboardModifier.ControlModifier):

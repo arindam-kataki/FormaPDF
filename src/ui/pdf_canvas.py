@@ -1057,8 +1057,8 @@ class PDFCanvas(QLabel):
         try:
             # Get all selected fields from drag handler
             selected_fields = []
-            if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
-                selected_fields = self.drag_handler.get_selected_fields()
+            if hasattr(self, 'enhanced_drag_handler') and hasattr(self.enhanced_drag_handler, 'get_selected_fields'):
+                selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
             # Also include the primary selected field from selection handler
             if hasattr(self, 'selection_handler'):
@@ -1507,7 +1507,7 @@ class PDFCanvas(QLabel):
         # Select all
         elif key == Qt.Key.Key_A and modifiers & Qt.KeyboardModifier.ControlModifier:
             for field in self.field_manager.fields:
-                self.drag_handler.select_field(field, add_to_selection=True)
+                self.enhanced_drag_handler.select_field(field, add_to_selection=True)
             self.draw_overlay()
             event.accept()
 
@@ -1990,6 +1990,7 @@ class PDFCanvas(QLabel):
         print(f"   Button: {event.button()}")
         print(f"   Position: {event.position().toPoint()}")
         print(f"   Modifiers: {event.modifiers()}")
+        print(f"   Current page: {self.current_page}")  # ✅ ADD THIS LINE
 
         if event.button() == Qt.MouseButton.LeftButton:
             self.setFocus()  # Enable keyboard events
@@ -2007,12 +2008,15 @@ class PDFCanvas(QLabel):
             print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
             print(f"   Page {page_num} doc pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
 
+            self.current_page = page_num  # Update canvas current page to match click location
+            print(f"✅ Updated canvas current_page to: {self.current_page}")
+
             doc_pos = QPoint(int(doc_x), int(doc_y))
 
             # Use enhanced drag handler with modifier support
             clicked_field = None
             try:
-                clicked_field = self.enhanced_drag_handler.handle_mouse_press(doc_pos, modifiers)
+                clicked_field = self.enhanced_drag_handler.handle_mouse_press(doc_pos, modifiers, page_num)
                 print(f"   Enhanced drag handler result: {clicked_field.name if clicked_field else 'None'}")
             except Exception as e:
                 print(f"⚠️ Error in enhanced drag handler: {e}")
