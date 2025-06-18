@@ -5,7 +5,7 @@ Complete working version for displaying PDFs with scrolling and field support
 
 import sys
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from PyQt6.QtWidgets import QLabel, QApplication
 from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
@@ -130,6 +130,9 @@ class PDFCanvas(QLabel):
 
         # Setup signal connections
         self._setup_signal_connections()
+
+        if hasattr(self, 'drag_handler'):
+            self.drag_handler.pdf_canvas_ref = self
 
         self._rendering_in_progress = False
 
@@ -274,6 +277,32 @@ class PDFCanvas(QLabel):
             padding: 20px;
         """)
 
+    def update_drag_handler_for_document(self):
+        """Update drag handler settings for the loaded document"""
+        if not hasattr(self, 'drag_handler'):
+            return
+
+        try:
+            # Calculate total document dimensions
+            if hasattr(self, 'pdf_document') and self.pdf_document:
+                total_width = max(800, self.width())
+
+                # Calculate total height including all pages and gaps
+                total_height = 0
+                for page_num in range(self.pdf_document.page_count):
+                    page = self.pdf_document[page_num]
+                    page_height = int(page.rect.height * self.zoom_level)
+                    total_height += page_height + 20  # Add gap between pages
+
+                total_height += 100  # Extra margin at bottom
+
+                # Update drag handler
+                self.drag_handler.set_canvas_size(total_width, total_height)
+                print(f"🎯 Updated drag handler for {self.pdf_document.page_count} pages: {total_width}x{total_height}")
+
+        except Exception as e:
+            print(f"⚠️ Error updating drag handler for document: {e}")
+
     def load_pdf(self, pdf_path: str) -> bool:
         """Load PDF document"""
         print(f"🔧 Loading PDF: {pdf_path}")
@@ -312,6 +341,7 @@ class PDFCanvas(QLabel):
             self.setStyleSheet("border: none; background-color: transparent;")
 
             self.debug_widget_setup()
+            self.update_drag_handler_for_document()
 
             return True
 
@@ -750,6 +780,7 @@ class PDFCanvas(QLabel):
         self.zoom_level = zoom_level
         # Re-render with new zoom level
         self.render_page()
+        self.update_drag_handler_for_document()
 
     def _filter_fields_in_zoomed_viewport(self, fields: List[FormField], viewport_rect: QRect,
                                           page_num: int, zoom_level: float) -> List[FormField]:
@@ -2108,6 +2139,80 @@ class PDFCanvas(QLabel):
             print(f"⚠️ Error creating field: {e}")
 
         return False
+
+    def get_page_at_position(self, y_position: float) -> Optional[int]:
+        """Determine which page a Y position corresponds to"""
+        try:
+            if not hasattr(self, 'page_positions') or not self.page_positions:
+                return 0  # Default to first page
+
+            # Find which page this Y position falls on
+            for page_num, page_top in enumerate(self.page_positions):
+                if page_num + 1 < len(self.page_positions):
+                    page_bottom = self.page_positions[page_num + 1]
+                else:
+                    # Last page - use page height
+                    if hasattr(self, 'pdf_document') and self.pdf_document:
+                        page = self.pdf_document[page_num]
+                        page_height = int(page.rect.height * self.zoom_level)
+                        page_bottom = page_top + page_height
+                    else:
+                        page_bottom = page_top + 800  # Fallback
+
+                if page_top <= y_position < page_bottom:
+                    return page_num
+
+            # If beyond all pages, put on last page
+            return len(self.page_positions) - 1 if self.page_positions else 0
+
+        except Exception as e:
+            print(f"⚠️ Error determining page at position: {e}")
+            return 0
+
+    def create_field_at_position(self, x: float, y: float, page_number: int, field_type: str):
+        """Create a new field at the specified position"""
+        try:
+            print(f"🎯 Creating {field_type} field at ({x}, {y}) on page {page_number}")
+
+            # Use the field manager to create the field (note: correct parameters)
+            field = self.field_manager.add_field(
+                field_type=field_type,
+                x=int(x),
+                y=int(y),
+                page_number=page_number
+                # Note: width and height are NOT parameters - they're set by default in FormField.create()
+            )
+
+            if field:
+                print(f"✅ Created field: {field.id}")
+
+                # Optionally resize the field after creation if needed
+                # field.resize_to(100, 30)  # Set custom size if desired
+
+                # Select the newly created field
+                try:
+                    self.selection_handler.select_field(field)
+                    self.drag_handler.select_field(field)
+                except Exception as e:
+                    print(f"⚠️ Error selecting new field: {e}")
+
+                # Redraw to show the new field
+                self.draw_overlay()
+
+                # Emit signal to notify other components
+                if hasattr(self, 'fieldClicked'):
+                    self.fieldClicked.emit(field.id)
+
+                return field
+            else:
+                print(f"⚠️ Failed to create field via field manager")
+                return None
+
+        except Exception as e:
+            print(f"⚠️ Error creating field: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def _get_selected_field_type(self):
         """Get the currently selected field type from the field palette"""

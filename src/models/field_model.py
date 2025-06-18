@@ -130,6 +130,15 @@ class FormField:
         )
         return new_field
 
+    def __hash__(self):
+        """Make FormField hashable using its ID"""
+        return hash(self.id)
+
+    def __eq__(self, other):
+        """Compare FormFields by ID"""
+        if not isinstance(other, FormField):
+            return False
+        return self.id == other.id
 
 class FieldManager:
     """Manages a collection of form fields"""

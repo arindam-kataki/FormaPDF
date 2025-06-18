@@ -249,6 +249,37 @@ class EnhancedDragHandler(QObject):
         self.drag_state.start_field_size = (field.width, field.height)
 
     def _handle_move_operation(self, dx: int, dy: int):
+        """Handle single field movement with cross-page support"""
+        if not self.drag_state.target_field or not self.drag_state.start_field_pos:
+            return
+
+        field = self.drag_state.target_field
+        start_x, start_y = self.drag_state.start_field_pos
+
+        # Calculate new position with zoom consideration
+        adjusted_dx = dx / self.zoom_level if self.zoom_level != 1.0 else dx
+        adjusted_dy = dy / self.zoom_level if self.zoom_level != 1.0 else dy
+
+        new_x = start_x + adjusted_dx
+        new_y = start_y + adjusted_dy
+
+        # ENABLE CROSS-PAGE DRAGGING: Only apply minimal constraints
+        # Allow movement across the entire document area
+        new_x = max(-50, new_x)  # Small left margin
+        new_y = max(-50, new_y)  # Small top margin
+        # No right/bottom limits - allow dragging to any page
+
+        # Apply grid snapping
+        if self.snap_to_grid:
+            new_x, new_y = GridUtils.snap_to_grid(new_x, new_y, self.grid_size)
+
+        # Update field position
+        field.move_to(int(new_x), int(new_y))
+
+        # IMPORTANT: Update the field's page number based on new position
+        self._update_field_page_number(field, new_x, new_y)
+
+    def _deprecated__handle_move_operation(self, dx: int, dy: int):
         """Handle single field movement with improved constraints"""
         if not self.drag_state.target_field or not self.drag_state.start_field_pos:
             return
@@ -275,6 +306,33 @@ class EnhancedDragHandler(QObject):
 
         # Update field position
         field.move_to(int(new_x), int(new_y))
+
+    def _update_field_page_number(self, field: FormField, x: float, y: float):
+        """Update field's page number based on its Y position"""
+        try:
+            # Get PDF canvas to determine which page the field is on
+            if hasattr(self, 'pdf_canvas_ref'):
+                canvas = self.pdf_canvas_ref
+            else:
+                # Try to find PDF canvas through field manager or selection handler
+                canvas = self._find_pdf_canvas()
+
+            if canvas and hasattr(canvas, 'get_page_at_position'):
+                page_num = canvas.get_page_at_position(y)
+                if page_num is not None and page_num != field.page_number:
+                    print(f"🎯 Moving field {field.id} from page {field.page_number} to page {page_num}")
+                    field.page_number = page_num
+
+        except Exception as e:
+            print(f"⚠️ Error updating field page number: {e}")
+
+    def _find_pdf_canvas(self):
+        """Try to find the PDF canvas reference"""
+        # This is a helper method to find the canvas when we need it
+        if self.selection_handler and hasattr(self.selection_handler, 'field_manager'):
+            # Try to get canvas through various paths
+            pass
+        return None
 
     def _handle_multi_move_operation(self, dx: int, dy: int):
         """Handle multiple field movement"""
