@@ -14,6 +14,7 @@ from ui.drag_overlay import DragOverlay
 from utils.geometry_utils import (
     ResizeHandles, ResizeCalculator, BoundaryConstraints, GridUtils
 )
+from ui.resize_visual_guide import ResizeVisualGuide
 
 class DragMode(Enum):
     """Enumeration of drag operation modes"""
@@ -90,6 +91,8 @@ class EnhancedDragHandler(QObject):
         self.drag_start_pos = QPoint()
         self.zoom_level = 1.0
 
+        self.resize_guide = None
+
         # Create drag overlay
         self.drag_overlay = DragOverlay(canvas)
         self.drag_overlay.hide()  # Initially hidden
@@ -152,7 +155,8 @@ class EnhancedDragHandler(QObject):
 
                     # NEW: Start visual guide
                     if not self.resize_guide:
-                        self.resize_guide = SimpleResizeGuide(self.canvas)
+                        #self.resize_guide = SimpleResizeGuide(self.canvas)
+                        self.resize_guide = ResizeVisualGuide(self.canvas)
                     self.resize_guide.start_resize(clicked_field, handle)
 
                     self.dragStarted.emit(clicked_field.id, "resize")
