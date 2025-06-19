@@ -343,6 +343,218 @@ class FieldPalette(QWidget):
             """)
 
 
+class ScrollableFieldPalette(QWidget):
+    """Scrollable field palette that doesn't get squished in small windows"""
+
+    fieldRequested = pyqtSignal(str)
+
+    def __init__(self):
+        super().__init__()
+        self.selected_field_type = None
+        self.field_buttons = {}
+        self.init_scrollable_ui()
+
+    def init_scrollable_ui(self):
+        """Initialize scrollable UI"""
+        # Main layout for the palette widget
+        main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
+
+        # Create scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll_area.setMinimumWidth(200)  # Ensure minimum width
+
+        # Create the scrollable content widget
+        scroll_content = QWidget()
+        scroll_layout = QVBoxLayout()
+        scroll_layout.setSpacing(5)
+        scroll_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Add field type buttons to scrollable content
+        self._add_field_buttons(scroll_layout)
+
+        # Add stretch to keep buttons at top
+        scroll_layout.addStretch()
+
+        scroll_content.setLayout(scroll_layout)
+        scroll_area.setWidget(scroll_content)
+
+        # Add scroll area to main layout
+        main_layout.addWidget(scroll_area)
+        self.setLayout(main_layout)
+
+        # Apply styles
+        self.apply_scrollable_styles()
+
+    def _add_field_buttons(self, layout):
+        """Add field type buttons to layout"""
+        field_types = [
+            ("📝 Text Field", "text"),
+            ("✅ Checkbox", "checkbox"),
+            ("🔘 Radio Button", "radio"),
+            ("📋 Dropdown", "dropdown"),
+            ("🔢 Number", "number"),
+            ("📅 Date", "date"),
+            ("📧 Email", "email"),
+            ("🔒 Password", "password"),
+            ("📄 Textarea", "textarea"),
+            ("🔗 URL", "url"),
+            ("📞 Phone", "phone"),
+            ("🖊️ Signature", "signature"),
+            ("🔘 Button", "button"),
+            ("📎 File Upload", "file"),
+            ("🏷️ Label", "label")
+        ]
+
+        for display_name, field_type in field_types:
+            button = QPushButton(display_name)
+            button.setMinimumHeight(35)  # Ensure buttons aren't too small
+            button.clicked.connect(lambda checked, ft=field_type: self._on_field_button_clicked(ft))
+            layout.addWidget(button)
+            self.field_buttons[field_type] = button
+
+    def apply_scrollable_styles(self):
+        """Apply styles for scrollable palette"""
+        self.setStyleSheet("""
+            QScrollArea {
+                border: none;
+                background-color: #f8f9fa;
+            }
+
+            QPushButton {
+                text-align: left;
+                padding: 8px 12px;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+                background-color: #ffffff;
+                font-size: 11px;
+                min-height: 30px;
+            }
+
+            QPushButton:hover {
+                background-color: #e9ecef;
+                border-color: #0078d4;
+            }
+
+            QPushButton:pressed {
+                background-color: #dee2e6;
+            }
+
+            /* Highlighted (selected) button style */
+            QPushButton.selected {
+                border: 2px solid #0078d4;
+                background-color: #e3f2fd;
+                color: #1565c0;
+                font-weight: bold;
+            }
+
+            QPushButton.selected:hover {
+                background-color: #bbdefb;
+                border-color: #1976d2;
+            }
+        """)
+
+    def _on_field_button_clicked(self, field_type):
+        """🔧 ENHANCED: Handle field button click with auto-reset logic"""
+        print(f"🎯 Field button clicked: {field_type}")
+
+        # Clear previous highlights
+        self.clear_highlights()
+
+        # Highlight selected button
+        self.highlight_field_type(field_type, True)
+
+        # Store the selected field type
+        self.selected_field_type = field_type
+
+        # Notify main window/canvas about selection
+        self._notify_canvas_selection(field_type)
+
+        # Emit the signal for backward compatibility
+        self.fieldRequested.emit(field_type)
+
+        print(f"✅ Field type {field_type} selected and ready for placement")
+
+    def _notify_canvas_selection(self, field_type):
+        """Notify canvas about field type selection"""
+        try:
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                if hasattr(main_window.pdf_canvas, 'set_selected_field_type'):
+                    main_window.pdf_canvas.set_selected_field_type(field_type)
+                    print(f"✅ Notified canvas of selection: {field_type}")
+        except Exception as e:
+            print(f"⚠️ Could not notify canvas: {e}")
+
+    def reset_selection(self):
+        """🔧 NEW: Reset field type selection after placement"""
+        print("🔄 Resetting field type selection...")
+
+        # Clear highlights
+        self.clear_highlights()
+
+        # Reset selected field type
+        self.selected_field_type = None
+
+        # Notify canvas that no field type is selected
+        try:
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                if hasattr(main_window.pdf_canvas, 'set_selected_field_type'):
+                    main_window.pdf_canvas.set_selected_field_type(None)
+                    print("✅ Notified canvas: selection cleared")
+        except Exception as e:
+            print(f"⚠️ Could not notify canvas: {e}")
+
+        print("✅ Field type selection reset complete")
+
+    def clear_highlights(self):
+        """Clear all field type highlights"""
+        for field_type, button in self.field_buttons.items():
+            button.setProperty("class", "")  # Remove selected class
+            button.setStyleSheet("")  # Reset to default style
+            button.style().unpolish(button)
+            button.style().polish(button)
+
+    def highlight_field_type(self, field_type: str, highlight: bool = True):
+        """Highlight a specific field type"""
+        if field_type not in self.field_buttons:
+            return
+
+        button = self.field_buttons[field_type]
+
+        if highlight:
+            # Add selected class for styling
+            button.setProperty("class", "selected")
+        else:
+            # Remove selected class
+            button.setProperty("class", "")
+
+        # Force style update
+        button.style().unpolish(button)
+        button.style().polish(button)
+
+    def get_selected_field_type(self):
+        """Get the currently selected field type"""
+        return self.selected_field_type
+
+    def _get_main_window(self):
+        """Get the main window safely"""
+        try:
+            widget = self
+            while widget.parent():
+                widget = widget.parent()
+                if (hasattr(widget, 'field_palette') and
+                        hasattr(widget, 'pdf_canvas')):
+                    return widget
+            return None
+        except Exception as e:
+            print(f"⚠️ Error finding main window: {e}")
+            return None
 
 class FieldPreviewWidget(QWidget):
     """Widget showing a preview of the selected field type"""

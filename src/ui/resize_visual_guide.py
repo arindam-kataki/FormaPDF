@@ -48,13 +48,30 @@ class ResizeVisualGuide(QWidget):
         self.resize_handle = handle
         self.zoom_level = zoom_level
 
-        # Store original rectangle
-        self.original_rect = QRect(
-            int(field.x * zoom_level),
-            int(field.y * zoom_level),
-            int(field.width * zoom_level),
-            int(field.height * zoom_level)
-        )
+        # 🔧 FIX: Use canvas coordinate conversion if available
+        if hasattr(self.parent(), 'document_to_screen_coordinates'):
+            screen_coords = self.parent().document_to_screen_coordinates(
+                field.page_number, field.x, field.y
+            )
+            if screen_coords:
+                screen_x, screen_y = screen_coords
+                self.original_rect = QRect(
+                    int(screen_x), int(screen_y),
+                    int(field.width * zoom_level), int(field.height * zoom_level)
+                )
+            else:
+                # Fallback to simple multiplication
+                self.original_rect = QRect(
+                    int(field.x * zoom_level), int(field.y * zoom_level),
+                    int(field.width * zoom_level), int(field.height * zoom_level)
+                )
+        else:
+            # Fallback for cases where parent doesn't have conversion method
+            self.original_rect = QRect(
+                int(field.x * zoom_level), int(field.y * zoom_level),
+                int(field.width * zoom_level), int(field.height * zoom_level)
+            )
+
         self.current_rect = QRect(self.original_rect)
 
         # Show overlay
@@ -67,13 +84,29 @@ class ResizeVisualGuide(QWidget):
         if not self.is_resizing or not field:
             return
 
-        # Update current rectangle
-        self.current_rect = QRect(
-            int(field.x * self.zoom_level),
-            int(field.y * self.zoom_level),
-            int(field.width * self.zoom_level),
-            int(field.height * self.zoom_level)
-        )
+        # 🔧 FIX: Use canvas coordinate conversion if available
+        if hasattr(self.parent(), 'document_to_screen_coordinates'):
+            screen_coords = self.parent().document_to_screen_coordinates(
+                field.page_number, field.x, field.y
+            )
+            if screen_coords:
+                screen_x, screen_y = screen_coords
+                self.current_rect = QRect(
+                    int(screen_x), int(screen_y),
+                    int(field.width * self.zoom_level), int(field.height * self.zoom_level)
+                )
+            else:
+                # Fallback to simple multiplication
+                self.current_rect = QRect(
+                    int(field.x * self.zoom_level), int(field.y * self.zoom_level),
+                    int(field.width * self.zoom_level), int(field.height * self.zoom_level)
+                )
+        else:
+            # Fallback for cases where parent doesn't have conversion method
+            self.current_rect = QRect(
+                int(field.x * self.zoom_level), int(field.y * self.zoom_level),
+                int(field.width * self.zoom_level), int(field.height * self.zoom_level)
+            )
 
         self.update()
 

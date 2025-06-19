@@ -102,6 +102,7 @@ class EnhancedDragHandler(QObject):
         self.resize_start_pos = QPoint()
         self.resize_start_size = (0, 0)
         self.resize_field = None
+        self.resize_start_field_pos = None  # 🔧 ADD THIS LINE
 
     def set_zoom_level(self, zoom_level: float):
         """Update zoom level for drag calculations"""
@@ -151,6 +152,7 @@ class EnhancedDragHandler(QObject):
                     self.resize_handle = handle
                     self.resize_start_pos = pos
                     self.resize_start_size = (clicked_field.width, clicked_field.height)
+                    self.resize_start_field_pos = (clicked_field.x, clicked_field.y)  # 🔧 ADD THIS LINE
                     self.resize_field = clicked_field
 
                     # NEW: Start visual guide
@@ -331,7 +333,38 @@ class EnhancedDragHandler(QObject):
 
         return self.is_dragging
 
-    def _handle_resize_move(self, pos: QPoint):
+    def _handle_resize_move(self, pos):
+        """Handle mouse movement during resize operation"""
+        if not self.resize_field or not self.resize_handle or not self.resize_start_field_pos:
+            return
+
+        field = self.resize_field
+
+        # ✅ Use the ORIGINAL starting position, not current field position
+        start_x, start_y = self.resize_start_field_pos
+        start_width, start_height = self.resize_start_size
+
+        # Calculate deltas from mouse movement
+        dx = (pos.x() - self.resize_start_pos.x()) / self.zoom_level
+        dy = (pos.y() - self.resize_start_pos.y()) / self.zoom_level
+
+        # Calculate new dimensions using ORIGINAL starting values
+        from utils.geometry_utils import ResizeCalculator
+        new_x, new_y, new_width, new_height = ResizeCalculator.calculate_resize(
+            start_x, start_y, start_width, start_height,
+            dx, dy, self.resize_handle, 20, 15
+        )
+
+        # Update field with new values
+        field.x = new_x
+        field.y = new_y
+        field.resize_to(new_width, new_height)
+
+        # Update visual guide
+        if hasattr(self, 'resize_guide') and self.resize_guide:
+            self.resize_guide.update_resize(field)
+
+    def deprecated_2_handle_resize_move(self, pos: QPoint):
         """Handle mouse movement during resize operation"""
         if not self.resize_field or not self.resize_handle:
             return
@@ -433,6 +466,7 @@ class EnhancedDragHandler(QObject):
             self.resize_mode = False
             self.resize_handle = None
             self.resize_field = None
+            self.resize_start_field_pos = None  # 🔧 ADD THIS LINE
             print("✅ Resize operation completed")
             return True
 

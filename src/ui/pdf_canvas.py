@@ -2131,7 +2131,15 @@ class PDFCanvas(QLabel):
 
         return False
 
+    def _reset_field_type_selection(self):
+        """Reset field type selection in both canvas and palette"""
+        self.selected_field_type = None
 
+        # Find and reset field palette
+        main_window = self._get_main_window()
+        if main_window and hasattr(main_window, 'sidebar'):
+            if hasattr(main_window.sidebar, 'reset_field_selection'):
+                main_window.sidebar.reset_field_selection()
 
     def create_field_at_position(self, x: float, y: float, page_number: int, field_type: str):
         """Create a new field at the specified position"""
