@@ -224,6 +224,42 @@ class PropertiesPanel(QWidget):
         # Advanced properties
         self._create_advanced_properties(field)
 
+    def update_live_values(self, x: int, y: int, width: int, height: int):
+        """Update position and size values during live drag operations"""
+        if not self.current_field:
+            return
+
+        try:
+            # Update position and size widgets without triggering signals
+            if "x" in self.property_widgets:
+                self.property_widgets["x"].set_value(x)
+            if "y" in self.property_widgets:
+                self.property_widgets["y"].set_value(y)
+            if "width" in self.property_widgets:
+                self.property_widgets["width"].set_value(width)
+            if "height" in self.property_widgets:
+                self.property_widgets["height"].set_value(height)
+        except Exception as e:
+            print(f"⚠️ Error in live update: {e}")
+
+    def update_field_values(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Update field values after operation completion"""
+        if not self.current_field or self.current_field.id != field_id:
+            return
+
+        try:
+            # Update the actual field object
+            self.current_field.x = x
+            self.current_field.y = y
+            self.current_field.width = width
+            self.current_field.height = height
+
+            # Update the UI widgets
+            self.update_live_values(x, y, width, height)
+            print(f"✅ Updated properties panel for {field_id}")
+        except Exception as e:
+            print(f"⚠️ Error updating field values: {e}")
+
     def _create_field_header(self, field: FormField):
         """Create field header with type and ID info"""
         header_frame = QFrame()

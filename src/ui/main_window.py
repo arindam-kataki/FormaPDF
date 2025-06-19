@@ -451,12 +451,73 @@ class PDFViewerMainWindow(QMainWindow):
             if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
                 self.field_palette.fieldRequested.connect(self._on_field_type_selected)
 
+                # Enhanced drag handler signals
+                if hasattr(self.pdf_canvas, 'enhanced_drag_handler'):
+                    drag_handler = self.pdf_canvas.enhanced_drag_handler
+
+                    # Connect enhanced signals if they exist
+                    if hasattr(drag_handler, 'dragStarted'):
+                        drag_handler.dragStarted.connect(self.on_drag_started)
+                        print("✅ Connected dragStarted signal")
+                    if hasattr(drag_handler, 'dragProgress'):
+                        drag_handler.dragProgress.connect(self.on_drag_progress)
+                        print("✅ Connected dragProgress signal")
+                    if hasattr(drag_handler, 'dragCompleted'):
+                        drag_handler.dragCompleted.connect(self.on_drag_completed)
+                        print("✅ Connected dragCompleted signal")
+                    if hasattr(drag_handler, 'fieldResized'):
+                        drag_handler.fieldResized.connect(self.on_field_resized)
+                        print("✅ Connected fieldResized signal")
+
             print("✅ Signal connections setup completed")
 
         except Exception as e:
             print(f"Warning: Error setting up signal connections: {e}")
             import traceback
             traceback.print_exc()
+
+    def on_drag_started(self, field_id: str, operation_type: str):
+        """Handle drag operation start"""
+        if hasattr(self, 'field_info_label'):
+            self.field_info_label.setText(f"Starting {operation_type} on {field_id}")
+
+    def on_drag_progress(self, field_id: str, x: int, y: int, w: int, h: int):
+        """Handle real-time drag progress"""
+        # Update properties panel if it exists
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            try:
+                self.properties_panel.update_live_values(x, y, w, h)
+            except Exception as e:
+                print(f"⚠️ Error updating properties panel: {e}")
+
+        # Update status bar with live coordinates
+        if hasattr(self, 'field_info_label'):
+            self.field_info_label.setText(f"{field_id}: ({x}, {y}) {w}×{h}")
+
+    def on_drag_completed(self, field_id: str):
+        """Handle drag operation completion"""
+        if hasattr(self, 'field_info_label'):
+            self.field_info_label.setText(f"Completed operation on {field_id}")
+
+        # Mark document as modified
+        self.document_modified = True
+
+        # Clear live update after 2 seconds
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(2000,
+                          lambda: self.field_info_label.setText("Ready") if hasattr(self, 'field_info_label') else None)
+
+    def on_field_resized(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Handle field resize completion"""
+        print(f"✅ Field {field_id} resized to ({x}, {y}) {width}×{height}")
+
+        # Update properties panel
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            try:
+                self.properties_panel.update_field_values(field_id, x, y, width, height)
+            except Exception as e:
+                print(f"⚠️ Error updating properties after resize: {e}")
+
     def open_pdf(self):
         """Open PDF file dialog and load selected file"""
         file_path, _ = QFileDialog.getOpenFileName(
