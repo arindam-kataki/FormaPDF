@@ -3,14 +3,13 @@ PDF Canvas Widget
 Complete working version for displaying PDFs with scrolling and field support
 """
 
-import sys
-from pathlib import Path
-from typing import List, Optional
+from typing import List
 
-from PyQt6.QtWidgets import QLabel, QApplication
-from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
-from PyQt6.QtCore import QObject, pyqtSignal, Qt, QRect
 from PyQt6.QtCore import QPoint
+from PyQt6.QtCore import pyqtSignal, Qt, QRect
+from PyQt6.QtGui import QPixmap, QPainter, QPen, QCursor, QPalette, QColor, QBrush
+from PyQt6.QtWidgets import QLabel
+
 from .enhanced_drag_handler import EnhancedDragHandler
 
 # Try to import PyMuPDF
@@ -143,7 +142,6 @@ class PDFCanvas(QLabel):
             try:
                 self.field_manager = FieldManager()
                 self.selection_handler = WorkingSelectionHandler(self.field_manager)
-                #self.drag_handler = DragHandler(self.field_manager)
                 self.enhanced_drag_handler = EnhancedDragHandler(self, self.field_manager)
                 self.field_renderer = FieldRenderer()
             except Exception as e:
@@ -156,7 +154,6 @@ class PDFCanvas(QLabel):
         """Initialize minimal handlers as fallback"""
         self.field_manager = MinimalFieldManager()
         self.selection_handler = MinimalSelectionHandler()
-        #self.drag_handler = MinimalDragHandler()
         self.enhanced_drag_handler = EnhancedDragHandler(self, self.field_manager)
         self.field_renderer = None
 
@@ -174,11 +171,6 @@ class PDFCanvas(QLabel):
                 self.enhanced_drag_handler.cursorChanged.connect(
                     lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
                 )
-
-            # Connect cursor changes
-            #self.drag_handler.cursorChanged.connect(
-            #    lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
-            #)
 
             # Connect selection handler signals - ONLY if they exist and are real signals
             if hasattr(self.selection_handler, 'selectionChanged'):
@@ -212,22 +204,7 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error in _on_selection_changed: {e}")
 
-    def _deprecated_1_setup_signal_connections(self):
-        """Setup signal connections with error handling"""
-        try:
-            # Connect drag handler signals
-            if hasattr(self.drag_handler, 'cursorChanged'):
-                self.drag_handler.cursorChanged.connect(
-                    lambda cursor_shape: self.setCursor(QCursor(cursor_shape))
-                )
 
-            # Connect selection handler signals
-            if hasattr(self.selection_handler, 'selectionChanged'):
-                self.selection_handler.selectionChanged.connect(self.selectionChanged)
-                # Safe connection to _on_selection_changed
-                self.selection_handler.selectionChanged.connect(self._on_selection_changed)
-        except Exception as e:
-            print(f"Warning: Error setting up signal connections: {e}")
 
     def _on_selection_changed(self, field):
         """Handle selection changes from selection handler"""
@@ -316,7 +293,7 @@ class PDFCanvas(QLabel):
             return
         # Import PyQt6 classes locally to avoid import issues
         from PyQt6.QtGui import QColor, QPainter, QPen
-        from PyQt6.QtCore import Qt, QRect
+        from PyQt6.QtCore import QRect
 
         self.setStyleSheet("border:solid 1px red;");
 
@@ -663,64 +640,6 @@ class PDFCanvas(QLabel):
             import traceback
             traceback.print_exc()
 
-    def deprecated_render_page(self):
-        """Render current PDF page to pixmap"""
-        print(f"🎨 Rendering page {self.current_page + 1}")
-
-        if not self.pdf_document or self.current_page >= self.pdf_document.page_count:
-            return
-
-        try:
-            # Get page and render to pixmap
-            page = self.pdf_document[self.current_page]
-            mat = fitz.Matrix(self.zoom_level, self.zoom_level)
-            pix = page.get_pixmap(matrix=mat)
-            img_data = pix.tobytes("ppm")
-
-            # Convert to QPixmap
-            self.page_pixmap = QPixmap()
-            self.page_pixmap.loadFromData(img_data)
-
-            # *** CRITICAL FIX: Set widget size to match PDF content ***
-            if self.page_pixmap:
-                pixmap_size = self.page_pixmap.size()
-
-                # Set both minimum size and actual size
-                self.setMinimumSize(pixmap_size)
-                self.resize(pixmap_size)
-
-                # Force parent to recognize size change
-                if self.parent():
-                    self.parent().updateGeometry()
-
-                print(f"📏 PDF Canvas sized to: {pixmap_size.width()}x{pixmap_size.height()}")
-
-                # Debug: Check if scrolling should be enabled
-                if self.parent() and hasattr(self.parent(), 'viewport'):
-                    viewport_size = self.parent().viewport().size()
-                    widget_size = self.size()
-                    print(f"📏 Viewport: {viewport_size.width()}x{viewport_size.height()}")
-                    print(f"📏 Widget: {widget_size.width()}x{widget_size.height()}")
-                    print(f"📏 Scrolling needed: H={widget_size.width() > viewport_size.width()}, V={widget_size.height() > viewport_size.height()}")
-
-            # Update the displayed pixmap
-            self.setPixmap(self.page_pixmap)
-
-            # Update drag handler with canvas size
-            if hasattr(self.drag_handler, 'set_canvas_size'):
-                self.drag_handler.set_canvas_size(
-                    self.page_pixmap.width(),
-                    self.page_pixmap.height()
-                )
-
-            # Draw overlay (grid, fields, etc.)
-            self.draw_overlay()
-
-        except Exception as e:
-            print(f"❌ Error rendering page: {e}")
-            import traceback
-            traceback.print_exc()
-
     def set_page(self, page_number: int):
         """Set current page and render it"""
         if not self.pdf_document:
@@ -1015,8 +934,8 @@ class PDFCanvas(QLabel):
 
                 # Get ALL selected fields from drag handler for counting
                 multi_selected_fields = []
-                if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
-                    multi_selected_fields = self.drag_handler.get_selected_fields()
+                if hasattr(self, 'enhanced_drag_handler') and hasattr(self.enhanced_drag_handler, 'get_selected_fields'):
+                    multi_selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
                 # Get ALL visible pages
                 visible_pages = self.get_visible_page_numbers()
@@ -1117,7 +1036,7 @@ class PDFCanvas(QLabel):
                 painter.drawRect(int(corner_x), int(corner_y), handle_size, handle_size)
 
             # Optional: Draw field ID for debugging multi-selection
-            if len(self.drag_handler.get_selected_fields()) > 1:
+            if len(self.enhanced_drag_handler.get_selected_fields()) > 1:
                 painter.setPen(QPen(QColor(0, 0, 0)))
                 painter.drawText(int(screen_x + 5), int(screen_y + 15), f"{field.id}")
 
@@ -1267,8 +1186,8 @@ class PDFCanvas(QLabel):
     def toggle_grid(self):
         """Toggle grid display"""
         self.show_grid = not self.show_grid
-        if hasattr(self.drag_handler, 'set_grid_settings'):
-            self.drag_handler.set_grid_settings(self.grid_size, self.show_grid)
+        if hasattr(self.enhanced_drag_handler, 'set_grid_settings'):
+            self.enhanced_drag_handler.set_grid_settings(self.grid_size, self.show_grid)
         self.draw_overlay()
 
     def get_fields_as_objects(self):
@@ -2093,7 +2012,7 @@ class PDFCanvas(QLabel):
             # PRIORITY 2: If field manager didn't find anything, try drag handler
             if not clicked_field:
                 try:
-                    clicked_field = self.drag_handler.handle_mouse_press(
+                    clicked_field = self.enhanced_drag_handler.handle_mouse_press(
                         doc_pos, self.selection_handler.get_selected_field()
                     )
                     print(f"   Drag handler found field: {clicked_field.name if clicked_field else 'None'}")
@@ -2237,7 +2156,7 @@ class PDFCanvas(QLabel):
                 # Select the newly created field
                 try:
                     self.selection_handler.select_field(field)
-                    self.drag_handler.select_field(field)
+                    self.enhanced_drag_handler.select_field(field)
                 except Exception as e:
                     print(f"⚠️ Error selecting new field: {e}")
 
@@ -2759,8 +2678,8 @@ class PDFCanvas(QLabel):
         try:
             # Get all selected fields from drag handler
             selected_fields = []
-            if hasattr(self, 'drag_handler') and hasattr(self.drag_handler, 'get_selected_fields'):
-                selected_fields = self.drag_handler.get_selected_fields()
+            if hasattr(self, 'enhanced_drag_handler') and hasattr(self.enhanced_drag_handler, 'get_selected_fields'):
+                selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
             # Also include the primary selected field from selection handler
             if hasattr(self, 'selection_handler'):

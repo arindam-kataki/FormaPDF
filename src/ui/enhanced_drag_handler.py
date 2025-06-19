@@ -82,6 +82,7 @@ class EnhancedDragHandler(QObject):
     dragCompleted = pyqtSignal(str)  # field_id
 
     def __init__(self, canvas, field_manager):
+        super().__init__()  # This is the critical line that was missing!
         self.canvas = canvas
         self.field_manager = field_manager
         self.selected_fields = []
