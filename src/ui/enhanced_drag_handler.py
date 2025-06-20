@@ -499,6 +499,30 @@ class EnhancedDragHandler(QObject):
         self.is_dragging = False
         return was_dragging
 
+    def select_field(self, field):
+        """Select a single field (for compatibility with selection_handler interface)"""
+        try:
+            if field is None:
+                # Clear selection
+                self.selected_fields.clear()
+                print("✅ Cleared field selection")
+            else:
+                # Select single field
+                self.selected_fields = [field]
+                print(f"✅ Selected field: {field.id}")
+
+        except Exception as e:
+            print(f"⚠️ Error in select_field: {e}")
+
+    def clear_selection(self):
+        """Clear all selected fields"""
+        self.selected_fields.clear()
+        print("✅ Cleared all field selections")
+
+    def get_selected_field(self):
+        """Get the first selected field (for compatibility)"""
+        return self.selected_fields[0] if self.selected_fields else None
+
     def deprecated_1_handle_mouse_release(self, pos: QPoint) -> bool:
         """
         Handle mouse release - end dragging and apply changes

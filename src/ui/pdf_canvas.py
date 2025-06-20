@@ -2114,6 +2114,7 @@ class PDFCanvas(QLabel):
                 new_field = self._create_field_at_position(x, y, field_type, page_num)
                 if new_field:
                     print(f"✅ Created {field_type} field at ({x}, {y}) on page {page_num}")
+                    self._reset_field_type_selection()
 
                     # Select the new field
                     try:

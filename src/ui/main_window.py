@@ -604,6 +604,11 @@ class PDFViewerMainWindow(QMainWindow):
             except Exception as e:
                 QMessageBox.critical(self, "Save Error", f"Failed to save: {e}")
 
+    def reset_field_selection(self):
+        """Reset field selection after placement"""
+        if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'reset_selection'):
+            self.field_palette.reset_selection()
+
     @pyqtSlot()
     def show_info(self):
         """Show application information"""

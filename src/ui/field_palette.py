@@ -5,7 +5,7 @@ Provides UI for selecting and creating different types of form fields
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QButtonGroup, QFrame, QToolTip, QGroupBox
+    QButtonGroup, QFrame, QToolTip, QGroupBox, QScrollArea
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QIcon, QPixmap, QPainter, QColor
@@ -736,7 +736,7 @@ class EnhancedFieldPalette(QWidget):
         layout.setSpacing(10)
 
         # Main field palette
-        self.field_palette = FieldPalette()
+        self.field_palette = ScrollableFieldPalette()
         layout.addWidget(self.field_palette)
 
         # Field preview
