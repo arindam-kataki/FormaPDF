@@ -2134,13 +2134,58 @@ class PDFCanvas(QLabel):
 
     def _reset_field_type_selection(self):
         """Reset field type selection in both canvas and palette"""
+        print("🔄 Starting field type selection reset...")
+
+        # Clear canvas selection
         self.selected_field_type = None
+        print("✅ Cleared canvas selected_field_type")
 
         # Find and reset field palette
-        main_window = self._get_main_window()
-        if main_window and hasattr(main_window, 'sidebar'):
-            if hasattr(main_window.sidebar, 'reset_field_selection'):
-                main_window.sidebar.reset_field_selection()
+        try:
+            main_window = self._get_main_window()
+            if main_window:
+                print(f"✅ Found main window: {type(main_window).__name__}")
+
+                # Try multiple possible paths to field palette
+                field_palette = None
+
+                # Path 1: Direct field_palette attribute (most likely)
+                if hasattr(main_window, 'field_palette'):
+                    field_palette = main_window.field_palette
+                    print("✅ Found field_palette via main_window.field_palette")
+
+                # Path 2: Via sidebar (backup)
+                elif hasattr(main_window, 'sidebar') and hasattr(main_window.sidebar, 'field_palette'):
+                    field_palette = main_window.sidebar.field_palette
+                    print("✅ Found field_palette via main_window.sidebar.field_palette")
+
+                # Try to reset the field palette
+                if field_palette:
+                    # Check if it's an EnhancedFieldPalette with nested field_palette
+                    if hasattr(field_palette, 'field_palette') and hasattr(field_palette.field_palette,
+                                                                           'reset_selection'):
+                        field_palette.field_palette.reset_selection()
+                        print("✅ Called nested field_palette.reset_selection()")
+
+                    # Direct reset_selection method
+                    elif hasattr(field_palette, 'reset_selection'):
+                        field_palette.reset_selection()
+                        print("✅ Called field_palette.reset_selection()")
+
+                    # Manual reset as fallback
+                    else:
+                        if hasattr(field_palette, 'clear_highlights'):
+                            field_palette.clear_highlights()
+                        if hasattr(field_palette, 'selected_field_type'):
+                            field_palette.selected_field_type = None
+                        print("✅ Manually cleared field_palette highlights and selection")
+                else:
+                    print("⚠️ Could not find field palette to reset")
+
+        except Exception as e:
+            print(f"⚠️ Error resetting field palette: {e}")
+
+        print("✅ Field type selection reset complete")
 
     def create_field_at_position(self, x: float, y: float, page_number: int, field_type: str):
         """Create a new field at the specified position"""

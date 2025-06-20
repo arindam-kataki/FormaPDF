@@ -792,3 +792,16 @@ class EnhancedFieldPalette(QWidget):
         # Update preview widget
         if hasattr(self, 'preview_widget') and field_type:
             self.preview_widget.set_field_type(field_type)
+
+    def reset_selection(self):
+        """Reset field selection (delegate to internal palette)"""
+        if hasattr(self.field_palette, 'reset_selection'):
+            self.field_palette.reset_selection()
+            print("✅ EnhancedFieldPalette: delegated reset to internal palette")
+        else:
+            # Manual reset
+            if hasattr(self.field_palette, 'clear_highlights'):
+                self.field_palette.clear_highlights()
+            if hasattr(self.field_palette, 'selected_field_type'):
+                self.field_palette.selected_field_type = None
+            print("✅ EnhancedFieldPalette: manual reset completed")
