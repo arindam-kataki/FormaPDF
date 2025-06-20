@@ -27,6 +27,8 @@ from PyQt6.QtGui import (
     QKeySequence, QPalette
 )
 
+from ui.field_palette import ScrollableFieldPalette
+
 
 class PDFCanvas(QLabel):
     """Custom widget for displaying PDF pages with field overlay"""
@@ -589,7 +591,7 @@ class PDFViewerMainWindow(QMainWindow):
         left_layout = QVBoxLayout()
 
         # Field palette
-        self.field_palette = FieldPalette()
+        self.field_palette = ScrollableFieldPalette()
         left_layout.addWidget(self.field_palette)
 
         # Properties panel

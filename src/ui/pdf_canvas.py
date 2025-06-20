@@ -2204,6 +2204,8 @@ class PDFCanvas(QLabel):
             if field:
                 print(f"✅ Created field: {field.id}")
 
+                self._reset_field_type_selection()
+
                 # Optionally resize the field after creation if needed
                 # field.resize_to(100, 30)  # Set custom size if desired
 
