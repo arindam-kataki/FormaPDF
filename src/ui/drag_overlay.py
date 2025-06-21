@@ -137,37 +137,59 @@ class DragOverlay(QWidget):
                 )
             self.ghost_positions[field.id] = ghost_pos
 
+    """
+    Multi-Page Drag Ghost Fix v2.1
+    Author: Claude Assistant
+    Date: 2025-06-20
+    Purpose: Fix drag ghost visibility on non-first pages in multi-page PDF documents
+
+    Changes in v2.1:
+    - Fixed coordinate conversion for multi-page documents
+    - Added zoom-aware ghost positioning
+    - Enhanced debugging and validation
+    - Improved fallback handling for page offset calculation
+    - Added visual debug indicators (removable)
+    """
+
     def update_ghost_positions(self):
-        """Calculate ghost positions with zoom-aware coordinate handling"""
+        """
+        Calculate ghost positions with proper multi-page support
+        Version: 2.1
+        """
         if not self.is_dragging or not self.drag_fields:
             return
 
-        print(f"🎯 Updating ghost positions at zoom {self.zoom_level:.2f}x")
+        print(f"🎯 [v2.1] Updating ghost positions for {len(self.drag_fields)} fields")
 
-        # ✅ ZOOM-AWARE: Calculate drag offset in screen coordinates
+        # v2.1: Convert screen drag offset to document coordinates first
         screen_drag_offset = self.current_drag_pos - self.drag_start_pos
-
-        # ✅ ZOOM-AWARE: Convert screen drag offset to document offset
         doc_drag_offset_x = screen_drag_offset.x() / self.zoom_level
         doc_drag_offset_y = screen_drag_offset.y() / self.zoom_level
 
         print(f"   Screen drag offset: {screen_drag_offset}")
         print(f"   Document drag offset: ({doc_drag_offset_x:.1f}, {doc_drag_offset_y:.1f})")
+        print(f"   Zoom level: {self.zoom_level:.2f}x")
 
-        # Get canvas reference
+        # Get canvas reference for coordinate conversion
         canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
 
-        # Update ghost position for each field
+        # Process each dragged field
         for field in self.drag_fields:
+            page_number = getattr(field, 'page_number', 0)
+
             try:
-                # ✅ ZOOM-AWARE METHOD 1: Calculate new field position in document space
+                # v2.1: Calculate new field position in document coordinates
                 new_field_doc_x = field.x + doc_drag_offset_x
                 new_field_doc_y = field.y + doc_drag_offset_y
 
-                # Convert new document position to screen coordinates
+                print(f"   Field {field.name} on page {page_number}:")
+                print(f"     Original doc: ({field.x}, {field.y})")
+                print(f"     New doc: ({new_field_doc_x:.1f}, {new_field_doc_y:.1f})")
+
+                # v2.1: Convert new document position to screen coordinates
                 if canvas and hasattr(canvas, 'document_to_screen_coordinates'):
                     screen_coords = canvas.document_to_screen_coordinates(
-                        field.page_number, new_field_doc_x, new_field_doc_y
+                        page_number, new_field_doc_x, new_field_doc_y
                     )
 
                     if screen_coords:
@@ -175,98 +197,136 @@ class DragOverlay(QWidget):
                         ghost_pos = QPoint(int(ghost_screen_x), int(ghost_screen_y))
                         self.ghost_positions[field.id] = ghost_pos
 
-                        print(
-                            f"   {field.name}: doc({field.x}, {field.y}) + offset({doc_drag_offset_x:.1f}, {doc_drag_offset_y:.1f}) = new_doc({new_field_doc_x:.1f}, {new_field_doc_y:.1f}) -> screen({ghost_screen_x}, {ghost_screen_y})")
+                        print(f"     Ghost screen: ({ghost_screen_x}, {ghost_screen_y})")
+
+                        # v2.1: Validate ghost position is within reasonable bounds
+                        if self._validate_ghost_position(ghost_pos, canvas):
+                            print(f"     ✅ Valid ghost position for {field.name}")
+                        else:
+                            print(f"     ⚠️ Ghost position may be off-screen for {field.name}")
+
                         continue
                     else:
-                        print(f"⚠️ Canvas coordinate conversion failed for {field.name}")
+                        print(f"     ❌ Canvas coordinate conversion failed")
 
-                # ✅ ZOOM-AWARE METHOD 2: Manual calculation fallback
-                self._calculate_zoom_aware_ghost_fallback(field, new_field_doc_x, new_field_doc_y, canvas)
+                # v2.1: Enhanced fallback calculation with manual page offset
+                print(f"     Using v2.1 fallback calculation...")
+                self._calculate_multi_page_ghost_fallback(field, new_field_doc_x, new_field_doc_y, canvas)
 
             except Exception as e:
-                print(f"❌ Error calculating ghost position for {field.name}: {e}")
+                print(f"❌ [v2.1] Error calculating ghost for {field.name}: {e}")
                 # Emergency fallback - position near cursor
                 self.ghost_positions[field.id] = QPoint(
                     self.current_drag_pos.x() - 50,
                     self.current_drag_pos.y() - 15
                 )
 
-    def _calculate_zoom_aware_ghost_fallback(self, field, new_doc_x, new_doc_y, canvas):
-        """Manual zoom-aware ghost calculation when canvas method fails"""
+    def _calculate_multi_page_ghost_fallback(self, field, new_doc_x, new_doc_y, canvas):
+        """
+        Fallback calculation for multi-page ghost positioning
+        Version: 2.1 - Enhanced page offset handling
+        """
         try:
-            field_page = getattr(field, 'page_number', 0)
+            page_number = getattr(field, 'page_number', 0)
 
-            # Convert document coordinates to screen coordinates manually
-            ghost_screen_x = int(new_doc_x * self.zoom_level)
-            ghost_screen_y = int(new_doc_y * self.zoom_level)
+            # v2.1: Manual conversion from document to screen coordinates
+            page_relative_x = new_doc_x * self.zoom_level
+            page_relative_y = new_doc_y * self.zoom_level
 
-            # Add page offset for multi-page documents
-            if field_page > 0 and canvas:
-                page_offset_y = self._get_page_offset_y(field_page, canvas)
-                ghost_screen_y += int(page_offset_y)
+            # v2.1: Get page top position from canvas
+            page_top = 0
+            if canvas and hasattr(canvas, 'page_positions') and canvas.page_positions:
+                if page_number < len(canvas.page_positions):
+                    page_top = canvas.page_positions[page_number]
+                    print(f"     [v2.1] Page {page_number} top position: {page_top}")
+                else:
+                    print(f"     ⚠️ [v2.1] Page {page_number} not found in page_positions")
+                    # v2.1: Calculate page offset manually if page_positions incomplete
+                    page_top = self._estimate_page_top(page_number, canvas)
 
-            # Account for scroll position
-            if canvas and hasattr(canvas, 'horizontalScrollBar') and hasattr(canvas, 'verticalScrollBar'):
-                scroll_x = canvas.horizontalScrollBar().value()
-                scroll_y = canvas.verticalScrollBar().value()
-                ghost_screen_x -= scroll_x
+            # v2.1: Calculate final screen coordinates with proper margins
+            ghost_screen_x = int(page_relative_x + 10)  # Add horizontal margin
+            ghost_screen_y = int(page_relative_y + page_top)
+
+            # v2.1: Account for scroll position
+            if canvas and hasattr(canvas, 'parent') and hasattr(canvas.parent(), 'verticalScrollBar'):
+                scroll_y = canvas.parent().verticalScrollBar().value()
                 ghost_screen_y -= scroll_y
+                print(f"     [v2.1] Adjusted for scroll: -{scroll_y}")
 
-            # Account for canvas margins
-            canvas_margin_x = getattr(canvas, 'canvas_margin_x', 0)
-            canvas_margin_y = getattr(canvas, 'canvas_margin_y', 0)
-            ghost_screen_x += canvas_margin_x
-            ghost_screen_y += canvas_margin_y
-
+            # v2.1: Store calculated ghost position
             ghost_pos = QPoint(ghost_screen_x, ghost_screen_y)
             self.ghost_positions[field.id] = ghost_pos
 
-            print(
-                f"   {field.name} (manual): new_doc({new_doc_x:.1f}, {new_doc_y:.1f}) -> screen({ghost_screen_x}, {ghost_screen_y}) [zoom: {self.zoom_level:.2f}x]")
+            print(f"     [v2.1] Fallback ghost: ({ghost_screen_x}, {ghost_screen_y})")
 
         except Exception as e:
-            print(f"❌ Manual ghost calculation failed for {field.name}: {e}")
+            print(f"❌ [v2.1] Fallback calculation failed: {e}")
 
-    def _get_page_offset_y(self, page_number, canvas):
-        """Get Y offset for a specific page"""
-        if page_number == 0 or not canvas:
-            return 0
-
+    def _estimate_page_top(self, page_number, canvas):
+        """
+        Estimate page top position when page_positions is incomplete
+        Version: 2.1
+        """
         try:
-            # Try different methods to get page offset
-            if hasattr(canvas, 'get_page_y_offset'):
-                return canvas.get_page_y_offset(page_number)
-            elif hasattr(canvas, 'page_positions') and canvas.page_positions:
-                if page_number < len(canvas.page_positions):
-                    return canvas.page_positions[page_number]
-            elif hasattr(canvas, 'pdf_document') and canvas.pdf_document:
-                # Manual calculation using page height
-                if page_number > 0:
-                    total_height = 0
-                    for i in range(page_number):
-                        if i < canvas.pdf_document.page_count:
-                            page = canvas.pdf_document[i]
-                            page_height = page.rect.height * self.zoom_level
-                            total_height += page_height + 20  # Add spacing
-                    return int(total_height)
+            if page_number == 0:
+                return 0
+
+            # v2.1: Calculate based on page height and spacing
+            if canvas and hasattr(canvas, 'pdf_document') and canvas.pdf_document:
+                total_height = 0
+                for i in range(page_number):
+                    if i < canvas.pdf_document.page_count:
+                        page = canvas.pdf_document[i]
+                        page_height = page.rect.height * self.zoom_level
+                        page_spacing = 20  # Default spacing between pages
+                        total_height += page_height + page_spacing
+
+                print(f"     [v2.1] Estimated page {page_number} top: {total_height}")
+                return int(total_height)
         except Exception as e:
-            print(f"⚠️ Error calculating page offset: {e}")
+            print(f"⚠️ [v2.1] Page estimation failed: {e}")
 
         return 0
 
+    def _validate_ghost_position(self, ghost_pos, canvas):
+        """
+        Validate that ghost position is within visible bounds
+        Version: 2.1 - Enhanced validation logic
+        """
+        try:
+            if not canvas:
+                return True  # Can't validate without canvas
+
+            # v2.1: Get canvas dimensions for validation
+            canvas_width = canvas.width()
+            canvas_height = canvas.height()
+
+            # v2.1: Check if ghost is within reasonable bounds (allow off-screen tolerance)
+            tolerance = 200  # Increased tolerance for better UX
+            valid_x = -tolerance <= ghost_pos.x() <= canvas_width + tolerance
+            valid_y = -tolerance <= ghost_pos.y() <= canvas_height + tolerance
+
+            return valid_x and valid_y
+
+        except Exception:
+            return True  # Default to valid if validation fails
+
     def draw_drag_feedback(self, painter: QPainter):
-        """Draw zoom-aware visual feedback for dragged fields"""
+        """
+        Draw multi-page aware visual feedback for dragged fields
+        Version: 2.1 - Enhanced visibility and debugging
+        """
         if not self.is_dragging or not self.drag_fields:
             return
 
-        print(f"🎨 Drawing {len(self.drag_fields)} ghosts at zoom {self.zoom_level:.2f}x")
+        print(f"🎨 [v2.1] Drawing ghosts for {len(self.drag_fields)} fields")
 
-        # Enhanced ghost styling with zoom-aware borders
-        ghost_color = QColor(100, 150, 255, 120)  # Semi-transparent blue
-        ghost_border = QColor(50, 100, 255, 255)  # Solid border
+        # v2.1: Enhanced ghost styling for better visibility
+        ghost_color = QColor(100, 150, 255, 140)  # Semi-transparent blue
+        ghost_border = QColor(50, 100, 255, 255)  # Solid blue border
 
-        # ✅ ZOOM-AWARE: Scale border thickness with zoom
+        # v2.1: Scale border thickness with zoom level
         border_thickness = max(1, int(2 * self.zoom_level))
 
         ghost_brush = QBrush(ghost_color)
@@ -276,47 +336,61 @@ class DragOverlay(QWidget):
 
         ghosts_drawn = 0
 
-        # Draw ghost for each dragged field
+        # v2.1: Draw ghost for each dragged field
         for field in self.drag_fields:
             if field.id in self.ghost_positions:
                 ghost_pos = self.ghost_positions[field.id]
+                page_number = getattr(field, 'page_number', 0)
 
-                # Validate ghost position
-                if self._is_ghost_position_valid(ghost_pos):
-                    # ✅ ZOOM-AWARE: Scale field dimensions by current zoom level
-                    field_width = int(getattr(field, 'width', 100) * self.zoom_level)
-                    field_height = int(getattr(field, 'height', 30) * self.zoom_level)
+                print(f"   [v2.1] Drawing ghost for {field.name} (page {page_number}) at {ghost_pos}")
 
-                    # Draw ghost rectangle
-                    ghost_rect = QRect(ghost_pos.x(), ghost_pos.y(), field_width, field_height)
-                    painter.drawRect(ghost_rect)
+                # v2.1: Get field dimensions scaled by zoom
+                field_width = int(getattr(field, 'width', 100) * self.zoom_level)
+                field_height = int(getattr(field, 'height', 30) * self.zoom_level)
 
-                    # Draw zoom-aware field label
-                    self._draw_zoom_aware_ghost_label(painter, field, ghost_rect)
+                # v2.1: Create ghost rectangle
+                ghost_rect = QRect(ghost_pos.x(), ghost_pos.y(), field_width, field_height)
 
-                    ghosts_drawn += 1
-                    print(f"   Drew ghost for {field.name} at {ghost_pos} (size: {field_width}x{field_height})")
-                else:
-                    print(f"⚠️ Invalid ghost position for {field.name}: {ghost_pos}")
+                # v2.1: DEBUG FEATURE - Draw page indicator for non-first pages (REMOVABLE)
+                if page_number > 0:
+                    # Draw small red page indicator for debugging
+                    painter.setPen(QPen(QColor(255, 0, 0), 1))
+                    painter.drawText(ghost_pos.x() - 20, ghost_pos.y() - 5, f"P{page_number}")
+                    painter.setPen(ghost_pen)  # Restore ghost pen
+
+                # v2.1: Draw the main ghost rectangle
+                painter.drawRect(ghost_rect)
+
+                # v2.1: Draw field label with proper scaling
+                self._draw_multi_page_ghost_label(painter, field, ghost_rect)
+
+                ghosts_drawn += 1
             else:
-                print(f"❌ No ghost position calculated for {field.name}")
+                page_number = getattr(field, 'page_number', 0)
+                print(f"   ❌ [v2.1] No ghost position for {field.name} on page {page_number}")
 
-        print(f"✅ Drew {ghosts_drawn}/{len(self.drag_fields)} ghosts at {self.zoom_level:.2f}x zoom")
+        print(f"✅ [v2.1] Drew {ghosts_drawn}/{len(self.drag_fields)} multi-page ghosts")
 
-    def _draw_zoom_aware_ghost_label(self, painter, field, rect):
-        """Draw field label with zoom-appropriate font size"""
+        # v2.1: DEBUG FEATURE - Draw cursor indicator (REMOVABLE)
+        self._draw_debug_cursor_indicator(painter)
+
+    def _draw_multi_page_ghost_label(self, painter, field, rect):
+        """
+        Draw field label with zoom-aware scaling
+        Version: 2.1
+        """
         if not hasattr(field, 'name') or not field.name:
             return
 
-        # ✅ ZOOM-AWARE: Scale font size with zoom level
+        # v2.1: Scale font size with zoom level (capped for readability)
         base_font_size = 10
-        scaled_font_size = max(6, int(base_font_size * min(self.zoom_level, 2.0)))  # Cap font scaling at 2x
+        scaled_font_size = max(7, int(base_font_size * min(self.zoom_level, 1.5)))
         font = QFont("Arial", scaled_font_size)
 
         painter.setFont(font)
-        painter.setPen(QPen(QColor(255, 255, 255, 220)))  # White text with slight transparency
+        painter.setPen(QPen(QColor(255, 255, 255, 230)))  # White text
 
-        # Calculate text position (centered in ghost)
+        # v2.1: Calculate centered text position
         fm = QFontMetrics(font)
         text_rect = fm.boundingRect(field.name)
 
@@ -325,45 +399,135 @@ class DragOverlay(QWidget):
 
         painter.drawText(text_x, text_y, field.name)
 
-    def _is_ghost_position_valid(self, ghost_pos):
-        """Validate that ghost position is within reasonable bounds"""
-        # More generous bounds for different zoom levels
-        max_bound = 5000 * self.zoom_level
-        min_bound = -1000 * self.zoom_level
+    def _draw_debug_cursor_indicator(self, painter):
+        """
+        Draw cursor position indicator for debugging
+        Version: 2.1 - DEBUG FEATURE (REMOVABLE)
 
-        return (min_bound <= ghost_pos.x() <= max_bound and
-                min_bound <= ghost_pos.y() <= max_bound)
-
-    # Debug method for troubleshooting zoom issues
-    def debug_zoom_ghost_positioning(self):
-        """Debug helper to understand zoom ghost positioning"""
+        NOTE: Remove this method in production for cleaner visuals
+        """
         if not self.is_dragging:
-            print("🐛 Not currently dragging")
             return
 
-        print(f"🐛 Ghost Positioning Debug at zoom {self.zoom_level:.2f}x:")
-        print(f"   Drag start: {self.drag_start_pos}")
-        print(f"   Current cursor: {self.current_drag_pos}")
+        cursor_x = self.current_drag_pos.x()
+        cursor_y = self.current_drag_pos.y()
 
-        screen_offset = self.current_drag_pos - self.drag_start_pos
-        doc_offset_x = screen_offset.x() / self.zoom_level
-        doc_offset_y = screen_offset.y() / self.zoom_level
+        # v2.1: Draw red crosshair at cursor position
+        painter.setPen(QPen(QColor(255, 100, 100, 180), 2))
+        painter.drawLine(cursor_x - 10, cursor_y, cursor_x + 10, cursor_y)  # Horizontal
+        painter.drawLine(cursor_x, cursor_y - 10, cursor_x, cursor_y + 10)  # Vertical
 
-        print(f"   Screen drag offset: {screen_offset}")
-        print(f"   Document drag offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
-        print(f"   Number of ghosts: {len(self.ghost_positions)}")
+        # v2.1: Draw cursor coordinates text
+        painter.setPen(QPen(QColor(255, 255, 255, 200)))
+        painter.setFont(QFont("Arial", 9))
+        painter.drawText(cursor_x + 15, cursor_y - 5, f"({cursor_x}, {cursor_y})")
 
-        for field in self.drag_fields:
-            if field.id in self.ghost_positions:
-                ghost_pos = self.ghost_positions[field.id]
-                new_doc_x = field.x + doc_offset_x
-                new_doc_y = field.y + doc_offset_y
-                print(f"   {field.name}:")
-                print(f"     Original doc: ({field.x}, {field.y})")
-                print(f"     New doc: ({new_doc_x:.1f}, {new_doc_y:.1f})")
-                print(f"     Ghost screen: ({ghost_pos.x()}, {ghost_pos.y()})")
+    def debug_multi_page_ghost_setup(self):
+        """
+        Debug multi-page ghost positioning setup
+        Version: 2.1 - DEBUG METHOD (REMOVABLE)
+
+        Call this method to troubleshoot ghost positioning issues
+        """
+        canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
+
+        print("🐛 [v2.1] Multi-Page Ghost Debug Report:")
+        print(f"   Version: 2.1")
+        print(f"   Zoom level: {self.zoom_level:.2f}x")
+        print(f"   Currently dragging: {self.is_dragging}")
+        print(f"   Number of drag fields: {len(self.drag_fields) if self.drag_fields else 0}")
+        print(f"   Ghost positions calculated: {len(self.ghost_positions)}")
+
+        if canvas:
+            print(f"   Canvas size: {canvas.width()}x{canvas.height()}")
+
+            if hasattr(canvas, 'page_positions'):
+                print(f"   Page positions available: {len(canvas.page_positions) if canvas.page_positions else 0}")
+                if canvas.page_positions:
+                    print(f"   Page positions: {canvas.page_positions[:5]}...")  # Show first 5
             else:
-                print(f"   {field.name}: NO GHOST POSITION")
+                print("   ⚠️ No page_positions attribute on canvas")
+
+            if hasattr(canvas, 'document_to_screen_coordinates'):
+                print("   ✅ Canvas has document_to_screen_coordinates method")
+            else:
+                print("   ❌ Canvas missing document_to_screen_coordinates method")
+
+            if hasattr(canvas, 'pdf_document') and canvas.pdf_document:
+                print(f"   PDF document: {canvas.pdf_document.page_count} pages")
+            else:
+                print("   ⚠️ No PDF document loaded")
+        else:
+            print("   ❌ No canvas parent found")
+
+        if self.drag_fields:
+            print("   Field Details:")
+            for i, field in enumerate(self.drag_fields):
+                page_num = getattr(field, 'page_number', 0)
+                has_ghost = field.id in self.ghost_positions
+                ghost_pos = self.ghost_positions.get(field.id, "None")
+                print(f"     {i + 1}. {field.name}: page {page_num}, ghost: {ghost_pos}, valid: {has_ghost}")
+
+    def start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
+        """
+        Start dragging operation with v2.1 enhancements
+        Version: 2.1
+        """
+        print(f"🎯 [v2.1] Starting drag with {len(fields)} fields at {start_pos}")
+
+        self.is_dragging = True
+        self.drag_fields = fields.copy()
+        self.drag_start_pos = start_pos
+        self.current_drag_pos = start_pos
+        self.zoom_level = zoom_level
+
+        # v2.1: Clear any previous ghost positions
+        self.ghost_positions.clear()
+
+        # v2.1: Calculate initial ghost positions
+        self.update_ghost_positions()
+
+        # v2.1: Enable mouse events for the overlay during drag
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+
+        # v2.1: Make overlay visible and bring to front
+        self.show()
+        self.raise_()
+        self.update()
+
+        print(f"✅ [v2.1] Drag initialization complete: {len(self.ghost_positions)} ghosts positioned")
+
+    """
+    INSTALLATION INSTRUCTIONS for v2.1:
+
+    1. Replace the following methods in your src/ui/drag_overlay.py file:
+       - update_ghost_positions()
+       - draw_drag_feedback()
+       - start_drag()
+
+    2. Add these new helper methods:
+       - _calculate_multi_page_ghost_fallback()
+       - _estimate_page_top()
+       - _validate_ghost_position()
+       - _draw_multi_page_ghost_label()
+
+    3. OPTIONAL DEBUG FEATURES (remove in production):
+       - _draw_debug_cursor_indicator()
+       - debug_multi_page_ghost_setup()
+
+    4. TEST with multi-page documents at various zoom levels
+
+    5. To remove debug features in production:
+       - Remove calls to _draw_debug_cursor_indicator() in draw_drag_feedback()
+       - Remove page indicator drawing in draw_drag_feedback()
+       - Remove debug_multi_page_ghost_setup() method
+
+    EXPECTED RESULTS:
+    - Drag ghosts visible on all pages
+    - Proper zoom-aware positioning
+    - Smooth cursor following
+    - Red debug indicators show page numbers and cursor (removable)
+    """
 
     # Enhanced drag handler methods with zoom awareness
     def set_zoom_level(self, zoom_level: float):
