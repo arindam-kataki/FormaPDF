@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from PyQt6.QtCore import QRect
+from click import clear
 
 
 class FieldType(Enum):
@@ -19,7 +20,17 @@ class FieldType(Enum):
     SIGNATURE = "signature"
     DATE = "date"
     BUTTON = "button"
-    NUMBER = "number"
+    NUMBER = "number",
+    EMAIL = "email",
+    LABEL = "label",
+    FILE_UPLOAD = "file upload",
+    PHONE= "phone",
+    URL = "url",
+    TEXTAREA = "textarea",
+    PASSWORD = "password"
+
+
+
 
 
 @dataclass
@@ -50,8 +61,11 @@ class FormField:
             FieldType.DROPDOWN: (120, 25),
             FieldType.SIGNATURE: (200, 50),
             FieldType.DATE: (100, 25),
+            FieldType.RADIO: (20, 20),
             FieldType.BUTTON: (80, 30),
-            FieldType.NUMBER: (100, 25)
+            FieldType.NUMBER: (100, 25),
+            FieldType.EMAIL: (200, 25),
+            FieldType.LABEL: (100, 25)
         }
 
         field_type_enum = FieldType(field_type)
