@@ -649,6 +649,7 @@ class PDFViewerMainWindow(QMainWindow):
 
     # Placeholder methods for signal connections
     @pyqtSlot(str)
+    @pyqtSlot(str)
     def create_field_at_center(self, field_type: str):
         """Create a new field at the center of the visible area"""
         print(f"Creating field of type: {field_type}")
@@ -671,6 +672,8 @@ class PDFViewerMainWindow(QMainWindow):
 
             # Create field using pdf_canvas
             if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                field = None
+
                 if hasattr(self.pdf_canvas, 'add_field'):
                     field = self.pdf_canvas.add_field(field_type, canvas_x, canvas_y)
                     if field:
@@ -683,21 +686,59 @@ class PDFViewerMainWindow(QMainWindow):
                         else:
                             self.pdf_canvas.update()
 
-                        return field
-                    else:
-                        print(f"❌ Failed to create {field_type} field")
-                        self.statusBar().showMessage(f"Failed to create {field_type} field", 3000)
-                elif hasattr(self.pdf_canvas.field_manager, 'add_field'):
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager, 'add_field'):
                     # Alternative: use field manager directly
                     field = self.pdf_canvas.field_manager.add_field(field_type, canvas_x, canvas_y)
                     if field:
                         print(f"✅ Created {field_type} field via field manager: {field.name}")
                         self.statusBar().showMessage(f"Created {field_type} field", 2000)
                         self.pdf_canvas.update()
-                        return field
                 else:
                     print("❌ No field creation method available")
                     self.statusBar().showMessage("Field creation not available", 3000)
+                    return None
+
+                # ========== TABBED FIELD PALETTE INTEGRATION ==========
+                if field:
+                    # Add to the properties tab dropdown
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'add_field_to_list'):
+                        self.field_palette.add_field_to_list(field)
+                        print(f"✅ Added {field_type} field to Properties tab list")
+
+                    # Select the new field in both tabs (this will switch to Properties tab)
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
+                        self.field_palette.set_field_selected(True, field)
+                        print(f"✅ Selected new {field_type} field in tabbed palette")
+
+                    # Update status with field info
+                    if hasattr(self, 'field_info_label'):
+                        # Try different ways to get field ID/name based on your field object
+                        field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+                        self.field_info_label.setText(f"Created {field_type} field: {field_id}")
+
+                    # Reset field type selection in Controls tab after a short delay
+                    # This allows user to see the selection briefly, then resets so they can create another field
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'reset_selection'):
+                        from PyQt6.QtCore import QTimer
+                        QTimer.singleShot(1500, lambda: (
+                            self.field_palette.reset_selection(),
+                            print("✅ Reset Controls tab selection - ready for next field")
+                        ))
+
+                    # Setup field manager connection if not already done
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_manager'):
+                        if hasattr(self.pdf_canvas, 'field_manager'):
+                            self.field_palette.set_field_manager(self.pdf_canvas.field_manager)
+                        elif hasattr(self, 'field_manager'):
+                            self.field_palette.set_field_manager(self.field_manager)
+
+                else:
+                    print(f"❌ Failed to create {field_type} field")
+                    self.statusBar().showMessage(f"Failed to create {field_type} field", 3000)
+                # ========== END TABBED FIELD PALETTE INTEGRATION ==========
+
+                return field
+
             else:
                 print("❌ PDF Canvas not available")
                 self.statusBar().showMessage("PDF Canvas not available", 3000)
@@ -705,6 +746,8 @@ class PDFViewerMainWindow(QMainWindow):
         except Exception as e:
             print(f"❌ Error creating field: {e}")
             self.statusBar().showMessage(f"Error creating field: {e}", 3000)
+            import traceback
+            traceback.print_exc()
 
         return None
     def deprecated_on_field_clicked(self, field_id: str):
@@ -1477,9 +1520,18 @@ class PDFViewerMainWindow(QMainWindow):
         # Implementation would go here
 
     @pyqtSlot(str)
-    def on_field_clicked(self, field_id: str):
-        """Handle field click"""
-        print(f"Field clicked: {field_id}")
+    def on_field_clicked(self, field):
+        """Handle field selection from canvas"""
+        has_selection = field is not None
+
+        # Update the tabbed palette
+        self.field_palette.set_field_selected(has_selection, field)
+
+        # Update status bar
+        if field and hasattr(self, 'field_info_label'):
+            self.field_info_label.setText(f"Selected: {field.field_type} ({field.id})")
+        elif hasattr(self, 'field_info_label'):
+            self.field_info_label.setText("No field selected")
 
     @pyqtSlot(str, int, int)
     def on_field_moved(self, field_id: str, x: int, y: int):
