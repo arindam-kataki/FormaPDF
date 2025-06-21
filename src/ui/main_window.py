@@ -27,6 +27,8 @@ except ImportError:
 
 try:
     from ui.field_palette import EnhancedFieldPalette
+    from ui.tabbed_field_palette import TabbedFieldPalette
+    from ui.properties_panel import PropertiesPanel
     FIELD_PALETTE_AVAILABLE = True
 except ImportError:
     print("Warning: FieldPalette not available")
@@ -137,7 +139,10 @@ class PDFViewerMainWindow(QMainWindow):
 
         # Field palette (with fallback)
         if FIELD_PALETTE_AVAILABLE and EnhancedFieldPalette:
-            self.field_palette = EnhancedFieldPalette()
+            #self.field_palette = EnhancedFieldPalette()
+            self.field_palette = TabbedFieldPalette()
+            if hasattr(self, 'field_manager'):
+                self.field_palette.set_field_manager(self.field_manager)
             left_layout.addWidget(self.field_palette)
         else:
             # Fallback widget
@@ -373,6 +378,16 @@ class PDFViewerMainWindow(QMainWindow):
                     print("  ✅ Connected field_palette.fieldRequested")
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect fieldRequested: {e}")
+
+            # Property change connection for the Properties tab
+            if (hasattr(self, 'field_palette') and
+                    self.field_palette is not None and
+                    hasattr(self.field_palette, 'propertyChanged')):
+                try:
+                    self.field_palette.propertyChanged.connect(self.on_property_changed)
+                    print("  ✅ Connected field_palette.propertyChanged")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect propertyChanged: {e}")
 
             if (hasattr(self, 'field_palette') and 
                 self.field_palette is not None and 
@@ -692,9 +707,23 @@ class PDFViewerMainWindow(QMainWindow):
             self.statusBar().showMessage(f"Error creating field: {e}", 3000)
 
         return None
-    def on_field_clicked(self, field_id: str):
+    def deprecated_on_field_clicked(self, field_id: str):
         """Handle field click (placeholder)"""
         self.statusBar().showMessage(f"Field clicked: {field_id}", 2000)
+
+    def on_field_clicked(self, field):
+        """Handle field selection from canvas"""
+        # Your existing logic here...
+
+        # Add this line:
+        has_selection = field is not None
+        self.field_palette.set_field_selected(has_selection, field)
+
+        # Update status bar
+        if field and hasattr(self, 'field_info_label'):
+            self.field_info_label.setText(f"Selected: {field.field_type} ({field.id})")
+        elif hasattr(self, 'field_info_label'):
+            self.field_info_label.setText("No field selected")
 
     @pyqtSlot(object)
     def on_selection_changed(self, field):
