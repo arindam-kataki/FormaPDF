@@ -754,7 +754,7 @@ class PDFViewerMainWindow(QMainWindow):
         """Handle field click (placeholder)"""
         self.statusBar().showMessage(f"Field clicked: {field_id}", 2000)
 
-    def on_field_clicked(self, field):
+    def Deprecated_on_field_clicked(self, field):
         """Handle field selection from canvas"""
         # Your existing logic here...
 
@@ -775,8 +775,61 @@ class PDFViewerMainWindow(QMainWindow):
 
     @pyqtSlot(str, str, object)
     def on_property_changed(self, field_id: str, property_name: str, value):
-        """Handle property change (placeholder)"""
-        self.statusBar().showMessage(f"Property changed: {property_name}", 2000)
+        """Handle property changes from the Properties tab"""
+        print(f"Property change: {field_id}.{property_name} = {value}")
+
+        try:
+            # Find the field and update it
+            field = None
+
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'get_field_by_id'):
+                    field = self.pdf_canvas.get_field_by_id(field_id)
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager,
+                                                                           'get_field_by_id'):
+                    field = self.pdf_canvas.field_manager.get_field_by_id(field_id)
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager, 'fields'):
+                    # Search in fields list
+                    for f in self.pdf_canvas.field_manager.fields:
+                        if getattr(f, 'id', getattr(f, 'name', None)) == field_id:
+                            field = f
+                            break
+
+            if field:
+                # Update the field property using different possible methods
+                if hasattr(field, 'set_property'):
+                    field.set_property(property_name, value)
+                elif hasattr(field, 'properties') and isinstance(field.properties, dict):
+                    field.properties[property_name] = value
+                elif hasattr(field, property_name):
+                    setattr(field, property_name, value)
+                else:
+                    print(f"⚠️ Cannot set property {property_name} on field {field_id}")
+                    return
+
+                print(f"✅ Updated {field_id}.{property_name} = {value}")
+
+                # Update the canvas display
+                if hasattr(self.pdf_canvas, 'update_field_display'):
+                    self.pdf_canvas.update_field_display(field)
+                elif hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+                else:
+                    self.pdf_canvas.update()
+
+                # Update status
+                if hasattr(self, 'field_info_label'):
+                    self.field_info_label.setText(f"Updated {property_name}: {value}")
+
+            else:
+                print(f"⚠️ Field not found: {field_id}")
+                if hasattr(self, 'field_info_label'):
+                    self.field_info_label.setText(f"Error: Field {field_id} not found")
+
+        except Exception as e:
+            print(f"❌ Error updating property: {e}")
+            if hasattr(self, 'field_info_label'):
+                self.field_info_label.setText(f"Error updating property: {e}")
 
     @pyqtSlot(str)
     def _on_field_type_selected(self, field_type):
@@ -1514,7 +1567,7 @@ class PDFViewerMainWindow(QMainWindow):
 
 
     @pyqtSlot(str)
-    def create_field_at_center(self, field_type: str):
+    def deprecated_create_field_at_center(self, field_type: str):
         """Create a new field at the center of the visible area"""
         print(f"Creating field of type: {field_type}")
         # Implementation would go here
@@ -1558,9 +1611,138 @@ class PDFViewerMainWindow(QMainWindow):
 
     @pyqtSlot(str, str, object)
     def on_property_changed(self, field_id: str, property_name: str, value):
-        """Handle property change"""
-        print(f"Property {property_name} of field {field_id} changed to {value}")
+        """Handle property changes from the Properties tab"""
+        print(f"Property change: {field_id}.{property_name} = {value}")
 
+        try:
+            # Find the field and update it
+            field = None
+
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'get_field_by_id'):
+                    field = self.pdf_canvas.get_field_by_id(field_id)
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager,
+                                                                           'get_field_by_id'):
+                    field = self.pdf_canvas.field_manager.get_field_by_id(field_id)
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager, 'fields'):
+                    # Search in fields list
+                    for f in self.pdf_canvas.field_manager.fields:
+                        if getattr(f, 'id', getattr(f, 'name', None)) == field_id:
+                            field = f
+                            break
+
+            if field:
+                # Update the field property using different possible methods
+                if hasattr(field, 'set_property'):
+                    field.set_property(property_name, value)
+                elif hasattr(field, 'properties') and isinstance(field.properties, dict):
+                    field.properties[property_name] = value
+                elif hasattr(field, property_name):
+                    setattr(field, property_name, value)
+                else:
+                    print(f"⚠️ Cannot set property {property_name} on field {field_id}")
+                    return
+
+                print(f"✅ Updated {field_id}.{property_name} = {value}")
+
+                # Update the canvas display
+                if hasattr(self.pdf_canvas, 'update_field_display'):
+                    self.pdf_canvas.update_field_display(field)
+                elif hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+                else:
+                    self.pdf_canvas.update()
+
+                # Update status
+                if hasattr(self, 'field_info_label'):
+                    self.field_info_label.setText(f"Updated {property_name}: {value}")
+
+            else:
+                print(f"⚠️ Field not found: {field_id}")
+                if hasattr(self, 'field_info_label'):
+                    self.field_info_label.setText(f"Error: Field {field_id} not found")
+
+        except Exception as e:
+            print(f"❌ Error updating property: {e}")
+            if hasattr(self, 'field_info_label'):
+                self.field_info_label.setText(f"Error updating property: {e}")
+
+    def delete_selected_field(self):
+        """Delete the currently selected field"""
+        try:
+            # Get the currently selected field from the canvas
+            selected_field = None
+
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'selected_field'):
+                    selected_field = self.pdf_canvas.selected_field
+                elif hasattr(self.pdf_canvas, 'get_selected_field'):
+                    selected_field = self.pdf_canvas.get_selected_field()
+
+            if selected_field:
+                field_id = getattr(selected_field, 'id', getattr(selected_field, 'name', 'unknown'))
+                field_type = getattr(selected_field, 'field_type', getattr(selected_field, 'type', 'field'))
+
+                # Remove from canvas/field manager
+                success = False
+                if hasattr(self.pdf_canvas, 'remove_field'):
+                    success = self.pdf_canvas.remove_field(selected_field)
+                elif hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager,
+                                                                           'remove_field'):
+                    success = self.pdf_canvas.field_manager.remove_field(selected_field)
+
+                if success:
+                    print(f"✅ Deleted {field_type} field: {field_id}")
+
+                    # Remove from properties tab dropdown
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'remove_field_from_list'):
+                        self.field_palette.remove_field_from_list(field_id)
+
+                    # Clear selection in both tabs
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
+                        self.field_palette.set_field_selected(False)
+
+                    # Update status
+                    if hasattr(self, 'field_info_label'):
+                        self.field_info_label.setText("Field deleted")
+
+                    self.statusBar().showMessage(f"Deleted {field_type} field", 2000)
+                    self.pdf_canvas.update()
+
+        except Exception as e:
+            print(f"❌ Error deleting field: {e}")
+            self.statusBar().showMessage(f"Error deleting field: {e}", 3000)
+
+    def refresh_field_list(self):
+        """Refresh the field list in the properties tab"""
+        try:
+            if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'refresh_control_list'):
+                self.field_palette.refresh_control_list()
+                print("✅ Refreshed field list in Properties tab")
+        except Exception as e:
+            print(f"❌ Error refreshing field list: {e}")
+
+    def setup_field_manager_integration(self):
+        """Setup field manager integration"""
+        try:
+            field_manager = None
+
+            # Try to find field manager in different locations
+            if hasattr(self, 'field_manager'):
+                field_manager = self.field_manager
+            elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+
+            if field_manager and hasattr(self, 'field_palette'):
+                if hasattr(self.field_palette, 'set_field_manager'):
+                    self.field_palette.set_field_manager(field_manager)
+                    print("✅ Connected field manager to tabbed palette")
+
+                # Refresh the field list
+                self.refresh_field_list()
+
+        except Exception as e:
+            print(f"❌ Error setting up field manager integration: {e}")
 
     def resizeEvent(self, event):
         """Handle window resize events"""
