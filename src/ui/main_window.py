@@ -649,7 +649,6 @@ class PDFViewerMainWindow(QMainWindow):
 
     # Placeholder methods for signal connections
     @pyqtSlot(str)
-    @pyqtSlot(str)
     def create_field_at_center(self, field_type: str):
         """Create a new field at the center of the visible area"""
         print(f"Creating field of type: {field_type}")
@@ -700,6 +699,7 @@ class PDFViewerMainWindow(QMainWindow):
 
                 # ========== TABBED FIELD PALETTE INTEGRATION ==========
                 if field:
+                    self._ensure_field_manager_integration()
                     # Add to the properties tab dropdown
                     if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'add_field_to_list'):
                         self.field_palette.add_field_to_list(field)
@@ -754,7 +754,7 @@ class PDFViewerMainWindow(QMainWindow):
         """Handle field click (placeholder)"""
         self.statusBar().showMessage(f"Field clicked: {field_id}", 2000)
 
-    def Deprecated_on_field_clicked(self, field):
+    def deprecated_1_on_field_clicked(self, field):
         """Handle field selection from canvas"""
         # Your existing logic here...
 
@@ -1572,19 +1572,50 @@ class PDFViewerMainWindow(QMainWindow):
         print(f"Creating field of type: {field_type}")
         # Implementation would go here
 
-    @pyqtSlot(str)
-    def on_field_clicked(self, field):
+    @pyqtSlot(str)  # Change back to str since canvas emits field.id
+    def on_field_clicked(self, field_id: str):
         """Handle field selection from canvas"""
-        has_selection = field is not None
+        print(f"Field clicked: {field_id}")
 
-        # Update the tabbed palette
-        self.field_palette.set_field_selected(has_selection, field)
+        try:
+            # Find the actual field object using the field_id
+            field = None
 
-        # Update status bar
-        if field and hasattr(self, 'field_info_label'):
-            self.field_info_label.setText(f"Selected: {field.field_type} ({field.id})")
-        elif hasattr(self, 'field_info_label'):
-            self.field_info_label.setText("No field selected")
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager, 'fields'):
+                    # Search in fields list
+                    for f in self.pdf_canvas.field_manager.fields:
+                        if getattr(f, 'id', getattr(f, 'name', None)) == field_id:
+                            field = f
+                            break
+
+            has_selection = field is not None
+
+            if has_selection:
+                print(f"✅ Found field object: {field}")
+
+                # Update the tabbed palette with the field object
+                if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
+                    self.field_palette.set_field_selected(True, field)
+                    print(f"✅ Updated tabbed palette selection")
+
+                # Update status bar
+                if hasattr(self, 'field_info_label'):
+                    field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+                    self.field_info_label.setText(f"Selected: {field_type} ({field_id})")
+            else:
+                print(f"⚠️ Field object not found for ID: {field_id}")
+
+                # Clear selection
+                if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
+                    self.field_palette.set_field_selected(False, None)
+
+        except Exception as e:
+            print(f"❌ Error handling field click: {e}")
+            import traceback
+            traceback.print_exc()
 
     @pyqtSlot(str, int, int)
     def on_field_moved(self, field_id: str, x: int, y: int):
@@ -1802,7 +1833,29 @@ class PDFViewerMainWindow(QMainWindow):
         self.save_window_state()
         super().closeEvent(event)
 
+    def _ensure_field_manager_integration(self):
+        """Ensure field manager is properly connected to tabbed palette"""
+        try:
+            field_manager = None
 
+            # Try to find field manager in different locations
+            if hasattr(self, 'field_manager'):
+                field_manager = self.field_manager
+            elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+
+            if field_manager and hasattr(self, 'field_palette'):
+                if hasattr(self.field_palette, 'set_field_manager'):
+                    self.field_palette.set_field_manager(field_manager)
+                    print("✅ Connected field manager to tabbed palette")
+
+                    # Refresh the field list
+                    if hasattr(self.field_palette, 'refresh_control_list'):
+                        self.field_palette.refresh_control_list()
+                        print("✅ Refreshed field list")
+
+        except Exception as e:
+            print(f"❌ Error setting up field manager integration: {e}")
 
 def main():
     """Main entry point for the application"""

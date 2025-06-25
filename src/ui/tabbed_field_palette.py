@@ -370,23 +370,52 @@ class PropertiesTab(QWidget):
 
     def refresh_control_list(self):
         """Refresh the list of available controls"""
+        print("🔄 Refreshing control list...")
         self.control_dropdown.clear()
 
         if not self.field_manager:
+            print("  ⚠️ No field manager available")
             self.control_dropdown.addItem("No controls available", None)
             return
 
-        fields = self.field_manager.get_all_fields()
+        # Try different methods to get fields
+        fields = []
+        if hasattr(self.field_manager, 'get_all_fields'):
+            fields = self.field_manager.get_all_fields()
+        elif hasattr(self.field_manager, 'fields'):
+            fields = self.field_manager.fields
+        else:
+            print("  ⚠️ Field manager has no recognizable fields method")
+            self.control_dropdown.addItem("No controls available", None)
+            return
+
         if not fields:
+            print("  ℹ️ No fields found in field manager")
             self.control_dropdown.addItem("No controls available", None)
             return
 
+        print(f"  ✅ Found {len(fields)} fields")
         for field in fields:
-            display_text = f"{field.field_type.title()} - {field.id}"
-            if hasattr(field, 'properties') and 'name' in field.properties:
-                display_text = f"{field.field_type.title()} - {field.properties['name']}"
+            try:
+                # Get field type safely
+                field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
 
-            self.control_dropdown.addItem(display_text, field.id)
+                # Get field ID safely
+                field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+
+                display_text = f"{str(field_type).title()} - {field_id}"
+
+                if hasattr(field, 'properties') and isinstance(field.properties, dict) and 'name' in field.properties:
+                    display_text = f"{str(field_type).title()} - {field.properties['name']}"
+
+                self.control_dropdown.addItem(display_text, field_id)
+                print(f"    Added: {display_text}")
+
+            except Exception as e:
+                print(f"  ⚠️ Error adding field to dropdown: {e}")
+                continue
 
     def set_selected_field(self, field):
         """Set the currently selected field"""
@@ -394,29 +423,55 @@ class PropertiesTab(QWidget):
 
         # Update dropdown selection
         if field:
-            for i in range(self.control_dropdown.count()):
-                if self.control_dropdown.itemData(i) == field.id:
-                    self.control_dropdown.setCurrentIndex(i)
-                    break
+            # Get field ID safely
+            field_id = getattr(field, 'id', getattr(field, 'name', None))
+
+            if field_id:
+                for i in range(self.control_dropdown.count()):
+                    if self.control_dropdown.itemData(i) == field_id:
+                        self.control_dropdown.setCurrentIndex(i)
+                        break
+            else:
+                print(f"⚠️ Field has no id or name attribute: {field}")
 
         # Update properties display
         self._update_properties_display(field)
 
     def _update_properties_display(self, field):
         """Update the properties display for the selected field"""
-        if self.properties_panel:
-            if field:
-                self.properties_panel.set_field(field)
-                self.control_info_label.setText(f"Editing: {field.field_type.title()} ({field.id})")
+        try:
+            if self.properties_panel:
+                if field:
+                    # Use the correct method name that exists in PropertiesPanel
+                    self.properties_panel.show_field_properties(field)
+
+                    # Get field info safely
+                    field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+
+                    field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+
+                    self.control_info_label.setText(f"Editing: {str(field_type).title()} ({field_id})")
+                else:
+                    # Use the correct method name for clearing
+                    self.properties_panel.show_no_selection()
+                    self.control_info_label.setText("Select a control to edit its properties")
             else:
-                self.properties_panel.clear_field()
-                self.control_info_label.setText("Select a control to edit its properties")
-        else:
-            # Update placeholder
-            if field:
-                self.properties_placeholder.setText(f"Properties for {field.field_type.title()} field:\n{field.id}")
-            else:
-                self.properties_placeholder.setText("Properties panel will appear here when a control is selected")
+                # Update placeholder
+                if field:
+                    field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+                    field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+                    self.properties_placeholder.setText(f"Properties for {str(field_type).title()} field:\n{field_id}")
+                else:
+                    self.properties_placeholder.setText("Properties panel will appear here when a control is selected")
+
+        except Exception as e:
+            print(f"❌ Error updating properties display: {e}")
+            import traceback
+            traceback.print_exc()
 
     def add_field_to_list(self, field):
         """Add a new field to the control list"""

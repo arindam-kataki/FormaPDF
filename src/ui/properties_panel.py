@@ -545,3 +545,11 @@ class PropertiesPanel(QWidget):
 
             widget = self.property_widgets[property_name]
             widget.set_value(value)
+
+    def set_field(self, field: FormField):
+        """Alias for show_field_properties to maintain compatibility"""
+        self.show_field_properties(field)
+
+    def clear_field(self):
+        """Alias for show_no_selection to maintain compatibility"""
+        self.show_no_selection()

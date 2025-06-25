@@ -274,3 +274,8 @@ class FieldManager:
             field.page_number = new_page
             return True
         return False
+
+    def get_all_fields(self) -> List[FormField]:
+        """Get all fields in the manager"""
+        return self.fields.copy()
+
