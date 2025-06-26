@@ -278,4 +278,3 @@ class FieldManager:
     def get_all_fields(self) -> List[FormField]:
         """Get all fields in the manager"""
         return self.fields.copy()
-

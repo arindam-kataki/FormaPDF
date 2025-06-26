@@ -1835,27 +1835,39 @@ class PDFViewerMainWindow(QMainWindow):
 
     def _ensure_field_manager_integration(self):
         """Ensure field manager is properly connected to tabbed palette"""
+        print("🔧 Setting up field manager integration...")
+
         try:
             field_manager = None
 
             # Try to find field manager in different locations
             if hasattr(self, 'field_manager'):
                 field_manager = self.field_manager
+                print("  ✅ Found field_manager in main window")
             elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
                 field_manager = self.pdf_canvas.field_manager
+                print("  ✅ Found field_manager in pdf_canvas")
+            else:
+                print("  ❌ No field manager found")
+                return
+
+            print(f"  Field manager type: {type(field_manager)}")
+            print(f"  Field manager has {len(getattr(field_manager, 'fields', []))} fields")
 
             if field_manager and hasattr(self, 'field_palette'):
                 if hasattr(self.field_palette, 'set_field_manager'):
+                    print("  🔗 Setting field manager on tabbed palette...")
                     self.field_palette.set_field_manager(field_manager)
-                    print("✅ Connected field manager to tabbed palette")
-
-                    # Refresh the field list
-                    if hasattr(self.field_palette, 'refresh_control_list'):
-                        self.field_palette.refresh_control_list()
-                        print("✅ Refreshed field list")
+                    print("  ✅ Connected field manager to tabbed palette")
+                else:
+                    print("  ❌ Tabbed palette has no set_field_manager method")
+            else:
+                print("  ❌ No field palette or field manager available")
 
         except Exception as e:
             print(f"❌ Error setting up field manager integration: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main():
     """Main entry point for the application"""
