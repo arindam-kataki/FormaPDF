@@ -1869,6 +1869,36 @@ class PDFViewerMainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
 
+    def debug_dropdown_integration(self):
+        """Debug method to test dropdown integration manually"""
+        print("🔍 DEBUG: Testing dropdown integration")
+
+        # Check field manager
+        if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+            fm = self.pdf_canvas.field_manager
+            print(f"  Field manager has {len(fm.fields)} fields:")
+            for i, field in enumerate(fm.fields):
+                print(f"    {i}: {field.id} ({field.field_type})")
+
+        # Test field manager integration
+        print("  Testing field manager integration...")
+        self._ensure_field_manager_integration()
+
+        # Check if tabbed palette has field manager
+        if hasattr(self, 'field_palette'):
+            props_tab = self.field_palette.properties_tab
+            print(f"  Properties tab field manager: {props_tab.field_manager is not None}")
+
+            # Force refresh
+            print("  Forcing dropdown refresh...")
+            props_tab.refresh_control_list()
+
+            print(f"  Dropdown count after refresh: {props_tab.control_dropdown.count()}")
+            for i in range(props_tab.control_dropdown.count()):
+                text = props_tab.control_dropdown.itemText(i)
+                data = props_tab.control_dropdown.itemData(i)
+                print(f"    Item {i}: '{text}' -> {data}")
+
 def main():
     """Main entry point for the application"""
     app = QApplication(sys.argv)
