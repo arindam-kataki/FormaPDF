@@ -365,12 +365,15 @@ class PropertiesTab(QWidget):
 
     def set_field_manager(self, field_manager):
         """Set the field manager reference"""
+        print(f"📝 Setting field manager: {field_manager}")  # ← ADD THIS
+        print(f"  Field manager has {len(getattr(field_manager, 'fields', []))} fields")  # ← ADD THIS
         self.field_manager = field_manager
         self.refresh_control_list()
 
     def refresh_control_list(self):
         """Refresh the list of available controls"""
         print("🔄 Refreshing control list...")
+        print(f"  DEBUG: self.field_manager = {self.field_manager}")  # ← ADD THIS
         self.control_dropdown.clear()
 
         if not self.field_manager:

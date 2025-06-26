@@ -49,7 +49,11 @@ class TextPropertyWidget(PropertyWidget):
 
     def set_value(self, value):
         self.widget.blockSignals(True)
-        self.widget.setText(str(value))
+        try:
+            int_value = int(float(value)) if value is not None else 0
+        except (ValueError, TypeError):
+            int_value = 0
+        self.widget.setValue(int_value)
         self.widget.blockSignals(False)
 
     def get_value(self):
@@ -62,7 +66,7 @@ class NumberPropertyWidget(PropertyWidget):
     def __init__(self, name: str, initial_value: int = 0, min_val: int = 0, max_val: int = 9999):
         widget = QSpinBox()
         widget.setRange(min_val, max_val)
-        widget.setValue(initial_value)
+        widget.setValue(int(float(initial_value)) if initial_value is not None else 0)
         super().__init__(name, widget, "valueChanged")
 
     def set_value(self, value):

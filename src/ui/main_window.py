@@ -699,6 +699,7 @@ class PDFViewerMainWindow(QMainWindow):
 
                 # ========== TABBED FIELD PALETTE INTEGRATION ==========
                 if field:
+                    print("🔧 STARTING TABBED FIELD PALETTE INTEGRATION")
                     self._ensure_field_manager_integration()
                     # Add to the properties tab dropdown
                     if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'add_field_to_list'):
@@ -1570,7 +1571,7 @@ class PDFViewerMainWindow(QMainWindow):
     def deprecated_create_field_at_center(self, field_type: str):
         """Create a new field at the center of the visible area"""
         print(f"Creating field of type: {field_type}")
-        # Implementation would go here
+        # Implementation would go herecls
 
     @pyqtSlot(str)  # Change back to str since canvas emits field.id
     def on_field_clicked(self, field_id: str):
@@ -1578,6 +1579,9 @@ class PDFViewerMainWindow(QMainWindow):
         print(f"Field clicked: {field_id}")
 
         try:
+
+            # ADD THIS LINE:
+            print("🔧 ENSURING FIELD MANAGER INTEGRATION FROM CLICK HANDLER")
             # Find the actual field object using the field_id
             field = None
 
@@ -1598,6 +1602,8 @@ class PDFViewerMainWindow(QMainWindow):
                 if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
                     self.field_palette.set_field_selected(True, field)
                     print(f"✅ Updated tabbed palette selection")
+                    print("🔧 ENSURING FIELD MANAGER INTEGRATION FROM CLICK HANDLER")
+                    self._ensure_field_manager_integration()
 
                 # Update status bar
                 if hasattr(self, 'field_info_label'):
@@ -1857,6 +1863,7 @@ class PDFViewerMainWindow(QMainWindow):
             if field_manager and hasattr(self, 'field_palette'):
                 if hasattr(self.field_palette, 'set_field_manager'):
                     print("  🔗 Setting field manager on tabbed palette...")
+                    print(f"  Field manager to set: {field_manager}")  # ← ADD THIS
                     self.field_palette.set_field_manager(field_manager)
                     print("  ✅ Connected field manager to tabbed palette")
                 else:
