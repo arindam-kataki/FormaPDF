@@ -600,7 +600,7 @@ class DragHandler(EnhancedDragHandler):
 # Keep existing WorkingSelectionHandler for compatibility
 class WorkingSelectionHandler(QObject):
     """A completely working SelectionHandler class"""
-
+    fieldSelected = pyqtSignal(object)  # Emits selected field or None
     def __init__(self, field_manager=None):
         super().__init__()
         self.field_manager = field_manager
@@ -613,7 +613,10 @@ class WorkingSelectionHandler(QObject):
         self.selected_field = field
         if old_field != field:
             print(f"✅ Selection changed: {old_field.name if old_field else 'None'} → {field.name if field else 'None'}")
-
+            try:
+                self.fieldSelected.emit(field)
+            except Exception as e:
+                print(f"⚠️ Error emitting fieldSelected signal: {e}")
             # Notify any callbacks instead of using signals
             self._notify_callbacks(field)
 

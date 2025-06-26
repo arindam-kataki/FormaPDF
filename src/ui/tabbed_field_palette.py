@@ -424,6 +424,15 @@ class PropertiesTab(QWidget):
         """Set the currently selected field"""
         self.current_field = field
 
+        # Handle None selection
+        if not field:
+            self.current_field = None
+            # Reset dropdown to "No controls available" state if needed
+            if self.control_dropdown.count() > 0:
+                self.control_dropdown.setCurrentIndex(0)
+            self._update_properties_display(None)
+            return
+
         # Update dropdown selection
         if field:
             # Get field ID safely
@@ -492,6 +501,13 @@ class PropertiesTab(QWidget):
         for i in range(self.control_dropdown.count()):
             if self.control_dropdown.itemData(i) == field_id:
                 self.control_dropdown.removeItem(i)
+                # Clear current selection if removed field was selected
+                if (hasattr(self, 'current_field') and
+                        self.current_field and
+                        getattr(self.current_field, 'id', None) == field_id):
+                    self.current_field = None
+                    self._update_properties_display(None)
+                    print(f"  ✅ Cleared selection for deleted field: {field_id}")
                 break
 
         if self.control_dropdown.count() == 0:

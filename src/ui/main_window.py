@@ -483,6 +483,25 @@ class PDFViewerMainWindow(QMainWindow):
                     if hasattr(drag_handler, 'fieldResized'):
                         drag_handler.fieldResized.connect(self.on_field_resized)
                         print("✅ Connected fieldResized signal")
+                        # PDF Canvas field selection connection
+                        if (hasattr(self, 'pdf_canvas') and
+                                self.pdf_canvas is not None and
+                                hasattr(self.pdf_canvas, 'selection_handler')):
+                            try:
+                                # Connect selection handler if it exists
+                                selection_handler = self.pdf_canvas.selection_handler
+                                if hasattr(selection_handler, 'fieldSelected'):
+                                    selection_handler.fieldSelected.connect(self.on_field_selected)
+                                    print("  ✅ Connected canvas field selection signal")
+                                elif hasattr(selection_handler, 'selectionChanged'):
+                                    # Fallback for older signal name
+                                    selection_handler.selectionChanged.connect(
+                                        lambda: self.on_field_selected(selection_handler.get_selected_field())
+                                    )
+                                    print("  ✅ Connected canvas selection changed signal")
+                            except Exception as e:
+                                print(f"  ⚠️ Failed to connect canvas selection: {e}")
+
 
             print("✅ Signal connections setup completed")
 
@@ -1905,6 +1924,30 @@ class PDFViewerMainWindow(QMainWindow):
                 text = props_tab.control_dropdown.itemText(i)
                 data = props_tab.control_dropdown.itemData(i)
                 print(f"    Item {i}: '{text}' -> {data}")
+
+    def on_field_selected(self, field):
+        """Handle field selection from canvas"""
+        try:
+            print(f"📌 Field selected: {field.id if field else 'None'}")
+
+            # Update properties tab
+            if hasattr(self, 'field_palette') and self.field_palette:
+                self.field_palette.set_field_selected(field is not None, field)
+                print("  ✅ Updated field palette selection")
+
+            # Update status bar
+            if field and hasattr(self, 'field_info_label'):
+                field_type = getattr(field, 'field_type', 'unknown')
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
+                self.field_info_label.setText(f"Selected: {field_type} - {field.id}")
+            elif hasattr(self, 'field_info_label'):
+                self.field_info_label.setText("No field selected")
+
+        except Exception as e:
+            print(f"❌ Error in field selection handler: {e}")
+            import traceback
+            traceback.print_exc()
 
 def main():
     """Main entry point for the application"""
