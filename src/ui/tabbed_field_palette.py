@@ -350,18 +350,77 @@ class PropertiesTab(QWidget):
             self.properties_panel = None
 
     def _on_control_selected(self, control_text):
-        """Handle control selection from dropdown"""
+        """Called when dropdown selection changes - DON'T propagate"""
+        print(f"🔽 Dropdown selected: '{control_text}'")
+
         if control_text == "No controls available":
-            self.current_field = None
-            self._update_properties_display(None)
+            # Highlight nothing, don't propagate (user just selected dropdown)
+            self.highlight_control(None, propagate_to_properties=False)
             return
 
-        # Find the field by ID (stored in combo box data)
+        # Find the field
         field_id = self.control_dropdown.currentData()
         if field_id and self.field_manager:
             field = self.field_manager.get_field_by_id(field_id)
             if field:
-                self.set_selected_field(field)
+                # Highlight WITHOUT propagation (just visual + dropdown update)
+                self.highlight_control(field, propagate_to_properties=False)
+
+                # ONLY NOW update properties display (locally)
+                self._update_properties_display(field)
+
+    def _notify_main_window_selection(self, field):
+        """Notify the main window that a field has been selected from dropdown"""
+        try:
+            # Find the main window
+            main_window = None
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'on_field_selected') or hasattr(parent, 'pdf_canvas'):
+                    main_window = parent
+                    break
+                parent = parent.parent()
+
+            if main_window:
+                print(f"  Found main window: {type(main_window).__name__}")
+
+                # Method 1: Call the main window's field selection handler directly
+                if hasattr(main_window, 'on_field_selected'):
+                    main_window.on_field_selected(field)
+                    print("  ✅ Called main_window.on_field_selected()")
+
+                # Method 2: Update the canvas selection if available
+                if hasattr(main_window, 'pdf_canvas') and main_window.pdf_canvas:
+                    canvas = main_window.pdf_canvas
+
+                    # Update the canvas selection handler
+                    if hasattr(canvas, 'selection_handler'):
+                        canvas.selection_handler.select_field(field)
+                        print("  ✅ Updated canvas selection_handler")
+
+                    # Update the enhanced drag handler if available
+                    if hasattr(canvas, 'enhanced_drag_handler'):
+                        canvas.enhanced_drag_handler.select_field(field)
+                        print("  ✅ Updated enhanced_drag_handler")
+
+                    # Trigger a repaint to show selection
+                    canvas.update()
+                    print("  ✅ Triggered canvas repaint")
+
+                # Method 3: Update the field palette if it has other tabs
+                if hasattr(main_window, 'field_palette'):
+                    palette = main_window.field_palette
+                    if hasattr(palette, 'controls_tab'):
+                        # Update the controls tab to reflect selection
+                        palette.controls_tab.set_field_selected(field is not None)
+                        print("  ✅ Updated controls tab selection state")
+            else:
+                print("  ⚠️ Could not find main window")
+
+        except Exception as e:
+            print(f"  ❌ Error notifying main window of selection: {e}")
+            import traceback
+            traceback.print_exc()
 
     def set_field_manager(self, field_manager):
         """Set the field manager reference"""
@@ -421,33 +480,103 @@ class PropertiesTab(QWidget):
                 continue
 
     def set_selected_field(self, field):
-        """Set the currently selected field"""
+        """Called externally to set selected field - ALWAYS propagate"""
+        print(f"🔧 External field selection: {field.id if field else 'None'}")
+
+        # This is coming from outside (canvas click, etc.) so propagate
+        self.highlight_control(field, propagate_to_properties=True)
+
+    def highlight_control(self, field, propagate_to_properties=True):
+        """Highlight a control and optionally propagate to main window"""
+        print(f"🎯 Highlighting control: {field.id if field else 'None'} (propagate={propagate_to_properties})")
+
+        # Always update these locally
         self.current_field = field
+        self._update_dropdown_selection(field)
+        self._update_canvas_highlighting(field)
 
-        # Handle None selection
-        if not field:
-            self.current_field = None
-            # Reset dropdown to "No controls available" state if needed
-            if self.control_dropdown.count() > 0:
-                self.control_dropdown.setCurrentIndex(0)
-            self._update_properties_display(None)
-            return
-
-        # Update dropdown selection
-        if field:
-            # Get field ID safely
-            field_id = getattr(field, 'id', getattr(field, 'name', None))
-
-            if field_id:
-                for i in range(self.control_dropdown.count()):
-                    if self.control_dropdown.itemData(i) == field_id:
-                        self.control_dropdown.setCurrentIndex(i)
-                        break
-            else:
-                print(f"⚠️ Field has no id or name attribute: {field}")
-
-        # Update properties display
+        # ALWAYS update properties display (user expects to see them!)
         self._update_properties_display(field)
+        print("  📋 Properties panel updated")
+
+        # Only notify main window if propagate is True
+        if propagate_to_properties:
+            print("  📤 Propagating to main window...")
+            self._notify_main_window(field)
+        else:
+            print("  🚫 Not propagating to main window")
+
+    def _update_dropdown_selection(self, field):
+        """Update dropdown selection without triggering signals"""
+        # Block signals to prevent recursion
+        self.control_dropdown.blockSignals(True)
+
+        try:
+            if not field:
+                # Select "No controls available" item
+                if self.control_dropdown.count() > 0:
+                    self.control_dropdown.setCurrentIndex(0)
+            else:
+                # Find matching item
+                field_id = getattr(field, 'id', getattr(field, 'name', None))
+                if field_id:
+                    for i in range(self.control_dropdown.count()):
+                        if self.control_dropdown.itemData(i) == field_id:
+                            self.control_dropdown.setCurrentIndex(i)
+                            break
+            print("  ✅ Dropdown selection updated (signals blocked)")
+        finally:
+            # Always restore signals
+            self.control_dropdown.blockSignals(False)
+
+    def _update_canvas_highlighting(self, field):
+        """Update visual highlighting on canvas"""
+        try:
+            # Find the main window and canvas
+            main_window = self._find_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                canvas = main_window.pdf_canvas
+
+                # Update selection handlers directly (no signals)
+                if hasattr(canvas, 'selection_handler'):
+                    canvas.selection_handler.selected_field = field
+
+                if hasattr(canvas, 'enhanced_drag_handler'):
+                    if hasattr(canvas.enhanced_drag_handler, 'selected_fields'):
+                        canvas.enhanced_drag_handler.selected_fields = [field] if field else []
+
+                # Trigger visual update
+                canvas.update()
+                print("  ✅ Canvas highlighting updated")
+        except Exception as e:
+            print(f"  ⚠️ Error updating canvas highlighting: {e}")
+
+    def _notify_main_window(self, field):
+        """Notify main window of selection (only when propagating)"""
+        try:
+            main_window = self._find_main_window()
+            if main_window:
+                # Update status bar
+                if field and hasattr(main_window, 'field_info_label'):
+                    field_type = getattr(field, 'field_type', 'unknown')
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+                    main_window.field_info_label.setText(f"Selected: {field_type} - {field.id}")
+                elif hasattr(main_window, 'field_info_label'):
+                    main_window.field_info_label.setText("No field selected")
+
+                print("  ✅ Main window notified")
+        except Exception as e:
+            print(f"  ⚠️ Error notifying main window: {e}")
+
+    def _find_main_window(self):
+        """Find the main window by traversing parent hierarchy"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'pdf_canvas') or hasattr(parent, 'on_field_selected'):
+                return parent
+            parent = parent.parent()
+        return None
 
     def _update_properties_display(self, field):
         """Update the properties display for the selected field"""
@@ -513,6 +642,21 @@ class PropertiesTab(QWidget):
         if self.control_dropdown.count() == 0:
             self.control_dropdown.addItem("No controls available", None)
 
+    def refresh_and_select_field(self, field_id):
+        """Refresh the dropdown and select a specific field - useful for external calls"""
+        print(f"🔄 Refreshing dropdown and selecting field: {field_id}")
+
+        # First refresh the dropdown to ensure it has latest data
+        self.refresh_control_list()
+
+        # Then try to select the field
+        if field_id and self.field_manager:
+            field = self.field_manager.get_field_by_id(field_id)
+            if field:
+                self.set_selected_field(field)
+                return True
+
+        return False
 
 class TabbedFieldPalette(QWidget):
     """Main tabbed field palette widget"""
