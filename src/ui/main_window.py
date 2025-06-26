@@ -1750,13 +1750,15 @@ class PDFViewerMainWindow(QMainWindow):
                 if success:
                     print(f"✅ Deleted {field_type} field: {field_id}")
 
-                    # Remove from properties tab dropdown
-                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'remove_field_from_list'):
-                        self.field_palette.remove_field_from_list(field_id)
+                    # IMPORTANT: Refresh the entire control list from field manager
+                    if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'refresh_control_list'):
+                        self.field_palette.refresh_control_list()
+                        print("  ✅ Refreshed entire control list after deletion")
 
                     # Clear selection in both tabs
                     if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
-                        self.field_palette.set_field_selected(False)
+                        self.field_palette.set_field_selected(False, None)
+                        print("  ✅ Cleared field selection")
 
                     # Update status
                     if hasattr(self, 'field_info_label'):
