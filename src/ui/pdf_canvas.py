@@ -2340,9 +2340,9 @@ class PDFCanvas(QLabel):
             return None
 
     def _add_field_to_dropdown(self, field):
-        """Add single field to dropdown without disturbing existing items"""
+        """Add field to dropdown and ensure field manager is set"""
         try:
-            # Find the main window and properties tab
+            # Find properties tab
             main_window = None
             parent = self.parent()
             while parent:
@@ -2354,26 +2354,42 @@ class PDFCanvas(QLabel):
             if main_window and hasattr(main_window, 'field_palette'):
                 properties_tab = main_window.field_palette.properties_tab
 
-                # Remove "No controls available" if it's the only item
+                # CRITICAL FIX: Ensure properties tab has field manager
+                if not properties_tab.field_manager and hasattr(self, 'field_manager'):
+                    properties_tab.field_manager = self.field_manager
+                    print(f"  🔗 Set field manager in properties tab")
+
+                # Remove placeholder if needed
                 if (properties_tab.control_dropdown.count() == 1 and
                         properties_tab.control_dropdown.itemText(0) == "No controls available"):
                     properties_tab.control_dropdown.clear()
-                    print("  🗑️ Removed 'No controls available' placeholder")
 
-                # Get field info
+                # Fix field type detection
                 field_type = getattr(field, 'field_type', 'unknown')
                 if hasattr(field_type, 'value'):
                     field_type = field_type.value
+                elif hasattr(field_type, 'name'):
+                    field_type = field_type.name
+                else:
+                    field_type = str(field_type).lower()
+
                 field_id = getattr(field, 'id', 'unknown')
 
-                # Create display text and add to dropdown
+                # Create display text with proper field type
                 display_text = f"{str(field_type).title()} - {field_id}"
                 properties_tab.control_dropdown.addItem(display_text, field_id)
                 print(f"  ➕ Added to dropdown: {display_text}")
 
-                # Select the newly added field in dropdown
-                properties_tab.control_dropdown.setCurrentIndex(properties_tab.control_dropdown.count() - 1)
-                print(f"  ✅ Selected new field in dropdown")
+                # Update selection and properties
+                last_index = properties_tab.control_dropdown.count() - 1
+                properties_tab.control_dropdown.blockSignals(True)
+                properties_tab.control_dropdown.setCurrentIndex(last_index)
+                properties_tab.control_dropdown.blockSignals(False)
+
+                # Update properties panel
+                properties_tab.current_field = field
+                properties_tab._update_properties_display(field)
+                print(f"  ✅ Updated dropdown selection and properties")
 
         except Exception as e:
             print(f"  ⚠️ Error adding field to dropdown: {e}")

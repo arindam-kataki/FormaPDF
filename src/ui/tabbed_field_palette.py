@@ -350,24 +350,45 @@ class PropertiesTab(QWidget):
             self.properties_panel = None
 
     def _on_control_selected(self, control_text):
-        """Called when dropdown selection changes - DON'T propagate"""
+        """Called when dropdown selection changes - FIXED"""
         print(f"🔽 Dropdown selected: '{control_text}'")
 
         if control_text == "No controls available":
-            # Highlight nothing, don't propagate (user just selected dropdown)
-            self.highlight_control(None, propagate_to_properties=False)
+            self.current_field = None
+            self._update_properties_display(None)
+            self._update_canvas_highlighting(None)
             return
 
         # Find the field
         field_id = self.control_dropdown.currentData()
+        print(f"  🔍 Looking for field ID: {field_id}")
+
         if field_id and self.field_manager:
             field = self.field_manager.get_field_by_id(field_id)
             if field:
-                # Highlight WITHOUT propagation (just visual + dropdown update)
-                self.highlight_control(field, propagate_to_properties=False)
+                print(f"  ✅ Found field: {field.id}")
 
-                # ONLY NOW update properties display (locally)
+                # Update current field
+                self.current_field = field
+
+                # Update properties panel (this was missing!)
                 self._update_properties_display(field)
+                print("  📋 Properties panel updated")
+
+                # Update canvas highlighting without propagating to main window
+                self._update_canvas_highlighting(field)
+                print("  🎨 Canvas highlighting updated")
+
+                # Update info label
+                field_type = getattr(field, 'field_type', 'unknown')
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
+                self.control_info_label.setText(f"Editing: {str(field_type).title()} ({field.id})")
+
+            else:
+                print(f"  ❌ Field not found for ID: {field_id}")
+        else:
+            print(f"  ⚠️ No field_id ({field_id}) or no field_manager")
 
     def _notify_main_window_selection(self, field):
         """Notify the main window that a field has been selected from dropdown"""
