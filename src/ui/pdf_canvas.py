@@ -972,7 +972,20 @@ class PDFCanvas(QLabel):
             self._rendering_in_progress = False
 
     def _draw_selection_handles(self, painter):
-        """Draw selection handles for all selected fields"""
+        """Draw selection handles for all selected fields with detailed logging"""
+
+        # Check what handlers think is selected when drawing starts
+        if hasattr(self, 'selection_handler'):
+            current = getattr(self.selection_handler, 'selected_field', None)
+            current_id = getattr(current, 'id', 'None') if current else 'None'
+            print(f"   Selection handler at draw time: {current_id}")
+
+        if hasattr(self, 'enhanced_drag_handler'):
+            if hasattr(self.enhanced_drag_handler, 'selected_fields'):
+                current_list = self.enhanced_drag_handler.selected_fields
+                current_ids = [getattr(f, 'id', 'unknown') for f in current_list]
+                print(f"   Enhanced drag handler at draw time: {current_ids}")
+
         try:
             # Get all selected fields from drag handler
             selected_fields = []
@@ -985,46 +998,100 @@ class PDFCanvas(QLabel):
                 if primary_field and primary_field not in selected_fields:
                     selected_fields.append(primary_field)
 
-            print(f"🎨 Drawing selection handles for {len(selected_fields)} fields")
+            # Enhanced logging with field details
+            print(f"🎨 Drawing selection handles for {len(selected_fields)} fields:")
 
-            # Draw selection for each selected field
+            if not selected_fields:
+                print("   📭 No fields selected")
+                return
+
+            # Log each selected field with details
             for i, field in enumerate(selected_fields):
+                field_id = getattr(field, 'id', getattr(field, 'name', f'field_{i}'))
+                field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+
+                # Handle field_type that might be an enum
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
+                elif hasattr(field_type, 'name'):
+                    field_type = field_type.name
+
+                page_num = getattr(field, 'page_number', 0)
+                x = getattr(field, 'x', 0)
+                y = getattr(field, 'y', 0)
+                width = getattr(field, 'width', 0)
+                height = getattr(field, 'height', 0)
+
+                print(
+                    f"   🎯 Field {i + 1}: {field_type.upper()} '{field_id}' on page {page_num} at ({x}, {y}) size {width}x{height}")
+
                 # Use different colors for multi-selection
                 if len(selected_fields) > 1:
-                    # Multi-selection: use blue for all
-                    self._draw_field_selection_handles(painter, field, QColor(0, 120, 255), i)
+                    # Multi-selection: use blue for all, but different shades
+                    colors = [
+                        QColor(0, 120, 255),  # Blue
+                        QColor(255, 120, 0),  # Orange
+                        QColor(120, 255, 0),  # Green
+                        QColor(255, 0, 120),  # Magenta
+                        QColor(0, 255, 120),  # Cyan
+                    ]
+                    color = colors[i % len(colors)]
+                    print(f"      🎨 Using multi-selection color: {color.name()}")
+                    self._draw_field_selection_handles(painter, field, color, i)
                 else:
                     # Single selection: use red
-                    self._draw_field_selection_handles(painter, field, QColor(255, 0, 0), 0)
+                    color = QColor(255, 0, 0)
+                    print(f"      🎨 Using single-selection color: {color.name()}")
+                    self._draw_field_selection_handles(painter, field, color, 0)
+
+            print(f"   ✅ Selection handles drawn for all {len(selected_fields)} field(s)")
 
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
+            import traceback
+            traceback.print_exc()
 
-    def _draw_field_selection_handles(self, painter, field, color, index):
-        """Draw selection handles for a single field"""
+    def _draw_field_selection_handles(self, painter, field, color, index=0):
+        """Draw selection handles for a single field with enhanced debugging"""
         try:
+            field_id = getattr(field, 'id', getattr(field, 'name', f'field_{index}'))
+            print(f"      🖌️ Drawing handles for {field_id}...")
+
+            # Get field position and size
+            page_num = getattr(field, 'page_number', 0)
+
             # Convert field coordinates to screen coordinates
-            screen_coords = self.document_to_screen_coordinates(field.page_number, field.x, field.y)
+            screen_coords = self.document_to_screen_coordinates(page_num, field.x, field.y)
             if not screen_coords:
+                print(f"      ⚠️ Field {field_id} not visible (page {page_num} not rendered)")
                 return
 
             screen_x, screen_y = screen_coords
             screen_width = field.width * self.zoom_level
             screen_height = field.height * self.zoom_level
 
+            print(
+                f"      📍 {field_id}: doc({field.x}, {field.y}) -> screen({int(screen_x)}, {int(screen_y)}) size({int(screen_width)}x{int(screen_height)})")
+
             # Draw selection rectangle with specified color
-            pen_width = 3 if index == 0 else 2  # Primary selection slightly thicker
-            painter.setPen(QPen(color, pen_width))
+            pen = QPen(color, 2)
+            painter.setPen(pen)
             painter.setBrush(QBrush())
-            painter.drawRect(int(screen_x - 2), int(screen_y - 2),
-                             int(screen_width + 4), int(screen_height + 4))
+
+            selection_rect = QRect(
+                int(screen_x - 2),
+                int(screen_y - 2),
+                int(screen_width + 4),
+                int(screen_height + 4)
+            )
+            painter.drawRect(selection_rect)
 
             # Draw corner handles
             handle_size = 8
             painter.setBrush(QBrush(color))
 
-            # Corner positions
-            corners = [
+            # Calculate handle positions
+            handles = [
                 (screen_x - handle_size // 2, screen_y - handle_size // 2),  # Top-left
                 (screen_x + screen_width - handle_size // 2, screen_y - handle_size // 2),  # Top-right
                 (screen_x - handle_size // 2, screen_y + screen_height - handle_size // 2),  # Bottom-left
@@ -1032,16 +1099,52 @@ class PDFCanvas(QLabel):
                 # Bottom-right
             ]
 
-            for corner_x, corner_y in corners:
-                painter.drawRect(int(corner_x), int(corner_y), handle_size, handle_size)
+            handle_count = 0
+            for handle_x, handle_y in handles:
+                handle_rect = QRect(int(handle_x), int(handle_y), handle_size, handle_size)
+                painter.drawRect(handle_rect)
+                handle_count += 1
 
-            # Optional: Draw field ID for debugging multi-selection
-            if len(self.enhanced_drag_handler.get_selected_fields()) > 1:
-                painter.setPen(QPen(QColor(0, 0, 0)))
-                painter.drawText(int(screen_x + 5), int(screen_y + 15), f"{field.id}")
+            print(f"      ✅ Drew selection rectangle and {handle_count} handles for {field_id}")
 
         except Exception as e:
-            print(f"⚠️ Error drawing field selection handles: {e}")
+            print(f"      ❌ Error drawing handles for field: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def debug_selection_state(self):
+        """Debug method to show current selection state"""
+        print("\n🔍 SELECTION STATE DEBUG:")
+
+        # Check selection handler
+        if hasattr(self, 'selection_handler'):
+            primary = self.selection_handler.get_selected_field()
+            if primary:
+                print(
+                    f"   Selection Handler: {getattr(primary, 'field_type', 'unknown')} '{getattr(primary, 'id', 'unknown')}'")
+            else:
+                print(f"   Selection Handler: None")
+        else:
+            print(f"   Selection Handler: Not available")
+
+        # Check enhanced drag handler
+        if hasattr(self, 'enhanced_drag_handler'):
+            if hasattr(self.enhanced_drag_handler, 'get_selected_fields'):
+                selected = self.enhanced_drag_handler.get_selected_fields()
+                if selected:
+                    print(f"   Enhanced Drag Handler: {len(selected)} field(s)")
+                    for i, field in enumerate(selected):
+                        field_type = getattr(field, 'field_type', 'unknown')
+                        field_id = getattr(field, 'id', f'field_{i}')
+                        print(f"     {i + 1}. {field_type} '{field_id}'")
+                else:
+                    print(f"   Enhanced Drag Handler: No fields selected")
+            else:
+                print(f"   Enhanced Drag Handler: No get_selected_fields method")
+        else:
+            print(f"   Enhanced Drag Handler: Not available")
+
+        print("🔍 END SELECTION DEBUG\n")
 
     def deprecated_2_draw_overlay(self):
         """Draw overlay with fields and grid for all visible pages"""
@@ -1902,6 +2005,7 @@ class PDFCanvas(QLabel):
 
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
+
 
     def mousePressEvent(self, event):
         """Enhanced mouse press event with multi-selection support"""

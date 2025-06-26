@@ -530,26 +530,62 @@ class PropertiesTab(QWidget):
             self.control_dropdown.blockSignals(False)
 
     def _update_canvas_highlighting(self, field):
-        """Update visual highlighting on canvas"""
+        """Debug version to see exactly what's happening"""
         try:
-            # Find the main window and canvas
             main_window = self._find_main_window()
             if main_window and hasattr(main_window, 'pdf_canvas'):
                 canvas = main_window.pdf_canvas
 
-                # Update selection handlers directly (no signals)
+                field_id = getattr(field, 'id', 'None') if field else 'None'
+                print(f"  🔧 Updating canvas highlighting to: {field_id}")
+
+                # BEFORE: Check current state
+                print(f"  📋 BEFORE UPDATE:")
+                if hasattr(canvas, 'selection_handler'):
+                    current = getattr(canvas.selection_handler, 'selected_field', None)
+                    current_id = getattr(current, 'id', 'None') if current else 'None'
+                    print(f"    Selection handler has: {current_id}")
+
+                if hasattr(canvas, 'enhanced_drag_handler'):
+                    if hasattr(canvas.enhanced_drag_handler, 'selected_fields'):
+                        current_list = canvas.enhanced_drag_handler.selected_fields
+                        current_ids = [getattr(f, 'id', 'unknown') for f in current_list]
+                        print(f"    Enhanced drag handler has: {current_ids}")
+
+                # UPDATE: Apply new selection
+                print(f"  🔄 APPLYING UPDATE:")
                 if hasattr(canvas, 'selection_handler'):
                     canvas.selection_handler.selected_field = field
+                    print(f"    Set selection_handler.selected_field = {field_id}")
 
                 if hasattr(canvas, 'enhanced_drag_handler'):
                     if hasattr(canvas.enhanced_drag_handler, 'selected_fields'):
                         canvas.enhanced_drag_handler.selected_fields = [field] if field else []
+                        print(f"    Set enhanced_drag_handler.selected_fields = [{field_id}]")
 
-                # Trigger visual update
+                # AFTER: Verify update took effect
+                print(f"  📋 AFTER UPDATE:")
+                if hasattr(canvas, 'selection_handler'):
+                    new_current = getattr(canvas.selection_handler, 'selected_field', None)
+                    new_current_id = getattr(new_current, 'id', 'None') if new_current else 'None'
+                    print(f"    Selection handler now has: {new_current_id}")
+
+                if hasattr(canvas, 'enhanced_drag_handler'):
+                    if hasattr(canvas.enhanced_drag_handler, 'selected_fields'):
+                        new_list = canvas.enhanced_drag_handler.selected_fields
+                        new_ids = [getattr(f, 'id', 'unknown') for f in new_list]
+                        print(f"    Enhanced drag handler now has: {new_ids}")
+
+                # FORCE VISUAL UPDATE
+                if hasattr(canvas, 'draw_overlay'):
+                    canvas.draw_overlay()
+                    print(f"    ✅ draw_overlay() called")
+
                 canvas.update()
-                print("  ✅ Canvas highlighting updated")
+                print(f"    ✅ update() called")
+
         except Exception as e:
-            print(f"  ⚠️ Error updating canvas highlighting: {e}")
+            print(f"  ❌ Error updating canvas highlighting: {e}")
 
     def _notify_main_window(self, field):
         """Notify main window of selection (only when propagating)"""

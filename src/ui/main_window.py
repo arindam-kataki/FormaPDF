@@ -1928,28 +1928,31 @@ class PDFViewerMainWindow(QMainWindow):
                 print(f"    Item {i}: '{text}' -> {data}")
 
     def on_field_selected(self, field):
-        """Handle field selection from canvas"""
+        """Handle field selection from canvas - FIXED to prevent dropdown revert"""
         try:
-            print(f"📌 Field selected: {field.id if field else 'None'}")
+            field_id = getattr(field, 'id', 'None') if field else 'None'
+            print(f"📌 MAIN WINDOW: Field selected from canvas: {field_id}")
 
-            # Update properties tab
+            # Get current selection state from properties tab
             if hasattr(self, 'field_palette') and self.field_palette:
-                self.field_palette.set_field_selected(field is not None, field)
-                print("  ✅ Updated field palette selection")
+                properties_tab = self.field_palette.properties_tab
+                current_selection = getattr(properties_tab, 'current_field', None)
+                current_id = getattr(current_selection, 'id', 'None') if current_selection else 'None'
+                print(f"   Current properties selection: {current_id}")
 
-            # Update status bar
-            if field and hasattr(self, 'field_info_label'):
-                field_type = getattr(field, 'field_type', 'unknown')
-                if hasattr(field_type, 'value'):
-                    field_type = field_type.value
-                self.field_info_label.setText(f"Selected: {field_type} - {field.id}")
-            elif hasattr(self, 'field_info_label'):
-                self.field_info_label.setText("No field selected")
+                # CHECK: Is this field already selected?
+                if (current_selection and field and
+                        getattr(current_selection, 'id', None) == getattr(field, 'id', None)):
+                    print(f"   ✅ Field {field_id} is already selected - skipping update to prevent revert")
+                    return
+
+                # Field is different, proceed with normal selection
+                print(f"   🔄 Field changed from {current_id} to {field_id} - proceeding with update")
+                properties_tab.highlight_control(field, propagate_to_properties=True)
+                print("   ✅ Called highlight_control")
 
         except Exception as e:
             print(f"❌ Error in field selection handler: {e}")
-            import traceback
-            traceback.print_exc()
 
 def main():
     """Main entry point for the application"""
