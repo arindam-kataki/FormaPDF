@@ -1592,55 +1592,28 @@ class PDFViewerMainWindow(QMainWindow):
         print(f"Creating field of type: {field_type}")
         # Implementation would go herecls
 
-    @pyqtSlot(str)  # Change back to str since canvas emits field.id
+    @pyqtSlot(str)
     def on_field_clicked(self, field_id: str):
-        """Handle field selection from canvas"""
+        """Handle field click - SIMPLIFIED"""
         print(f"Field clicked: {field_id}")
 
         try:
-
-            # ADD THIS LINE:
-            print("🔧 ENSURING FIELD MANAGER INTEGRATION FROM CLICK HANDLER")
-            # Find the actual field object using the field_id
+            # Find field object
             field = None
-
             if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-                if hasattr(self.pdf_canvas, 'field_manager') and hasattr(self.pdf_canvas.field_manager, 'fields'):
-                    # Search in fields list
+                if hasattr(self.pdf_canvas, 'field_manager'):
                     for f in self.pdf_canvas.field_manager.fields:
-                        if getattr(f, 'id', getattr(f, 'name', None)) == field_id:
+                        if getattr(f, 'id', None) == field_id:
                             field = f
                             break
 
-            has_selection = field is not None
-
-            if has_selection:
+            if field:
                 print(f"✅ Found field object: {field}")
-
-                # Update the tabbed palette with the field object
-                if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
-                    self.field_palette.set_field_selected(True, field)
-                    print(f"✅ Updated tabbed palette selection")
-                    print("🔧 ENSURING FIELD MANAGER INTEGRATION FROM CLICK HANDLER")
-                    self._ensure_field_manager_integration()
-
-                # Update status bar
-                if hasattr(self, 'field_info_label'):
-                    field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
-                    if hasattr(field_type, 'value'):
-                        field_type = field_type.value
-                    self.field_info_label.setText(f"Selected: {field_type} ({field_id})")
-            else:
-                print(f"⚠️ Field object not found for ID: {field_id}")
-
-                # Clear selection
-                if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'set_field_selected'):
-                    self.field_palette.set_field_selected(False, None)
+                # Just call field selection - NO integration!
+                self.on_field_selected(field)
 
         except Exception as e:
             print(f"❌ Error handling field click: {e}")
-            import traceback
-            traceback.print_exc()
 
     @pyqtSlot(str, int, int)
     def on_field_moved(self, field_id: str, x: int, y: int):

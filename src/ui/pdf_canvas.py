@@ -2309,6 +2309,7 @@ class PDFCanvas(QLabel):
                 print(f"✅ Created field: {field.id}")
 
                 self._reset_field_type_selection()
+                self._add_field_to_dropdown(field)
 
                 # Optionally resize the field after creation if needed
                 # field.resize_to(100, 30)  # Set custom size if desired
@@ -2337,6 +2338,95 @@ class PDFCanvas(QLabel):
             import traceback
             traceback.print_exc()
             return None
+
+    def _add_field_to_dropdown(self, field):
+        """Add single field to dropdown without disturbing existing items"""
+        try:
+            # Find the main window and properties tab
+            main_window = None
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'field_palette'):
+                    main_window = parent
+                    break
+                parent = parent.parent()
+
+            if main_window and hasattr(main_window, 'field_palette'):
+                properties_tab = main_window.field_palette.properties_tab
+
+                # Remove "No controls available" if it's the only item
+                if (properties_tab.control_dropdown.count() == 1 and
+                        properties_tab.control_dropdown.itemText(0) == "No controls available"):
+                    properties_tab.control_dropdown.clear()
+                    print("  🗑️ Removed 'No controls available' placeholder")
+
+                # Get field info
+                field_type = getattr(field, 'field_type', 'unknown')
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
+                field_id = getattr(field, 'id', 'unknown')
+
+                # Create display text and add to dropdown
+                display_text = f"{str(field_type).title()} - {field_id}"
+                properties_tab.control_dropdown.addItem(display_text, field_id)
+                print(f"  ➕ Added to dropdown: {display_text}")
+
+                # Select the newly added field in dropdown
+                properties_tab.control_dropdown.setCurrentIndex(properties_tab.control_dropdown.count() - 1)
+                print(f"  ✅ Selected new field in dropdown")
+
+        except Exception as e:
+            print(f"  ⚠️ Error adding field to dropdown: {e}")
+
+    def _remove_field_from_dropdown(self, field_id):
+        """Remove single field from dropdown"""
+        try:
+            # Find the main window and properties tab
+            main_window = None
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'field_palette'):
+                    main_window = parent
+                    break
+                parent = parent.parent()
+
+            if main_window and hasattr(main_window, 'field_palette'):
+                properties_tab = main_window.field_palette.properties_tab
+
+                # Find and remove the item
+                for i in range(properties_tab.control_dropdown.count()):
+                    if properties_tab.control_dropdown.itemData(i) == field_id:
+                        item_text = properties_tab.control_dropdown.itemText(i)
+                        properties_tab.control_dropdown.removeItem(i)
+                        print(f"  ➖ Removed from dropdown: {item_text}")
+                        break
+
+                # If no items left, add placeholder
+                if properties_tab.control_dropdown.count() == 0:
+                    properties_tab.control_dropdown.addItem("No controls available", None)
+                    print(f"  ➕ Added 'No controls available' placeholder")
+
+        except Exception as e:
+            print(f"  ⚠️ Error removing field from dropdown: {e}")
+
+    def delete_field(self, field_id):
+        """Delete field and update dropdown"""
+        try:
+            # Delete from field manager
+            success = self.field_manager.remove_field(field_id)
+
+            if success:
+                # Remove from dropdown
+                self._remove_field_from_dropdown(field_id)
+                print(f"🗑️ Deleted field: {field_id}")
+
+                # Clear selection if deleted field was selected
+                self.selection_handler.clear_selection()
+                self.enhanced_drag_handler.clear_selection()
+                self.draw_overlay()
+
+        except Exception as e:
+            print(f"❌ Error deleting field: {e}")
 
     def _get_selected_field_type(self):
         """Get the currently selected field type from the field palette"""
