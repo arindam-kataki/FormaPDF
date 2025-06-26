@@ -636,6 +636,42 @@ class PropertiesTab(QWidget):
         return None
 
     def _update_properties_display(self, field):
+        """Update properties display for selected field or show no selection"""
+        try:
+            if hasattr(self, 'properties_panel') and self.properties_panel:
+                if field:
+                    self.properties_panel.show_field_properties(field)
+                    print("   📋 Properties panel updated with field data")
+                else:
+                    self.properties_panel.show_no_selection()
+                    print("   📋 Properties panel showing no selection state")
+
+            # Update info label
+            if hasattr(self, 'control_info_label'):
+                if field:
+                    field_type = getattr(field, 'field_type', 'unknown')
+                    field_id = getattr(field, 'id', 'unknown')
+                    self.control_info_label.setText(f"Editing: {field_type} - {field_id}")
+                else:
+                    self.control_info_label.setText("Select a control to edit its properties")
+
+            # Update placeholder if it exists
+            if hasattr(self, 'properties_placeholder'):
+                if field:
+                    field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+                    field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+                    self.properties_placeholder.setText(f"Properties for {str(field_type).title()} field:\n{field_id}")
+                else:
+                    self.properties_placeholder.setText("Properties panel will appear here when a control is selected")
+
+        except Exception as e:
+            print(f"❌ Error updating properties display: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def deprecated_update_properties_display(self, field):
         """Update the properties display for the selected field"""
         try:
             if self.properties_panel:
@@ -714,6 +750,120 @@ class PropertiesTab(QWidget):
                 return True
 
         return False
+
+    def ensure_no_selection_option(self):
+        """Ensure dropdown has a 'No controls selected' option at the top"""
+        if self.control_dropdown.count() == 0:
+            self.control_dropdown.addItem("No controls selected", None)
+            return
+
+        # Check if first item is already a "no selection" item
+        first_item_text = self.control_dropdown.itemText(0)
+        first_item_data = self.control_dropdown.itemData(0)
+
+        if first_item_data is None and ("No control" in first_item_text or "available" in first_item_text):
+            # Update the text to be consistent
+            self.control_dropdown.setItemText(0, "No controls selected")
+            return
+
+        # Add "No controls selected" at the top
+        self.control_dropdown.insertItem(0, "No controls selected", None)
+
+    def refresh_control_list(self):
+        """Refresh the control list and ensure proper no-selection state"""
+        print("🔄 Refreshing control list...")
+
+        # Store current selection to restore if possible
+        current_field_id = None
+        if hasattr(self, 'current_field') and self.current_field:
+            current_field_id = getattr(self.current_field, 'id', None)
+
+        # Clear existing items
+        self.control_dropdown.clear()
+
+        # Always add "No controls selected" first
+        self.control_dropdown.addItem("No controls selected", None)
+
+        if not self.field_manager:
+            print("  ⚠️ No field manager available")
+            return
+
+        # Get fields from field manager
+        fields = []
+        if hasattr(self.field_manager, 'get_all_fields'):
+            fields = self.field_manager.get_all_fields()
+        elif hasattr(self.field_manager, 'fields'):
+            fields = self.field_manager.fields
+        else:
+            print("  ⚠️ Field manager has no recognizable fields method")
+            return
+
+        if not fields:
+            print("  ℹ️ No fields found in field manager")
+            return
+
+        print(f"  ✅ Found {len(fields)} fields")
+        restore_index = 0  # Default to "No controls selected"
+
+        for field in fields:
+            try:
+                # Get field information
+                field_type = getattr(field, 'field_type', getattr(field, 'type', 'unknown'))
+                if hasattr(field_type, 'value'):
+                    field_type = field_type.value
+
+                field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+
+                display_text = f"{str(field_type).title()} - {field_id}"
+
+                if hasattr(field, 'properties') and isinstance(field.properties, dict) and 'name' in field.properties:
+                    display_text = f"{str(field_type).title()} - {field.properties['name']}"
+
+                self.control_dropdown.addItem(display_text, field_id)
+                print(f"    Added: {display_text}")
+
+                # Check if this was the previously selected field
+                if current_field_id and field_id == current_field_id:
+                    restore_index = self.control_dropdown.count() - 1
+
+            except Exception as e:
+                print(f"  ⚠️ Error adding field to dropdown: {e}")
+                continue
+
+        # Restore selection if field still exists, otherwise stay at "No controls selected"
+        self.control_dropdown.blockSignals(True)
+        self.control_dropdown.setCurrentIndex(restore_index)
+        self.control_dropdown.blockSignals(False)
+
+        if restore_index == 0:
+            self.current_field = None
+            self._update_properties_display(None)
+            print("  📋 Reset to no selection state")
+        else:
+            print(f"  🔄 Restored selection to index {restore_index}")
+
+    def select_no_control(self):
+        """Explicitly select the 'No controls selected' option"""
+        print("🚫 Selecting no control...")
+
+        # Ensure the no-selection option exists
+        self.ensure_no_selection_option()
+
+        # Block signals to prevent recursive calls
+        self.control_dropdown.blockSignals(True)
+
+        try:
+            # Select the first item (should be "No controls selected")
+            self.control_dropdown.setCurrentIndex(0)
+            print("   ✅ Dropdown set to 'No controls selected'")
+        finally:
+            self.control_dropdown.blockSignals(False)
+
+        # Clear current field and update display
+        self.current_field = None
+        self._update_properties_display(None)
+
+        print("   📋 Properties cleared for no selection")
 
 class TabbedFieldPalette(QWidget):
     """Main tabbed field palette widget"""

@@ -182,12 +182,13 @@ class PropertiesPanel(QWidget):
         self.current_field = None
 
         message = QLabel(
-            "No field selected\n\n"
+            "No control selected\n\n"
             "💡 Tips:\n"
-            "• Click on a field to edit properties\n"
-            "• Drag fields to move them\n"
+            "• Click on a control to edit properties\n"
+            "• Drag controls to move them\n"
             "• Drag handles to resize them\n"
-            "• Use arrow keys for precise movement"
+            "• Use arrow keys for precise movement\n"
+            "• Click outside any control to deselect"
         )
         message.setAlignment(Qt.AlignmentFlag.AlignCenter)
         message.setStyleSheet("""

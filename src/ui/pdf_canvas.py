@@ -2006,8 +2006,124 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing selection handles: {e}")
 
-
     def mousePressEvent(self, event):
+        """Enhanced mouse press event with proper outside-click handling"""
+        print("🖱️ Enhanced mouse press event started")
+        print(f"   Button: {event.button()}")
+        print(f"   Position: {event.position().toPoint()}")
+        print(f"   Modifiers: {event.modifiers()}")
+        print(f"   Current page: {self.current_page}")
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()  # Enable keyboard events
+            screen_pos = event.position().toPoint()
+            modifiers = event.modifiers()
+
+            # Convert screen coordinates to document coordinates
+            doc_coords = self.screen_to_document_coordinates(screen_pos.x(), screen_pos.y())
+
+            if not doc_coords:
+                print("   Click was in margin/gap area - clearing selection")
+                self._handle_outside_click()
+                return
+
+            page_num, doc_x, doc_y = doc_coords
+            print(f"   Screen pos: ({screen_pos.x()}, {screen_pos.y()})")
+            print(f"   Page {page_num} doc pos: ({doc_x}, {doc_y}) at zoom {self.zoom_level}")
+
+            self.current_page = page_num  # Update canvas current page to match click location
+            print(f"✅ Updated canvas current_page to: {self.current_page}")
+
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            # Check if we clicked on an existing field
+            clicked_field = None
+            try:
+                clicked_field = self.enhanced_drag_handler.handle_mouse_press(doc_pos, modifiers, page_num)
+                print(f"   Enhanced drag handler result: {clicked_field.name if clicked_field else 'None'}")
+            except Exception as e:
+                print(f"⚠️ Error in enhanced drag handler: {e}")
+
+            # If we clicked on a field, handle field selection
+            if clicked_field:
+                try:
+                    # For multi-selection, don't change selection handler's primary selection
+                    if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                        self.selection_handler.select_field(clicked_field)
+
+                    print(f"✅ Field interaction: {clicked_field.id}")
+                    self._handle_field_clicked(clicked_field.id)
+
+                    # Force redraw to show selection
+                    self.draw_overlay()
+                    return
+
+                except Exception as e:
+                    print(f"⚠️ Error in field selection: {e}")
+
+            # Handle field creation for empty areas (if field type is selected)
+            if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                selected_field_type = self.get_selected_field_type()
+                if selected_field_type and selected_field_type != 'select':
+                    try:
+                        self.create_field_at_position(doc_x, doc_y, page_num, selected_field_type)
+                        return
+                    except Exception as e:
+                        print(f"⚠️ Error creating field: {e}")
+
+            # Handle empty space click (clear selection if not holding Ctrl)
+            if not (modifiers & Qt.KeyboardModifier.ControlModifier):
+                print("   Clicked on empty space - clearing all selections")
+                self._handle_outside_click()
+
+    def _handle_outside_click(self):
+        """Handle clicking outside any control - clear all selections and reset UI"""
+        print("🧹 Handling outside click - clearing all selections")
+
+        try:
+            # Clear canvas selections
+            if hasattr(self, 'selection_handler') and self.selection_handler:
+                self.selection_handler.clear_selection()
+                print("   ✅ Cleared selection handler")
+
+            if hasattr(self, 'enhanced_drag_handler') and self.enhanced_drag_handler:
+                self.enhanced_drag_handler.clear_selection()
+                print("   ✅ Cleared enhanced drag handler")
+
+            # Clear properties panel and dropdown
+            self._clear_properties_panel()
+
+            # Redraw to remove any visual selection indicators
+            self.draw_overlay()
+
+            print("✅ Outside click handling completed")
+
+        except Exception as e:
+            print(f"⚠️ Error in outside click handling: {e}")
+
+    def _clear_properties_panel(self):
+        """Clear the properties panel and reset dropdown to 'No controls selected'"""
+        try:
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'field_palette'):
+                properties_tab = main_window.field_palette.properties_tab
+
+                # Just call the simple method we already have
+                properties_tab.select_no_control()
+
+        except Exception as e:
+            print(f"   ⚠️ Error clearing properties panel: {e}")
+
+    def _get_main_window(self):
+        """Helper method to find the main window"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'field_palette'):
+                return parent
+            parent = parent.parent()
+        return None
+
+    def deprecated_2_mousePressEvent(self, event):
         """Enhanced mouse press event with multi-selection support"""
         print("🖱️ Enhanced mouse press event started")
         print(f"   Button: {event.button()}")
