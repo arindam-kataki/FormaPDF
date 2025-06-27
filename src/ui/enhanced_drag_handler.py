@@ -166,13 +166,20 @@ class EnhancedDragHandler(QObject):
 
             # Handle multi-selection with Ctrl
             if modifiers & Qt.KeyboardModifier.ControlModifier:
-                if clicked_field in self.selected_fields:
-                    self.selected_fields.remove(clicked_field)
-                else:
-                    self.selected_fields.append(clicked_field)
+                # Multi-selection via field manager
+                if hasattr(self, 'field_manager') and self.field_manager:
+                    self.field_manager.select_field(clicked_field, multi_select=True)
+                print(f"🎯 Multi-select: Ctrl+clicked {clicked_field.name}")
             else:
-                # Single selection
-                self.selected_fields = [clicked_field]
+                # Single selection via field manager
+                if hasattr(self, 'field_manager') and self.field_manager:
+                    self.field_manager.select_field(clicked_field, multi_select=False)
+                    # Add this debug:
+                    current_selection = self.field_manager.get_selected_fields()
+                    print(f"🔍 DEBUG: FieldManager now has {len(current_selection)} fields selected:")
+                    for f in current_selection:
+                        print(f"   - {f.id}")
+                print(f"🎯 Single-select: Clicked {clicked_field.name}")
 
             # Prepare for potential drag
             self.drag_start_pos = pos
@@ -236,7 +243,7 @@ class EnhancedDragHandler(QObject):
                     self.selected_fields.clear()
 
             # Handle multi-selection with Ctrl
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
+            if (modifiers & Qt.KeyboardModifier.ControlModifier) or (modifiers & Qt.KeyboardModifier.MetaModifier):
                 if clicked_field in self.selected_fields:
                     self.selected_fields.remove(clicked_field)
                 else:

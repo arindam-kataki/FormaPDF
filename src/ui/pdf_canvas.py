@@ -1320,7 +1320,7 @@ class PDFCanvas(QLabel):
         modifiers = event.modifiers()
 
         # Ctrl + Wheel = Zoom
-        if modifiers & Qt.KeyboardModifier.ControlModifier:
+        if (modifiers & Qt.KeyboardModifier.ControlModifier) or (modifiers & Qt.KeyboardModifier.MetaModifier):
             # Get the angle delta (positive = zoom in, negative = zoom out)
             delta = event.angleDelta().y()
 
@@ -1567,6 +1567,34 @@ class PDFCanvas(QLabel):
         print()
 
     def mousePressEvent(self, event):
+        """Simplified mouse press - let enhanced_drag_handler do the work"""
+        print("🖱️ Enhanced mouse press event started")
+
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.setFocus()
+            screen_pos = event.position().toPoint()
+            modifiers = event.modifiers()
+
+            # Convert coordinates
+            doc_coords = self.screen_to_document_coordinates(screen_pos.x(), screen_pos.y())
+
+            if not doc_coords:
+                print("   Click was in margin/gap area - clearing selection")
+                self._handle_outside_click()
+                return
+
+            page_num, doc_x, doc_y = doc_coords
+            self.current_page = page_num
+            doc_pos = QPoint(int(doc_x), int(doc_y))
+
+            # Let enhanced_drag_handler handle EVERYTHING else
+            clicked_field = self.enhanced_drag_handler.handle_mouse_press(doc_pos, modifiers, page_num)
+
+            # If no field was clicked and we have a selected field type, create new field
+            if not clicked_field:
+                self._try_create_field_at_position(doc_x, doc_y, page_num)
+
+    def deprecated_mousePressEvent(self, event):
         """Enhanced mouse press event with proper outside-click handling"""
         print("🖱️ Enhanced mouse press event started")
         print(f"   Button: {event.button()}")
@@ -2063,7 +2091,7 @@ class PDFCanvas(QLabel):
             field_name = f"{field_type.lower()}_{field_count}"
 
             # Create the field using field manager (which now accepts page_number)
-            new_field = self.field_manager.add_field(field_type, field_x, field_y, page_num)
+            new_field = self.field_manager.create_field(field_type, field_x, field_y, page_num)
 
             # Add to field manager
             # self.field_manager.fields.append(new_field)
