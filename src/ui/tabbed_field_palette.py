@@ -552,6 +552,21 @@ class PropertiesTab(QWidget):
             self.control_dropdown.blockSignals(False)
 
     def _update_canvas_highlighting(self, field):
+        """Update canvas highlighting - now respects FieldManager"""
+        try:
+            main_window = self._find_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                canvas = main_window.pdf_canvas
+
+                # Instead of forcing selection, just trigger a visual update
+                if hasattr(canvas, 'draw_overlay'):
+                    canvas.draw_overlay()
+                    print(f"✅ Triggered visual update only")
+                canvas.update()
+        except Exception as e:
+            print(f"❌ Error in canvas highlighting: {e}")
+
+    def deprecated_update_canvas_highlighting(self, field):
         """Debug version to see exactly what's happening"""
         try:
             main_window = self._find_main_window()
