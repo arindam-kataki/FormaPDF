@@ -1703,8 +1703,15 @@ class PDFViewerMainWindow(QMainWindow):
             selected_field = None
 
             if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-                if hasattr(self.pdf_canvas, 'selected_field'):
-                    selected_field = self.pdf_canvas.selected_field
+
+                selected_field = None
+
+                if hasattr(self.pdf_canvas, 'selection_handler') and self.pdf_canvas.selection_handler:
+                    selected_field = self.pdf_canvas.selection_handler.get_selected_field()
+                elif hasattr(self.pdf_canvas, 'enhanced_drag_handler') and self.pdf_canvas.enhanced_drag_handler:
+                    # For multi-selection, get the first selected field
+                    selected_fields = self.pdf_canvas.enhanced_drag_handler.get_selected_fields()
+                    selected_field = selected_fields[0] if selected_fields else None
                 elif hasattr(self.pdf_canvas, 'get_selected_field'):
                     selected_field = self.pdf_canvas.get_selected_field()
 
