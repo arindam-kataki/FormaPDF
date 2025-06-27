@@ -1592,7 +1592,9 @@ class PDFCanvas(QLabel):
 
             # If no field was clicked and we have a selected field type, create new field
             if not clicked_field:
-                self._try_create_field_at_position(doc_x, doc_y, page_num)
+                field_type = self._get_selected_field_type()
+                if field_type:
+                    self.create_field_at_position(doc_x, doc_y, page_num, field_type)
 
     def deprecated_mousePressEvent(self, event):
         """Enhanced mouse press event with proper outside-click handling"""
@@ -1885,8 +1887,9 @@ class PDFCanvas(QLabel):
             if field:
                 print(f"✅ Created field: {field.id}")
 
+
+                #self._add_field_to_dropdown(field)
                 self._reset_field_type_selection()
-                self._add_field_to_dropdown(field)
 
                 # Optionally resize the field after creation if needed
                 # field.resize_to(100, 30)  # Set custom size if desired
@@ -2051,7 +2054,7 @@ class PDFCanvas(QLabel):
 
                 # Default to text field if nothing specific is selected
                 print("ℹ️ No specific field type selected, defaulting to TEXT")
-                return "text"
+                return None
 
         except Exception as e:
             print(f"⚠️ Error getting selected field type: {e}")
