@@ -29,10 +29,6 @@ class FieldType(Enum):
     TEXTAREA = "textarea",
     PASSWORD = "password"
 
-
-
-
-
 @dataclass
 class FormField:
     """Data model for a form field"""
@@ -222,7 +218,7 @@ class FieldManager(QObject):
             field_type_enum = self._get_field_type_enum(field_type)
 
             # Create the field
-            field = FormField.create(field_type_enum, x, y, field_id, page_num=page_num, **kwargs)
+            field = FormField.create(field_type_enum, x, y, field_id, page_num, **kwargs)
 
             # Add to master list
             self.all_fields.append(field)

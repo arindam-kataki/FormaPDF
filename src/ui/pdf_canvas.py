@@ -259,7 +259,7 @@ class PDFCanvas(QLabel):
             self.zoom_level = 1.0
 
             # Clear existing fields
-            self.field_manager.clear_all()
+            self.field_manager.clear_all_fields()
 
             # Clear selection safely
             try:
@@ -1846,11 +1846,11 @@ class PDFCanvas(QLabel):
             print(f"🎯 Creating {field_type} field at ({x}, {y}) on page {page_number}")
 
             # Use the field manager to create the field (note: correct parameters)
-            field = self.field_manager.add_field(
-                field_type=field_type,
-                x=int(x),
-                y=int(y),
-                page_number=page_number
+            field = self.field_manager.create_field(
+                field_type,
+                int(x),
+                int(y),
+                page_number
                 # Note: width and height are NOT parameters - they're set by default in FormField.create()
             )
 
