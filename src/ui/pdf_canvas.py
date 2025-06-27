@@ -1612,7 +1612,7 @@ class PDFCanvas(QLabel):
                         clicked_field_id = getattr(clicked_field, 'id', None)
 
                         # Debug current selection
-                        current_ids = [getattr(f, 'id', 'no_id') for f in self.selected_fields]
+                        current_ids = [getattr(f, 'id', 'no_id') for f in self.field_manager.get_selected_fields()]
                         print(f"   🔍 Current selection: {current_ids}")
                         print(f"   🔍 Clicked field: {clicked_field_id}")
 
@@ -1620,7 +1620,7 @@ class PDFCanvas(QLabel):
                         already_selected = False
                         field_to_remove = None
 
-                        for existing_field in self.selected_fields:
+                        for existing_field in self.field_manager.get_selected_fields():
                             if getattr(existing_field, 'id', None) == clicked_field_id:
                                 already_selected = True
                                 field_to_remove = existing_field
@@ -1628,16 +1628,16 @@ class PDFCanvas(QLabel):
 
                         if already_selected:
                             # Remove the field
-                            self.selected_fields.remove(field_to_remove)
+                            self.field_manager.get_selected_fields().remove(field_to_remove)
                             print(f"   ➖ Removed {clicked_field_id} from selection")
                         else:
                             # Add the field
-                            self.selected_fields.append(clicked_field)
+                            self.field_manager.get_selected_fields().append(clicked_field)
                             print(f"   ➕ Added {clicked_field_id} to selection")
 
                     else:
                         # Single selection
-                        self.selected_fields = [clicked_field]
+                        self.field_manager.select_field(clicked_field, multi_select=False)
                         print(f"   🎯 Single selection: {getattr(clicked_field, 'id', 'no_id')}")
 
                     print(f"✅ Field interaction: {clicked_field.id}")

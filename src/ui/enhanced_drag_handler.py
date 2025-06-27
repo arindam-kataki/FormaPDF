@@ -500,65 +500,51 @@ class EnhancedDragHandler(QObject):
         return was_dragging
 
     def select_field(self, field):
-        """Select a single field (for compatibility with selection_handler interface)"""
+        """Select a single field (delegates to field_manager)"""
         try:
-            if field is None:
-                # Clear selection
-                self.selected_fields.clear()
-                print("✅ Cleared field selection")
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.select_field(field, multi_select=False)
+                print(f"✅ Selected field via field_manager: {field.id if field else 'None'}")
             else:
-                # Select single field
-                self.selected_fields = [field]
-                print(f"✅ Selected field: {field.id}")
-
+                print("⚠️ No field_manager available for selection")
         except Exception as e:
             print(f"⚠️ Error in select_field: {e}")
 
     def clear_selection(self):
-        """Clear all selected fields"""
-        self.selected_fields.clear()
-        print("✅ Cleared all field selections")
+        """Clear all selected fields (delegates to field_manager)"""
+        try:
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.select_field(None)
+                print("✅ Cleared all field selections via field_manager")
+            else:
+                print("⚠️ No field_manager available for clearing selection")
+        except Exception as e:
+            print(f"⚠️ Error clearing selection: {e}")
 
     def get_selected_field(self):
-        """Get the first selected field (for compatibility)"""
-        return self.selected_fields[0] if self.selected_fields else None
+        """Get the first selected field (delegates to field_manager)"""
+        try:
+            if hasattr(self, 'field_manager') and self.field_manager:
+                return self.field_manager.get_selected_field()
+            return None
+        except Exception as e:
+            print(f"⚠️ Error getting selected field: {e}")
+            return None
 
-    def deprecated_1_handle_mouse_release(self, pos: QPoint) -> bool:
-        """
-        Handle mouse release - end dragging and apply changes
-
-        Returns:
-            bool: True if drag was ended
-        """
-        if not self.is_dragging:
-            return False
-
-        # End drag operation
-        was_dragging = self.drag_overlay.end_drag()
-
-        if was_dragging:
-            # Apply drag changes to actual fields
-            self.apply_drag_changes(pos)
-
-            # ✅ CLEAR SELECTION AFTER DRAG ENDS
-            print("🧹 Clearing selection after drag completion")
-            field_count = len(self.selected_fields)
-            self.selected_fields.clear()
-
-            # Also clear canvas selection handler
-            if hasattr(self.canvas, 'selection_handler') and self.canvas.selection_handler:
-                try:
-                    self.canvas.selection_handler.clear_selection()
-                    print("🧹 Cleared canvas selection handler")
-                except Exception as e:
-                    print(f"⚠️ Error clearing canvas selection: {e}")
-
-        self.is_dragging = False
-        return was_dragging
+    def get_selected_fields(self):
+        """Get all selected fields (delegates to field_manager)"""
+        try:
+            if hasattr(self, 'field_manager') and self.field_manager:
+                return self.field_manager.get_selected_fields()
+            return []
+        except Exception as e:
+            print(f"⚠️ Error getting selected fields: {e}")
+            return []
 
     def apply_drag_changes(self, final_pos: QPoint):
         """Apply drag offset to actual field positions"""
-        if not self.selected_fields:
+        selected_fields = self.get_selected_fields()  # ✅ FIXED
+        if not selected_fields:
             return
 
         # Calculate final drag offset

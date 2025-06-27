@@ -305,7 +305,8 @@ class PropertiesTab(QWidget):
 
         self.control_dropdown = QComboBox()
         self.control_dropdown.addItem("No controls available", None)
-        self.control_dropdown.currentTextChanged.connect(self._on_control_selected)
+        #temporary commented out
+        #self.control_dropdown.currentTextChanged.connect(self._on_control_selected)
         dropdown_layout.addWidget(self.control_dropdown)
 
         selection_layout.addLayout(dropdown_layout)

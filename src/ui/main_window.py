@@ -444,6 +444,18 @@ class PDFViewerMainWindow(QMainWindow):
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect positionClicked: {e}")
 
+            # MULTI-SELECTION: Connect to FieldManager instead of canvas selectionChanged
+            if (hasattr(self, 'pdf_canvas') and
+                    self.pdf_canvas is not None and
+                    hasattr(self.pdf_canvas, 'field_manager') and
+                    hasattr(self.pdf_canvas.field_manager, 'selection_changed')):
+                try:
+                    self.pdf_canvas.field_manager.selection_changed.connect(self.on_multi_selection_changed)
+                    print("  ✅ Connected FieldManager.selection_changed for multi-select")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect multi-selection: {e}")
+
+            """
             if (hasattr(self, 'pdf_canvas') and 
                 self.pdf_canvas is not None and 
                 hasattr(self.pdf_canvas, 'selectionChanged')):
@@ -452,8 +464,10 @@ class PDFViewerMainWindow(QMainWindow):
                     print("  ✅ Connected pdf_canvas.selectionChanged")
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect selectionChanged: {e}")
+            """
 
             # Properties panel connections - check both object and signal exist
+            """
             if (hasattr(self, 'properties_panel') and 
                 self.properties_panel is not None and 
                 hasattr(self.properties_panel, 'propertyChanged')):
@@ -463,6 +477,7 @@ class PDFViewerMainWindow(QMainWindow):
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect propertyChanged: {e}")
 
+            """
             if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
                 self.field_palette.fieldRequested.connect(self._on_field_type_selected)
 
@@ -509,6 +524,21 @@ class PDFViewerMainWindow(QMainWindow):
             print(f"Warning: Error setting up signal connections: {e}")
             import traceback
             traceback.print_exc()
+
+    @pyqtSlot(list)
+    def on_multi_selection_changed(self, selected_fields):
+        """Handle multi-selection changes from FieldManager"""
+        count = len(selected_fields)
+
+        print(f"🔥 Multi-selection changed: {count} fields")
+
+        if count == 0:
+            self.statusBar().showMessage("No fields selected", 2000)
+        elif count == 1:
+            field = selected_fields[0]
+            self.statusBar().showMessage(f"Selected: {field.id}", 2000)
+        else:  # Multiple fields selected
+            self.statusBar().showMessage(f"Multi-select: {count} fields", 2000)
 
     def on_drag_started(self, field_id: str, operation_type: str):
         """Handle drag operation start"""
