@@ -404,7 +404,6 @@ class DragHandler(EnhancedDragHandler):
     """Backward compatible drag handler"""
     pass
 
-
 # Keep existing WorkingSelectionHandler for compatibility
 class WorkingSelectionHandler(QObject):
     """A completely working SelectionHandler class"""

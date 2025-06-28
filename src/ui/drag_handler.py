@@ -301,3 +301,4 @@ class DragHandler(QObject):
         self.fieldMoved.emit(field.id, field.x, field.y)
 
 
+SelectionHandler = DragHandler

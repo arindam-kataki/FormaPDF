@@ -25,11 +25,16 @@ except ImportError:
 try:
     from models.field_model import FormField, FieldType, FieldManager
     from ui.field_renderer import FieldRenderer
-    from ui.enhanced_drag_handler import EnhancedDragHandler as DragHandler, WorkingSelectionHandler, SelectionHandler
+    from ui.enhanced_drag_handler import EnhancedDragHandler as DragHandler, WorkingSelectionHandler
+
+    # Create the SelectionHandler alias
+    SelectionHandler = WorkingSelectionHandler
+
     FIELD_COMPONENTS_AVAILABLE = True
     print("✅ Enhanced field components loaded successfully")
 except ImportError as e:
     print(f"⚠️ Enhanced field management components not available: {e}")
+    print(f"⚠️ Specific error: {e}")
     print("   Falling back to minimal versions...")
     FIELD_COMPONENTS_AVAILABLE = False
 
