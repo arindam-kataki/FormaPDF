@@ -312,7 +312,8 @@ class EnhancedDragHandler(QObject):
             # ✅ CLEAR SELECTION AFTER DRAG ENDS
             print("🧹 Clearing selection after drag completion")
             field_count = len(self.get_selected_fields())
-            self.get_selected_fields().clear()
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.clear_selection()
 
             # Also clear canvas selection handler
             if hasattr(self.canvas, 'selection_handler') and self.canvas.selection_handler:

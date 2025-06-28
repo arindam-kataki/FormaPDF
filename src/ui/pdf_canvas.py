@@ -981,8 +981,8 @@ class PDFCanvas(QLabel):
             print(f"   Selection handler at draw time: {current_id}")
 
         if hasattr(self, 'enhanced_drag_handler'):
-            if hasattr(self.enhanced_drag_handler, 'selected_fields'):
-                current_list = self.enhanced_drag_handler.selected_fields
+            if hasattr(self.enhanced_drag_handler, 'get_selected_fields'):
+                current_list = self.enhanced_drag_handler.get_selected_fields()
                 current_ids = [getattr(f, 'id', 'unknown') for f in current_list]
                 print(f"   Enhanced drag handler at draw time: {current_ids}")
 
