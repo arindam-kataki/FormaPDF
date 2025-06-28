@@ -86,7 +86,7 @@ class EnhancedDragHandler(QObject):
         super().__init__()  # This is the critical line that was missing!
         self.canvas = canvas
         self.field_manager = field_manager
-        self.selected_fields = []
+        #self.selected_fields = []
         self.is_dragging = False
         self.drag_start_pos = QPoint()
         self.zoom_level = 1.0
@@ -195,77 +195,6 @@ class EnhancedDragHandler(QObject):
 
         return clicked_field
 
-    def deprecated_2_handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier, page_num: int = None) -> Optional[Any]:
-        """
-        Handle mouse press - detect field clicks and prepare for dragging
-
-        Returns:
-            Field object if clicked, None otherwise
-        """
-
-        # ✅ DETERMINE WHICH PAGE TO SEARCH - USE PROVIDED PAGE_NUM FIRST
-        if page_num is not None:
-            # Use the page number passed from mousePressEvent (this is most accurate)
-            search_page = page_num
-            print(f"🔍 Using provided page number: {search_page}")
-        else:
-            # Fallback to canvas current page with update
-            if hasattr(self.canvas, 'update_current_page_from_scroll'):
-                self.canvas.update_current_page_from_scroll()
-
-            search_page = getattr(self.canvas, 'current_page', 0)
-            print(f"🔍 Using canvas current page: {search_page}")
-
-        print(f"🔍 Enhanced drag handler: Looking for field at {pos} on page {search_page}")
-
-        # ✅ SINGLE FIELD LOOKUP WITH CORRECT PAGE
-        clicked_field = self.field_manager.get_field_at_position(
-            pos.x(), pos.y(), search_page
-        )
-
-        if clicked_field:
-
-            print(f"✅ Found field {clicked_field.name} on page {clicked_field.page_number}")
-
-            # ✅ ADDITIONAL SAFETY CHECK: Ensure field is on current page
-            if clicked_field.page_number != search_page:
-                print(
-                    f"⚠️ Field {clicked_field.name} is on page {clicked_field.page_number}, but current page is {search_page}. Ignoring click.")
-                return None
-
-            # ✅ WHEN MULTI-SELECTING, PREVENT CROSS-PAGE SELECTION
-            if self.get_selected_fields() and modifiers & Qt.KeyboardModifier.ControlModifier:
-                # Check if we're trying to multi-select across pages
-                first_selected_page = self.get_selected_fields()[0].page_number if self.get_selected_fields() else search_page
-                if first_selected_page != search_page:
-                    print(
-                        f"🔄 Switching from page {first_selected_page} to page {search_page}, clearing previous selection")
-                    self.get_selected_fields().clear()
-
-            # Handle multi-selection with Ctrl
-            if (modifiers & Qt.KeyboardModifier.ControlModifier) or (modifiers & Qt.KeyboardModifier.MetaModifier):
-                if clicked_field in self.get_selected_fields():
-                    self.get_selected_fields().remove(clicked_field)
-                else:
-                    self.get_selected_fields().append(clicked_field)
-            else:
-                # Single selection
-                self.selected_fields = [clicked_field]
-
-            # Prepare for potential drag
-            self.drag_start_pos = pos
-
-            print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
-        else:
-            print(f"❌ No field found at {pos} on page {search_page}")
-            # ✅ DEBUG: Show what fields exist on this page
-            fields_on_page = [f for f in self.field_manager.fields if f.page_number == search_page]
-            print(f"   Available fields on page {search_page}: {len(fields_on_page)}")
-            for field in fields_on_page:
-                print(f"   - {field.name} at ({field.x}, {field.y})")
-
-        return clicked_field
-
     def handle_mouse_move(self, pos: QPoint) -> bool:
         """
         Handle mouse move - start/update dragging or resizing
@@ -278,7 +207,7 @@ class EnhancedDragHandler(QObject):
             self._handle_resize_move(pos)
             return True
 
-        if not self.selected_fields:
+        if not self.get_selected_fields():
             return False
 
         # Check if we should start dragging
@@ -324,50 +253,9 @@ class EnhancedDragHandler(QObject):
         if hasattr(self, 'resize_guide') and self.resize_guide:
             self.resize_guide.update_resize(field)
 
-    def deprecated_2_handle_resize_move(self, pos: QPoint):
-        """Handle mouse movement during resize operation"""
-        if not self.resize_field or not self.resize_handle:
-            return
-
-        field = self.resize_field
-        start_x, start_y = field.x, field.y
-        start_width, start_height = self.resize_start_size
-
-        # Calculate deltas
-        dx = (pos.x() - self.resize_start_pos.x()) / self.zoom_level
-        dy = (pos.y() - self.resize_start_pos.y()) / self.zoom_level
-
-        # Import resize calculator
-        from utils.geometry_utils import ResizeCalculator, BoundaryConstraints, GridUtils
-
-        # Calculate new dimensions
-        new_x, new_y, new_width, new_height = ResizeCalculator.calculate_resize(
-            start_x, start_y, start_width, start_height,
-            dx, dy, self.resize_handle, 20, 15  # min_width, min_height
-        )
-
-        # Apply constraints (optional - you can add canvas bounds later)
-        # new_x, new_y = BoundaryConstraints.constrain_position(...)
-
-        # Apply grid snapping (optional)
-        # if snap_to_grid:
-        #     new_x, new_y = GridUtils.snap_to_grid(new_x, new_y, grid_size)
-
-        # Update field
-        field.x = new_x
-        field.y = new_y
-        field.resize_to(new_width, new_height)
-
-        # Emit progress signal
-        self.dragProgress.emit(field.id, new_x, new_y, new_width, new_height)
-
-        # NEW: Update visual guide
-        if hasattr(self, 'resize_guide') and self.resize_guide:
-            self.resize_guide.update_resize(field)
-
     def start_drag(self):
         """Start drag operation using overlay"""
-        if not self.selected_fields:
+        if not self.get_selected_fields():
             return
 
         print(f"🚀 Starting drag operation with {len(self.get_selected_fields())} fields")
@@ -448,17 +336,6 @@ class EnhancedDragHandler(QObject):
         except Exception as e:
             print(f"⚠️ Error in select_field: {e}")
 
-    def clear_selection(self):
-        """Clear all selected fields (delegates to field_manager)"""
-        try:
-            if hasattr(self, 'field_manager') and self.field_manager:
-                self.field_manager.select_field(None)
-                print("✅ Cleared all field selections via field_manager")
-            else:
-                print("⚠️ No field_manager available for clearing selection")
-        except Exception as e:
-            print(f"⚠️ Error clearing selection: {e}")
-
     def get_selected_field(self):
         """Get the first selected field (delegates to field_manager)"""
         try:
@@ -501,11 +378,25 @@ class EnhancedDragHandler(QObject):
             print(f"✅ Moved field {field.name} by ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
 
     def clear_selection(self):
-        """Clear field selection"""
-        self.selected_fields.clear()
-        if self.is_dragging:
-            self.drag_overlay.cancel_drag()
-            self.is_dragging = False
+        """Clear selection via field manager"""
+        print("🔄 EnhancedDragHandler: Clearing selection...")
+        try:
+            # Use field manager as primary source
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.clear_selection()
+                print("✅ Cleared via FieldManager")
+            else:
+                print("⚠️ No field manager available")
+
+            # Cancel any ongoing drag operation
+            if hasattr(self, 'is_dragging') and self.is_dragging:
+                if hasattr(self, 'drag_overlay') and self.drag_overlay:
+                    self.drag_overlay.cancel_drag()
+                self.is_dragging = False
+                print("✅ Cancelled drag operation")
+
+        except Exception as e:
+            print(f"❌ Error in EnhancedDragHandler.clear_selection: {e}")
 
 # For backward compatibility, keep the original DragHandler available
 class DragHandler(EnhancedDragHandler):
