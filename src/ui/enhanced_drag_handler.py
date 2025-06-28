@@ -74,8 +74,8 @@ class EnhancedDragHandler(QObject):
     Enhanced drag handler that works with the transparent overlay
     """
 
-    sigSelectionChanged = pyqtSignal(list)  # When selection changes (which fields are selected)
-    sigPropertiesChanged = pyqtSignal(list)  # When field properties change (position, size, etc.)
+    selectionChanged = pyqtSignal(list)  # When selection changes (which fields are selected)
+    propertiesChanged = pyqtSignal(list)  # When field properties change (position, size, etc.)
     cursorChanged = pyqtSignal(Qt.CursorShape)
 
     # Signals for drag and resize operations
@@ -186,7 +186,7 @@ class EnhancedDragHandler(QObject):
             # Prepare for potential drag
             self.drag_start_pos = pos
             self.canvas.draw_overlay()
-            self.sigSelectionChanged.emit(self.get_selected_fields())
+            self.selectionChanged.emit(self.get_selected_fields())
             print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
@@ -196,7 +196,7 @@ class EnhancedDragHandler(QObject):
             for field in fields_on_page:
                 print(f"   - {field.name} at ({field.x}, {field.y})")
             self.field_manager.clear_selection()
-            self.sigSelectionChanged.emit(self.get_selected_fields())
+            self.selectionChanged.emit(self.get_selected_fields())
             self.canvas.draw_overlay()
 
         return clicked_field
@@ -277,6 +277,7 @@ class EnhancedDragHandler(QObject):
         # Emit drag started signal
         field_info = "multiple" if len(self.get_selected_fields()) > 1 else self.get_selected_fields()[0].id
         self.dragStarted.emit(field_info, "move")
+        self.propertiesChanged.emit(self.get_selected_fields())
 
     def handle_mouse_release(self, pos: QPoint) -> bool:
         """
@@ -288,8 +289,11 @@ class EnhancedDragHandler(QObject):
         # Handle resize mode
         if self.resize_mode and self.resize_field:
             field = self.resize_field
+
             self.fieldResized.emit(field.id, field.x, field.y, field.width, field.height)
             self.dragCompleted.emit(field.id)
+            # Emit property changed
+            self.propertiesChanged.emit(self.get_selected_fields())
 
             # NEW: End visual guide
             if hasattr(self, 'resize_guide') and self.resize_guide:
@@ -310,11 +314,15 @@ class EnhancedDragHandler(QObject):
         was_dragging = self.drag_overlay.end_drag()
 
         if was_dragging:
+
             # Apply drag changes to actual fields
             self.apply_drag_changes(pos)
 
             # Emit completion signal
             self.dragCompleted.emit("multiple" if len(self.get_selected_fields()) > 1 else self.get_selected_fields()[0].id)
+
+            # Emit property changed
+            self.propertiesChanged.emit(self.get_selected_fields())
 
             # ✅ CLEAR SELECTION AFTER DRAG ENDS
             print("🧹 Clearing selection after drag completion")
@@ -330,7 +338,6 @@ class EnhancedDragHandler(QObject):
                 except Exception as e:
                     print(f"⚠️ Error clearing canvas selection: {e}")
 
-        self.sigPropertiesChanged.emit(self.get_selected_fields())
 
         self.is_dragging = False
         return was_dragging
