@@ -74,8 +74,8 @@ class EnhancedDragHandler(QObject):
     Enhanced drag handler that works with the transparent overlay
     """
 
-    selectionChanged = pyqtSignal(list)  # When selection changes (which fields are selected)
-    propertiesChanged = pyqtSignal(list)  # When field properties change (position, size, etc.)
+    sigSelectionChanged = pyqtSignal(list)  # When selection changes (which fields are selected)
+    sigPropertiesChanged = pyqtSignal(list)  # When field properties change (position, size, etc.)
     cursorChanged = pyqtSignal(Qt.CursorShape)
 
     # Signals for drag and resize operations
@@ -186,6 +186,7 @@ class EnhancedDragHandler(QObject):
             # Prepare for potential drag
             self.drag_start_pos = pos
             self.canvas.draw_overlay()
+            self.sigSelectionChanged.emit(self.get_selected_fields())
             print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
@@ -194,6 +195,9 @@ class EnhancedDragHandler(QObject):
             print(f"   Available fields on page {search_page}: {len(fields_on_page)}")
             for field in fields_on_page:
                 print(f"   - {field.name} at ({field.x}, {field.y})")
+            self.field_manager.clear_selection()
+            self.sigSelectionChanged.emit(self.get_selected_fields())
+            self.canvas.draw_overlay()
 
         return clicked_field
 
@@ -254,6 +258,7 @@ class EnhancedDragHandler(QObject):
         # Update visual guide
         if hasattr(self, 'resize_guide') and self.resize_guide:
             self.resize_guide.update_resize(field)
+
 
     def start_drag(self):
         """Start drag operation using overlay"""
@@ -324,6 +329,8 @@ class EnhancedDragHandler(QObject):
                     print("🧹 Cleared canvas selection handler")
                 except Exception as e:
                     print(f"⚠️ Error clearing canvas selection: {e}")
+
+        self.sigPropertiesChanged.emit(self.get_selected_fields())
 
         self.is_dragging = False
         return was_dragging
