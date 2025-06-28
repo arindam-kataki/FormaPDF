@@ -411,21 +411,21 @@ class WorkingSelectionHandler(QObject):
     def __init__(self, field_manager=None):
         super().__init__()
         self.field_manager = field_manager
-        self.selected_field = None
+        #self.selected_field = None
         print("✅ WorkingSelectionHandler initialized successfully")
 
     def select_field(self, field):
-        """Select a field - signal-free version"""
-        old_field = self.selected_field
-        self.selected_field = field
-        if old_field != field:
-            print(f"✅ Selection changed: {old_field.name if old_field else 'None'} → {field.name if field else 'None'}")
-            try:
-                self.fieldSelected.emit(field)
-            except Exception as e:
-                print(f"⚠️ Error emitting fieldSelected signal: {e}")
-            # Notify any callbacks instead of using signals
+        """Select a field via field manager"""
+        try:
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.select_field(field, multi_select=False)
+                print(f"✅ WorkingSelectionHandler: Selected via FieldManager: {field.id if field else 'None'}")
+            else:
+                print("⚠️ WorkingSelectionHandler: No FieldManager available")
+
             self._notify_callbacks(field)
+        except Exception as e:
+            print(f"❌ Error in WorkingSelectionHandler.select_field: {e}")
 
     def _notify_callbacks(self, field):
         """Notify callbacks of selection change - replaces signal emission"""
@@ -455,18 +455,27 @@ class WorkingSelectionHandler(QObject):
             print(f"✅ Added selection callback")
 
     def clear_selection(self):
-        """Clear selection - this is where the error happens"""
-        print("🔄 Clearing selection...")
+        """Clear selection via field manager"""
+        print("🔄 WorkingSelectionHandler: Clearing selection...")
         try:
-            self.select_field(None)
-            print("✅ Selection cleared successfully")
+            if hasattr(self, 'field_manager') and self.field_manager:
+                self.field_manager.clear_selection()
+                print("✅ WorkingSelectionHandler: Cleared via FieldManager")
+            else:
+                print("⚠️ WorkingSelectionHandler: No FieldManager available")
         except Exception as e:
-            print(f"⚠️ Error clearing selection: {e}")
-            self.selected_field = None
+            print(f"❌ Error in WorkingSelectionHandler.clear_selection: {e}")
 
     def get_selected_field(self):
-        """Get selected field"""
-        return self.selected_field
+        """Get selected field via field manager"""
+        try:
+            if hasattr(self, 'field_manager') and self.field_manager:
+                return self.field_manager.get_selected_field()
+            else:
+                return None
+        except Exception as e:
+            print(f"❌ Error getting selected field: {e}")
+            return None
 
     @property
     def selectionChanged(self):
@@ -485,28 +494,3 @@ class WorkingSelectionHandler(QObject):
 # For backward compatibility, create an alias
 SelectionHandler = WorkingSelectionHandler
 
-
-class SimpleResizeGuide:
-    """Simple visual feedback for resize operations"""
-
-    def __init__(self, canvas):
-        self.canvas = canvas
-        self.is_active = False
-
-    def start_resize(self, field, handle):
-        """Start showing resize feedback"""
-        self.is_active = True
-        # Force redraw to show guides
-        if hasattr(self.canvas, 'draw_overlay'):
-            self.canvas.draw_overlay()
-
-    def update_resize(self, field):
-        """Update resize feedback"""
-        if self.is_active and hasattr(self.canvas, 'draw_overlay'):
-            self.canvas.draw_overlay()
-
-    def end_resize(self):
-        """End resize feedback"""
-        self.is_active = False
-        if hasattr(self.canvas, 'draw_overlay'):
-            self.canvas.draw_overlay()
