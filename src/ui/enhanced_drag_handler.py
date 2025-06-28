@@ -74,10 +74,13 @@ class EnhancedDragHandler(QObject):
     Enhanced drag handler that works with the transparent overlay
     """
 
+    selectionChanged = pyqtSignal(list)  # When selection changes (which fields are selected)
+    propertiesChanged = pyqtSignal(list)  # When field properties change (position, size, etc.)
+    cursorChanged = pyqtSignal(Qt.CursorShape)
+
     # Signals for drag and resize operations
     fieldMoved = pyqtSignal(str, int, int)  # field_id, new_x, new_y
     fieldResized = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
-    cursorChanged = pyqtSignal(Qt.CursorShape)
     dragStarted = pyqtSignal(str, str)  # field_id, operation_type
     dragProgress = pyqtSignal(str, int, int, int, int)  # field_id, x, y, w, h
     dragCompleted = pyqtSignal(str)  # field_id
@@ -86,7 +89,6 @@ class EnhancedDragHandler(QObject):
         super().__init__()  # This is the critical line that was missing!
         self.canvas = canvas
         self.field_manager = field_manager
-        #self.selected_fields = []
         self.is_dragging = False
         self.drag_start_pos = QPoint()
         self.zoom_level = 1.0
@@ -183,7 +185,7 @@ class EnhancedDragHandler(QObject):
 
             # Prepare for potential drag
             self.drag_start_pos = pos
-
+            self.canvas.draw_overlay()
             print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
