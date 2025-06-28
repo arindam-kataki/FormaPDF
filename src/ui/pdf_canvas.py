@@ -1601,6 +1601,7 @@ class PDFCanvas(QLabel):
                 if field_type:
                     self.create_field_at_position(doc_x, doc_y, page_num, field_type)
 
+
     def deprecated_mousePressEvent(self, event):
         """Enhanced mouse press event with proper outside-click handling"""
         print("🖱️ Enhanced mouse press event started")
