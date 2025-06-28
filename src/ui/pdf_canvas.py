@@ -993,10 +993,10 @@ class PDFCanvas(QLabel):
                 selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
             # Also include the primary selected field from selection handler
-            if hasattr(self, 'selection_handler'):
-                primary_field = self.selection_handler.get_selected_field()
-                if primary_field and primary_field not in selected_fields:
-                    selected_fields.append(primary_field)
+            #if hasattr(self, 'selection_handler'):
+            #    primary_field = self.selection_handler.get_selected_field()
+            #    if primary_field and primary_field not in selected_fields:
+            #        selected_fields.append(primary_field)
 
             # Enhanced logging with field details
             print(f"🎨 Drawing selection handles for {len(selected_fields)} fields:")
@@ -2498,10 +2498,10 @@ class PDFCanvas(QLabel):
                 selected_fields = self.enhanced_drag_handler.get_selected_fields()
 
             # Also include the primary selected field from selection handler
-            if hasattr(self, 'selection_handler'):
-                primary_field = self.selection_handler.get_selected_field()
-                if primary_field and primary_field not in selected_fields:
-                    selected_fields.append(primary_field)
+            #if hasattr(self, 'selection_handler'):
+            #    primary_field = self.selection_handler.get_selected_field()
+            #    if primary_field and primary_field not in selected_fields:
+            #        selected_fields.append(primary_field)
 
             # Draw selection for each selected field
             for field in selected_fields:
