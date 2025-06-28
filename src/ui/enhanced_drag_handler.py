@@ -138,7 +138,7 @@ class EnhancedDragHandler(QObject):
 
         if clicked_field:
             # NEW: Check for resize handles first (only for single field)
-            if len(self.selected_fields) == 1 and clicked_field == self.selected_fields[0]:
+            if len(self.get_selected_fields()) == 1 and clicked_field == self.get_selected_fields()[0]:
                 from utils.geometry_utils import ResizeHandles
                 handle = ResizeHandles.get_handle_at_position(
                     pos.x(), pos.y(),
@@ -184,7 +184,7 @@ class EnhancedDragHandler(QObject):
             # Prepare for potential drag
             self.drag_start_pos = pos
 
-            print(f"🎯 Enhanced drag handler: {len(self.selected_fields)} fields selected")
+            print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
             # ✅ DEBUG: Show what fields exist on this page
@@ -234,20 +234,20 @@ class EnhancedDragHandler(QObject):
                 return None
 
             # ✅ WHEN MULTI-SELECTING, PREVENT CROSS-PAGE SELECTION
-            if self.selected_fields and modifiers & Qt.KeyboardModifier.ControlModifier:
+            if self.get_selected_fields() and modifiers & Qt.KeyboardModifier.ControlModifier:
                 # Check if we're trying to multi-select across pages
-                first_selected_page = self.selected_fields[0].page_number if self.selected_fields else search_page
+                first_selected_page = self.get_selected_fields()[0].page_number if self.get_selected_fields() else search_page
                 if first_selected_page != search_page:
                     print(
                         f"🔄 Switching from page {first_selected_page} to page {search_page}, clearing previous selection")
-                    self.selected_fields.clear()
+                    self.get_selected_fields().clear()
 
             # Handle multi-selection with Ctrl
             if (modifiers & Qt.KeyboardModifier.ControlModifier) or (modifiers & Qt.KeyboardModifier.MetaModifier):
-                if clicked_field in self.selected_fields:
-                    self.selected_fields.remove(clicked_field)
+                if clicked_field in self.get_selected_fields():
+                    self.get_selected_fields().remove(clicked_field)
                 else:
-                    self.selected_fields.append(clicked_field)
+                    self.get_selected_fields().append(clicked_field)
             else:
                 # Single selection
                 self.selected_fields = [clicked_field]
@@ -255,7 +255,7 @@ class EnhancedDragHandler(QObject):
             # Prepare for potential drag
             self.drag_start_pos = pos
 
-            print(f"🎯 Enhanced drag handler: {len(self.selected_fields)} fields selected")
+            print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
             # ✅ DEBUG: Show what fields exist on this page
@@ -263,53 +263,6 @@ class EnhancedDragHandler(QObject):
             print(f"   Available fields on page {search_page}: {len(fields_on_page)}")
             for field in fields_on_page:
                 print(f"   - {field.name} at ({field.x}, {field.y})")
-
-        return clicked_field
-
-    def deprecated_2_handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier) -> Optional[Any]:
-        """
-        Handle mouse press - detect field clicks and prepare for dragging
-
-        Returns:
-            Field object if clicked, None otherwise
-        """
-
-        if hasattr(self.canvas, 'update_current_page_from_scroll'):
-            self.canvas.update_current_page_from_scroll()
-
-        current_page = getattr(self.canvas, 'current_page', 0)
-        print(f"🔍 Enhanced drag handler: Looking for field at {pos} on page {current_page}")
-
-        # ✅ FORCE UPDATE CURRENT PAGE BEFORE FIELD LOOKUP:
-        if hasattr(self.canvas, 'update_current_page_from_scroll'):
-            self.canvas.update_current_page_from_scroll()
-            updated_page = getattr(self.canvas, 'current_page', 0)
-            print(f"📄 Updated current page to: {updated_page}")
-            current_page = updated_page
-
-        clicked_field = self.field_manager.get_field_at_position(
-            pos.x(), pos.y(), current_page
-        )
-
-        clicked_field = self.field_manager.get_field_at_position(
-            pos.x(), pos.y(), self.canvas.current_page
-        )
-
-        if clicked_field:
-            # Handle multi-selection with Ctrl
-            if modifiers & Qt.KeyboardModifier.ControlModifier:
-                if clicked_field in self.selected_fields:
-                    self.selected_fields.remove(clicked_field)
-                else:
-                    self.selected_fields.append(clicked_field)
-            else:
-                # Single selection
-                self.selected_fields = [clicked_field]
-
-            # Prepare for potential drag
-            self.drag_start_pos = pos
-
-            print(f"🎯 Enhanced drag handler: {len(self.selected_fields)} fields selected")
 
         return clicked_field
 
@@ -412,44 +365,22 @@ class EnhancedDragHandler(QObject):
         if hasattr(self, 'resize_guide') and self.resize_guide:
             self.resize_guide.update_resize(field)
 
-    def deprecated_1_handle_mouse_move(self, pos: QPoint) -> bool:
-        """
-        Handle mouse move - start/update dragging
-
-        Returns:
-            bool: True if currently dragging
-        """
-        if not self.selected_fields:
-            return False
-
-        # Check if we should start dragging
-        if not self.is_dragging:
-            drag_distance = (pos - self.drag_start_pos).manhattanLength()
-            if drag_distance > 5:  # Start drag after 5 pixel threshold
-                self.start_drag()
-
-        # Update drag if in progress
-        if self.is_dragging:
-            self.drag_overlay.update_drag(pos)
-
-        return self.is_dragging
-
     def start_drag(self):
         """Start drag operation using overlay"""
         if not self.selected_fields:
             return
 
-        print(f"🚀 Starting drag operation with {len(self.selected_fields)} fields")
+        print(f"🚀 Starting drag operation with {len(self.get_selected_fields())} fields")
 
         self.is_dragging = True
         self.drag_overlay.start_drag(
-            self.selected_fields,
+            self.get_selected_fields(),
             self.drag_start_pos,
             self.zoom_level
         )
 
         # Emit drag started signal
-        field_info = "multiple" if len(self.selected_fields) > 1 else self.selected_fields[0].id
+        field_info = "multiple" if len(self.get_selected_fields()) > 1 else self.get_selected_fields()[0].id
         self.dragStarted.emit(field_info, "move")
 
     def handle_mouse_release(self, pos: QPoint) -> bool:
@@ -488,12 +419,12 @@ class EnhancedDragHandler(QObject):
             self.apply_drag_changes(pos)
 
             # Emit completion signal
-            self.dragCompleted.emit("multiple" if len(self.selected_fields) > 1 else self.selected_fields[0].id)
+            self.dragCompleted.emit("multiple" if len(self.get_selected_fields()) > 1 else self.get_selected_fields()[0].id)
 
             # ✅ CLEAR SELECTION AFTER DRAG ENDS
             print("🧹 Clearing selection after drag completion")
-            field_count = len(self.selected_fields)
-            self.selected_fields.clear()
+            field_count = len(self.get_selected_fields())
+            self.get_selected_fields().clear()
 
             # Also clear canvas selection handler
             if hasattr(self.canvas, 'selection_handler') and self.canvas.selection_handler:
@@ -558,7 +489,7 @@ class EnhancedDragHandler(QObject):
         drag_offset = final_pos - self.drag_start_pos
 
         # Apply offset to each field
-        for field in self.selected_fields:
+        for field in self.get_selected_fields():
             # Convert screen offset to document coordinates
             doc_offset_x = drag_offset.x() / self.zoom_level
             doc_offset_y = drag_offset.y() / self.zoom_level
@@ -575,14 +506,6 @@ class EnhancedDragHandler(QObject):
         if self.is_dragging:
             self.drag_overlay.cancel_drag()
             self.is_dragging = False
-
-    def get_selected_fields(self):
-        """Get list of currently selected fields"""
-        if hasattr(self, 'selected_fields'):
-            return self.selected_fields.copy()
-        else:
-            return []
-
 
 # For backward compatibility, keep the original DragHandler available
 class DragHandler(EnhancedDragHandler):
