@@ -2242,8 +2242,45 @@ class PDFCanvas(QLabel):
                         except Exception as e:
                             print(f"⚠️ Error notifying main window: {e}")
 
+    def scroll_to_page(self, page_index):
+        """Scroll to show the specified page in continuous view"""
+        if not self.pdf_document or not hasattr(self, 'page_positions'):
+            print("⚠️ Cannot scroll - no document or page positions")
+            return False
 
-    def scroll_to_page(self, page_number):
+        if page_index < 0 or page_index >= len(self.page_positions):
+            print(f"⚠️ Invalid page index: {page_index}")
+            return False
+
+        try:
+            # Get the Y position for this page
+            target_y = self.page_positions[page_index]
+
+            # Get the scroll area (navigate up the widget hierarchy)
+            scroll_area = self.parent()
+            while scroll_area and not hasattr(scroll_area, 'verticalScrollBar'):
+                scroll_area = scroll_area.parent()
+
+            if not scroll_area:
+                print("⚠️ Could not find scroll area")
+                return False
+
+            # Scroll to the page
+            scroll_bar = scroll_area.verticalScrollBar()
+            scroll_bar.setValue(target_y)
+
+            print(f"✅ Scrolled to page {page_index + 1} at Y position {target_y}")
+
+            # Update current page tracking
+            self.current_page = page_index
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Error scrolling to page: {e}")
+            return False
+
+    def x_scroll_to_page(self, page_number):
         """Scroll to show a specific page"""
         if (not hasattr(self, 'page_positions') or
                 not self.page_positions or

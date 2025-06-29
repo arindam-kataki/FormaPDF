@@ -962,8 +962,65 @@ class PDFViewerMainWindow(QMainWindow):
         self.statusBar().showMessage(f"Selected {field_type} field - click on PDF to place", 3000)
 
     # Navigation and Zoom Methods
+
     @pyqtSlot()
     def previous_page(self):
+        """Navigate to previous page in continuous view"""
+        print("🔧 Previous page button clicked")
+
+        if not hasattr(self.pdf_canvas, 'current_page') or not hasattr(self.pdf_canvas, 'pdf_document'):
+            self.statusBar().showMessage("No PDF loaded", 1000)
+            return
+
+        current = getattr(self.pdf_canvas, 'current_page', 0)
+        if current > 0:
+            new_page = current - 1
+            print(f"🔧 Navigating from page {current + 1} to page {new_page + 1}")
+
+            # Use continuous view navigation
+            if hasattr(self, 'jump_to_page_continuous'):
+                self.jump_to_page_continuous(new_page + 1)  # jump_to_page_continuous expects 1-based
+            elif hasattr(self.pdf_canvas, 'scroll_to_page'):
+                self.pdf_canvas.scroll_to_page(new_page)
+            else:
+                self.statusBar().showMessage("Navigation not available", 1000)
+                return
+
+            self.statusBar().showMessage(f"Page {new_page + 1}", 1000)
+        else:
+            self.statusBar().showMessage("Already at first page", 1000)
+
+    @pyqtSlot()
+    def next_page(self):
+        """Navigate to next page in continuous view"""
+        print("🔧 Next page button clicked")
+
+        if not hasattr(self.pdf_canvas, 'current_page') or not hasattr(self.pdf_canvas, 'pdf_document'):
+            self.statusBar().showMessage("No PDF loaded", 1000)
+            return
+
+        current = getattr(self.pdf_canvas, 'current_page', 0)
+        total_pages = self.pdf_canvas.pdf_document.page_count
+
+        if current < total_pages - 1:
+            new_page = current + 1
+            print(f"🔧 Navigating from page {current + 1} to page {new_page + 1}")
+
+            # Use continuous view navigation
+            if hasattr(self, 'jump_to_page_continuous'):
+                self.jump_to_page_continuous(new_page + 1)  # jump_to_page_continuous expects 1-based
+            elif hasattr(self.pdf_canvas, 'scroll_to_page'):
+                self.pdf_canvas.scroll_to_page(new_page)
+            else:
+                self.statusBar().showMessage("Navigation not available", 1000)
+                return
+
+            self.statusBar().showMessage(f"Page {new_page + 1}", 1000)
+        else:
+            self.statusBar().showMessage("Already at last page", 1000)
+
+    @pyqtSlot()
+    def x_previous_page(self):
         """Navigate to previous page"""
         if not hasattr(self.pdf_canvas, 'current_page'):
             self.statusBar().showMessage("No PDF loaded", 1000)
@@ -981,7 +1038,7 @@ class PDFViewerMainWindow(QMainWindow):
             self.statusBar().showMessage("Already at first page", 1000)
 
     @pyqtSlot()
-    def next_page(self):
+    def x_next_page(self):
         """Navigate to next page"""
         if not hasattr(self.pdf_canvas, 'current_page') or not hasattr(self.pdf_canvas, 'pdf_document'):
             self.statusBar().showMessage("No PDF loaded", 1000)
