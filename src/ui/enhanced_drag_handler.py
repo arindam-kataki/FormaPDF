@@ -172,6 +172,11 @@ class EnhancedDragHandler(QObject):
                 if hasattr(self, 'field_manager') and self.field_manager:
                     self.field_manager.select_field(clicked_field, multi_select=True)
                 print(f"🎯 Multi-select: Ctrl+clicked {clicked_field.name}")
+
+                # 🔧 EMIT SIGNAL RIGHT AFTER MULTI-SELECTION
+                selected_fields = self.get_selected_fields()
+                print(f"📡 Emitted selectionChanged: {len(selected_fields)} fields (multi-select)")
+                self.selectionChanged.emit(selected_fields)
             else:
                 # Single selection via field manager
                 if hasattr(self, 'field_manager') and self.field_manager:
@@ -182,12 +187,16 @@ class EnhancedDragHandler(QObject):
                     for f in current_selection:
                         print(f"   - {f.id}")
                 print(f"🎯 Single-select: Clicked {clicked_field.name}")
+                # 🔧 EMIT SIGNAL RIGHT AFTER SINGLE-SELECTION
+                selected_fields = self.get_selected_fields()
+                print(f"📡 Emitted selectionChanged: {len(selected_fields)} fields (single-select)")
+                self.selectionChanged.emit(selected_fields)
 
             # Prepare for potential drag
             self.drag_start_pos = pos
             self.canvas.draw_overlay()
-            self.selectionChanged.emit(self.get_selected_fields())
             print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
+
         else:
             print(f"❌ No field found at {pos} on page {search_page}")
             # ✅ DEBUG: Show what fields exist on this page

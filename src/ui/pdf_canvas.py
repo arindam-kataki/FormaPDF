@@ -1893,8 +1893,7 @@ class PDFCanvas(QLabel):
             if field:
                 print(f"✅ Created field: {field.id}")
 
-
-                #self._add_field_to_dropdown(field)
+                self._add_field_to_dropdown(field)
                 self._reset_field_type_selection()
 
                 # Optionally resize the field after creation if needed

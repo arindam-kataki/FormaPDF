@@ -268,7 +268,6 @@ class ControlsTab(QWidget):
         """Get the currently selected field type"""
         return self.selected_field_type
 
-
 class PropertiesTab(QWidget):
     """Tab containing properties for the selected form control"""
 
@@ -306,7 +305,7 @@ class PropertiesTab(QWidget):
         self.control_dropdown = QComboBox()
         self.control_dropdown.addItem("No controls available", None)
         #temporary commented out
-        #self.control_dropdown.currentTextChanged.connect(self._on_control_selected)
+        self.control_dropdown.currentTextChanged.connect(self._on_control_selected)
         dropdown_layout.addWidget(self.control_dropdown)
 
         selection_layout.addLayout(dropdown_layout)
@@ -823,6 +822,20 @@ class PropertiesTab(QWidget):
         self._update_properties_display(None)
 
         print("   📋 Properties cleared for no selection")
+
+    def handle_selection_changed(self, selected_fields):
+        """Handle selection changes - decide what to do based on field count"""
+        print(f"📋 Properties panel: Handling {len(selected_fields)} selected fields")
+
+        if len(selected_fields) == 1:
+            # Single field selected - show it
+            field = selected_fields[0]
+            self.set_selected_field(field)
+            print(f"   ✅ Dropdown set to single selected field: {field.name} (ID: {field.id})")
+        else:
+            # 0 fields OR multiple fields - clear selection
+            self.select_no_control()
+            print("   ✅ Dropdown set to 'No controls selected'")
 
 class TabbedFieldPalette(QWidget):
     """Main tabbed field palette widget"""

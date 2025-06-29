@@ -478,6 +478,19 @@ class PDFViewerMainWindow(QMainWindow):
                     print(f"  ⚠️ Failed to connect propertyChanged: {e}")
 
             """
+
+            # 🔧 SIMPLE: Connect canvas selection to properties panel via main window
+            if (hasattr(self, 'pdf_canvas') and
+                    hasattr(self.pdf_canvas, 'enhanced_drag_handler') and
+                    hasattr(self, 'field_palette')):
+
+                drag_handler = self.pdf_canvas.enhanced_drag_handler
+
+                # Connect selection changes to main window handler
+                if hasattr(drag_handler, 'selectionChanged'):
+                    drag_handler.selectionChanged.connect(self._on_field_selection_changed)
+                    print("✅ Connected field selection to main window")
+
             if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
                 self.field_palette.fieldRequested.connect(self._on_field_type_selected)
 
@@ -1963,6 +1976,15 @@ class PDFViewerMainWindow(QMainWindow):
 
         except Exception as e:
             print(f"❌ Error in field selection handler: {e}")
+
+    @pyqtSlot(list)
+    def _on_field_selection_changed(self, selected_fields):
+        """Handle field selection changes from canvas - just pass through"""
+        print(f"🎯 Main window: Passing {len(selected_fields)} selected fields to properties panel")
+
+        if hasattr(self, 'field_palette'):
+            properties_tab = self.field_palette.properties_tab
+            properties_tab.handle_selection_changed(selected_fields)
 
 def main():
     """Main entry point for the application"""
