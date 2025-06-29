@@ -117,8 +117,12 @@ class PDFCanvas(QLabel):
         self.page_pixmap = None
 
         # Grid properties
-        self.show_grid = False
-        self.grid_size = 20
+        self.grid_size = 20  # Default grid size in pixels
+        self.grid_offset_x = 0  # Horizontal grid offset
+        self.grid_offset_y = 0  # Vertical grid offset
+        self.show_grid = False  # Grid visibility
+        self.grid_color = Qt.GlobalColor.lightGray  # Grid line color
+        self.grid_opacity = 0.5  # Grid transparency (0.0 to 1.0)
 
         # Initialize handlers
         self._init_handlers()
@@ -1158,6 +1162,118 @@ class PDFCanvas(QLabel):
             print("✅ Scroll tracking timer stopped")
 
     def _draw_grid(self, painter):
+        """Draw enhanced grid overlay with offset support"""
+        if not self.page_pixmap or not self.show_grid:
+            return
+
+        from PyQt6.QtGui import QColor, QPen
+
+        # Create pen with configurable color and opacity
+        grid_color = QColor(self.grid_color)
+        grid_color.setAlphaF(self.grid_opacity)
+        pen = QPen(grid_color, 1)
+        painter.setPen(pen)
+
+        width = self.page_pixmap.width()
+        height = self.page_pixmap.height()
+
+        # Apply zoom scaling to grid size
+        zoom_level = getattr(self, 'zoom_level', 1.0)
+        scaled_grid_size = int(self.grid_size * zoom_level)
+        scaled_offset_x = int(self.grid_offset_x * zoom_level)
+        scaled_offset_y = int(self.grid_offset_y * zoom_level)
+
+        # Skip grid if too small at current zoom
+        if scaled_grid_size < 2:
+            return
+
+        # Draw vertical lines with offset
+        start_x = (scaled_offset_x % scaled_grid_size)
+        for x in range(start_x, width, scaled_grid_size):
+            painter.drawLine(x, 0, x, height)
+
+        # Draw horizontal lines with offset
+        start_y = (scaled_offset_y % scaled_grid_size)
+        for y in range(start_y, height, scaled_grid_size):
+            painter.drawLine(0, y, width, y)
+
+    def increase_grid_size(self):
+        """Increase grid size"""
+        old_size = self.grid_size
+        self.grid_size = min(self.grid_size + 5, 100)  # Max 100px
+        if self.grid_size != old_size:
+            self._update_drag_handler_grid()
+            self.draw_overlay()
+            return True
+        return False
+
+    def decrease_grid_size(self):
+        """Decrease grid size"""
+        old_size = self.grid_size
+        self.grid_size = max(self.grid_size - 5, 5)  # Min 5px
+        if self.grid_size != old_size:
+            self._update_drag_handler_grid()
+            self.draw_overlay()
+            return True
+        return False
+
+    def move_grid_up(self):
+        """Move grid up by 1 pixel"""
+        self.grid_offset_y = (self.grid_offset_y - 1) % self.grid_size
+        self.draw_overlay()
+        return True
+
+    def move_grid_down(self):
+        """Move grid down by 1 pixel"""
+        self.grid_offset_y = (self.grid_offset_y + 1) % self.grid_size
+        self.draw_overlay()
+        return True
+
+    def move_grid_left(self):
+        """Move grid left by 1 pixel"""
+        self.grid_offset_x = (self.grid_offset_x - 1) % self.grid_size
+        self.draw_overlay()
+        return True
+
+    def move_grid_right(self):
+        """Move grid right by 1 pixel"""
+        self.grid_offset_x = (self.grid_offset_x + 1) % self.grid_size
+        self.draw_overlay()
+        return True
+
+    def reset_grid_offset(self):
+        """Reset grid offset to origin"""
+        self.grid_offset_x = 0
+        self.grid_offset_y = 0
+        self.draw_overlay()
+        return True
+
+    def set_grid_size(self, size):
+        """Set specific grid size"""
+        size = max(5, min(size, 100))  # Clamp between 5-100px
+        if size != self.grid_size:
+            self.grid_size = size
+            self._update_drag_handler_grid()
+            self.draw_overlay()
+            return True
+        return False
+
+    def get_grid_info(self):
+        """Get current grid settings"""
+        return {
+            'size': self.grid_size,
+            'offset_x': self.grid_offset_x,
+            'offset_y': self.grid_offset_y,
+            'visible': self.show_grid,
+            'zoom_level': getattr(self, 'zoom_level', 1.0)
+        }
+
+    def _update_drag_handler_grid(self):
+        """Update drag handler with new grid settings"""
+        if hasattr(self, 'enhanced_drag_handler') and hasattr(self.enhanced_drag_handler, 'set_grid_settings'):
+            self.enhanced_drag_handler.set_grid_settings(self.grid_size, self.show_grid)
+
+    def x_draw_grid(self, painter):
         """Draw grid overlay"""
         if not self.page_pixmap:
             return

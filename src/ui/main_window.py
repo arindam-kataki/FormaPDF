@@ -370,6 +370,49 @@ class PDFViewerMainWindow(QMainWindow):
         self.grid_action.triggered.connect(self.toggle_grid)
         toolbar.addAction(self.grid_action)
 
+        # Grid controls section (add after existing grid toggle)
+        toolbar.addSeparator()
+
+        # Grid size controls
+        grid_size_decrease = QAction("🔍-📐", self)
+        grid_size_decrease.setToolTip("Decrease grid size (Ctrl+Shift+-)")
+        grid_size_decrease.triggered.connect(self.decrease_grid_size)
+        toolbar.addAction(grid_size_decrease)
+
+        grid_size_increase = QAction("🔍+📐", self)
+        grid_size_increase.setToolTip("Increase grid size (Ctrl+Shift+=)")
+        grid_size_increase.triggered.connect(self.increase_grid_size)
+        toolbar.addAction(grid_size_increase)
+
+        toolbar.addSeparator()
+
+        # Grid movement controls
+        grid_up = QAction("📐⬆️", self)
+        grid_up.setToolTip("Move grid up (Ctrl+Shift+Up)")
+        grid_up.triggered.connect(self.move_grid_up)
+        toolbar.addAction(grid_up)
+
+        grid_down = QAction("📐⬇️", self)
+        grid_down.setToolTip("Move grid down (Ctrl+Shift+Down)")
+        grid_down.triggered.connect(self.move_grid_down)
+        toolbar.addAction(grid_down)
+
+        grid_left = QAction("📐⬅️", self)
+        grid_left.setToolTip("Move grid left (Ctrl+Shift+Left)")
+        grid_left.triggered.connect(self.move_grid_left)
+        toolbar.addAction(grid_left)
+
+        grid_right = QAction("📐➡️", self)
+        grid_right.setToolTip("Move grid right (Ctrl+Shift+Right)")
+        grid_right.triggered.connect(self.move_grid_right)
+        toolbar.addAction(grid_right)
+
+        # Grid reset
+        grid_reset = QAction("📐🎯", self)
+        grid_reset.setToolTip("Reset grid offset (Ctrl+Shift+0)")
+        grid_reset.triggered.connect(self.reset_grid_offset)
+        toolbar.addAction(grid_reset)
+
         # Panel toggle
         self.panel_toggle_action = QAction("📋 Panel", self)
         self.panel_toggle_action.setCheckable(True)
@@ -1122,6 +1165,69 @@ class PDFViewerMainWindow(QMainWindow):
             self.statusBar().showMessage(f"Grid {grid_status}", 1000)
         else:
             self.statusBar().showMessage("Grid toggle not available", 1000)
+
+    @pyqtSlot()
+    def increase_grid_size(self):
+        """Increase grid size"""
+        if hasattr(self.pdf_canvas, 'increase_grid_size'):
+            if self.pdf_canvas.increase_grid_size():
+                grid_info = self.pdf_canvas.get_grid_info()
+                self.statusBar().showMessage(f"Grid size: {grid_info['size']}px", 1000)
+            else:
+                self.statusBar().showMessage("Grid size at maximum (100px)", 1000)
+        else:
+            self.statusBar().showMessage("Grid size adjustment not available", 1000)
+
+    @pyqtSlot()
+    def decrease_grid_size(self):
+        """Decrease grid size"""
+        if hasattr(self.pdf_canvas, 'decrease_grid_size'):
+            if self.pdf_canvas.decrease_grid_size():
+                grid_info = self.pdf_canvas.get_grid_info()
+                self.statusBar().showMessage(f"Grid size: {grid_info['size']}px", 1000)
+            else:
+                self.statusBar().showMessage("Grid size at minimum (5px)", 1000)
+        else:
+            self.statusBar().showMessage("Grid size adjustment not available", 1000)
+
+    @pyqtSlot()
+    def move_grid_up(self):
+        """Move grid up"""
+        if hasattr(self.pdf_canvas, 'move_grid_up'):
+            self.pdf_canvas.move_grid_up()
+            grid_info = self.pdf_canvas.get_grid_info()
+            self.statusBar().showMessage(f"Grid offset: ({grid_info['offset_x']}, {grid_info['offset_y']})", 1000)
+
+    @pyqtSlot()
+    def move_grid_down(self):
+        """Move grid down"""
+        if hasattr(self.pdf_canvas, 'move_grid_down'):
+            self.pdf_canvas.move_grid_down()
+            grid_info = self.pdf_canvas.get_grid_info()
+            self.statusBar().showMessage(f"Grid offset: ({grid_info['offset_x']}, {grid_info['offset_y']})", 1000)
+
+    @pyqtSlot()
+    def move_grid_left(self):
+        """Move grid left"""
+        if hasattr(self.pdf_canvas, 'move_grid_left'):
+            self.pdf_canvas.move_grid_left()
+            grid_info = self.pdf_canvas.get_grid_info()
+            self.statusBar().showMessage(f"Grid offset: ({grid_info['offset_x']}, {grid_info['offset_y']})", 1000)
+
+    @pyqtSlot()
+    def move_grid_right(self):
+        """Move grid right"""
+        if hasattr(self.pdf_canvas, 'move_grid_right'):
+            self.pdf_canvas.move_grid_right()
+            grid_info = self.pdf_canvas.get_grid_info()
+            self.statusBar().showMessage(f"Grid offset: ({grid_info['offset_x']}, {grid_info['offset_y']})", 1000)
+
+    @pyqtSlot()
+    def reset_grid_offset(self):
+        """Reset grid offset to origin"""
+        if hasattr(self.pdf_canvas, 'reset_grid_offset'):
+            self.pdf_canvas.reset_grid_offset()
+            self.statusBar().showMessage("Grid offset reset to origin", 1000)
 
     @pyqtSlot()
     def zoom_to_fit(self):

@@ -350,6 +350,51 @@ class PropertiesTab(QWidget):
             self.properties_panel = None
 
     def _on_control_selected(self):
+        """Handle control selection from dropdown - update FieldManager as source of truth AND navigate to page"""
+        try:
+            current_index = self.control_dropdown.currentIndex()
+            field_id = self.control_dropdown.itemData(current_index)
+
+            print(f"🔽 DROPDOWN: User selected control: {field_id}")
+
+            if field_id and self.field_manager:
+                field = self.field_manager.get_field_by_id(field_id)
+                if field:
+                    # UPDATE FIELDMANAGER as source of truth
+                    self.field_manager.select_field(field, multi_select=False)
+                    print(f"  📋 FieldManager updated - selected: {field_id}")
+
+                    # Update local state
+                    self.current_field = field
+                    self._update_properties_display(field)
+
+                    # *** NEW: Navigate to field's page ***
+                    self._navigate_to_field_page(field)
+
+                    # Notify main window to update canvas visuals
+                    self._notify_main_window(field)
+                    print("  📤 Propagated to main window")
+
+                    # CRITICAL: Force canvas overlay repaint
+                    main_window = self._find_main_window()
+                    if main_window and hasattr(main_window, 'pdf_canvas'):
+                        main_window.pdf_canvas.draw_overlay()
+                        print("  🎨 Canvas overlay repainted")
+
+            else:
+                # Clear selection in FieldManager
+                if self.field_manager:
+                    self.field_manager.clear_selection()
+                    print("  🧹 FieldManager selection cleared")
+
+                self.current_field = None
+                self._update_properties_display(None)
+                self._notify_main_window(None)
+
+        except Exception as e:
+            print(f"❌ Error in dropdown selection: {e}")
+
+    def x_on_control_selected(self):
         """Handle control selection from dropdown - update FieldManager as source of truth"""
         try:
             current_index = self.control_dropdown.currentIndex()
@@ -390,6 +435,167 @@ class PropertiesTab(QWidget):
 
         except Exception as e:
             print(f"❌ Error in dropdown selection: {e}")
+
+    def _navigate_to_field_page(self, field):
+        """Scroll to bring the selected field into view in the viewport"""
+        try:
+            # Get field's page and position
+            field_page = getattr(field, 'page_number', getattr(field, 'page', 0))
+            field_x = getattr(field, 'x', 0)
+            field_y = getattr(field, 'y', 0)
+
+            print(f"🎯 Bringing field '{field.id}' into view: page {field_page + 1}, position ({field_x}, {field_y})")
+
+            # Find the main window
+            main_window = self._find_main_window()
+            if not main_window:
+                print("  ⚠️ Cannot navigate - main window not found")
+                return False
+
+            # Get required components
+            if not (hasattr(main_window, 'pdf_canvas') and hasattr(main_window, 'scroll_area')):
+                print("  ⚠️ Required components not found")
+                return False
+
+            pdf_canvas = main_window.pdf_canvas
+            scroll_area = main_window.scroll_area
+
+            # Get current zoom level
+            zoom_level = getattr(pdf_canvas, 'zoom_level', 1.0)
+
+            # Calculate field's absolute screen position
+            field_absolute_y = self._calculate_field_screen_position(pdf_canvas, field_page, field_x, field_y,
+                                                                     zoom_level)
+
+            if field_absolute_y is None:
+                print("  ⚠️ Could not calculate field position")
+                return False
+
+            # Get viewport dimensions
+            viewport = scroll_area.viewport()
+            viewport_height = viewport.height()
+            viewport_width = viewport.width()
+
+            # Calculate where to scroll to center the field in viewport
+            target_scroll_y = field_absolute_y - (viewport_height // 2)
+            target_scroll_y = max(0, int(target_scroll_y))  # Don't scroll above top
+
+            # Perform the scroll
+            v_scrollbar = scroll_area.verticalScrollBar()
+            current_scroll = v_scrollbar.value()
+
+            print(f"  📜 Scrolling from {current_scroll} to {target_scroll_y} to center field")
+            v_scrollbar.setValue(target_scroll_y)
+
+            # Update page tracking
+            if hasattr(main_window, 'update_page_controls'):
+                main_window.update_page_controls()
+
+            # Show status message
+            if hasattr(main_window, 'statusBar'):
+                main_window.statusBar().showMessage(f"Scrolled to field '{field.id}' on page {field_page + 1}", 2000)
+
+            # Force a redraw to ensure field is highlighted
+            if hasattr(pdf_canvas, 'draw_overlay'):
+                pdf_canvas.draw_overlay()
+
+            print(f"  ✅ Field brought into view at scroll position {target_scroll_y}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Error bringing field into view: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _calculate_field_screen_position(self, pdf_canvas, field_page, field_x, field_y, zoom_level):
+        """Calculate the absolute screen Y position of a field"""
+        try:
+            # Method 1: Use page positions if available (most accurate)
+            if hasattr(pdf_canvas, 'page_positions') and field_page < len(pdf_canvas.page_positions):
+                page_top = pdf_canvas.page_positions[field_page]
+                field_y_on_page = field_y * zoom_level
+                absolute_y = page_top + field_y_on_page
+                print(
+                    f"    📐 Calculated position using page_positions: page_top={page_top}, field_y_scaled={field_y_on_page}, absolute_y={absolute_y}")
+                return absolute_y
+
+            # Method 2: Use document_to_screen_coordinates if available
+            elif hasattr(pdf_canvas, 'document_to_screen_coordinates'):
+                screen_coords = pdf_canvas.document_to_screen_coordinates(field_page, field_x, field_y)
+                if screen_coords:
+                    screen_x, screen_y = screen_coords
+                    print(f"    📐 Calculated position using document_to_screen_coordinates: ({screen_x}, {screen_y})")
+                    return screen_y
+
+            # Method 3: Estimate based on page height and spacing
+            elif hasattr(pdf_canvas, 'pdf_document'):
+                try:
+                    # Calculate estimated page height
+                    page = pdf_canvas.pdf_document[field_page]
+                    page_height = int(page.rect.height * zoom_level)
+                    page_spacing = 15  # Default spacing between pages
+
+                    # Estimate position
+                    estimated_page_top = field_page * (page_height + page_spacing) + 15  # Add top margin
+                    field_y_scaled = field_y * zoom_level
+                    estimated_absolute_y = estimated_page_top + field_y_scaled
+
+                    print(
+                        f"    📐 Estimated position: page_height={page_height}, estimated_page_top={estimated_page_top}, absolute_y={estimated_absolute_y}")
+                    return estimated_absolute_y
+
+                except Exception as e:
+                    print(f"    ⚠️ Error in estimation method: {e}")
+
+            print("    ⚠️ Could not calculate field position - no suitable method available")
+            return None
+
+        except Exception as e:
+            print(f"    ❌ Error calculating field position: {e}")
+            return None
+
+    def x_navigate_to_field_page(self, field):
+        """Navigate to the page containing the selected field"""
+        try:
+            # Get field's page number
+            field_page = getattr(field, 'page_number', getattr(field, 'page', 0))
+            print(f"🧭 Navigating to field page: {field_page + 1}")  # Convert to 1-based for user display
+
+            # Find the main window
+            main_window = self._find_main_window()
+            if not main_window:
+                print("  ⚠️ Cannot navigate - main window not found")
+                return False
+
+            # Navigate using the existing page navigation methods
+            if hasattr(main_window, 'jump_to_page_continuous'):
+                # Use continuous view navigation (1-based page number)
+                main_window.jump_to_page_continuous(field_page + 1)
+                print(f"  ✅ Navigated to page {field_page + 1} using continuous view")
+
+            elif hasattr(main_window, 'pdf_canvas') and hasattr(main_window.pdf_canvas, 'scroll_to_page'):
+                # Direct canvas navigation (0-based page number)
+                main_window.pdf_canvas.scroll_to_page(field_page)
+                print(f"  ✅ Navigated to page {field_page + 1} using canvas scroll")
+
+            else:
+                print("  ⚠️ No navigation method available")
+                return False
+
+            # Update page controls to reflect new page
+            if hasattr(main_window, 'update_page_controls'):
+                main_window.update_page_controls()
+
+            # Show status message
+            if hasattr(main_window, 'statusBar'):
+                main_window.statusBar().showMessage(f"Navigated to field '{field.id}' on page {field_page + 1}", 2000)
+
+            return True
+
+        except Exception as e:
+            print(f"❌ Error navigating to field page: {e}")
+            return False
 
     def _notify_main_window_selection(self, field):
         """Notify the main window that a field has been selected from dropdown"""
