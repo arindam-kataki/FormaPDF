@@ -68,7 +68,7 @@ except ImportError:
     ICON_UTILS_AVAILABLE = False
 
 
-class PDFViewerMainWindow(QMainWindow):
+class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin):
     """Main application window with safe fallbacks"""
 
     def __init__(self):
@@ -246,8 +246,6 @@ class PDFViewerMainWindow(QMainWindow):
         about_action = QAction("&About", self)
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
-
-
 
     def create_center_panel(self) -> QWidget:
         """Create center panel with PDF viewer"""
@@ -729,6 +727,69 @@ class PDFViewerMainWindow(QMainWindow):
                 self.properties_panel.update_field_values(field_id, x, y, width, height)
             except Exception as e:
                 print(f"⚠️ Error updating properties after resize: {e}")
+
+    def load_pdf_file(self, pdf_path: str):
+        """
+        Load PDF file - ONLY called by project management system
+        """
+        print(f"🔄 Loading PDF through project: {pdf_path}")
+        print(f"📁 File exists: {Path(pdf_path).exists()}")
+
+        # Verify we're in a project context
+        if not hasattr(self, 'current_project_path') or not self.current_project_path:
+            print("⚠️ PDF loading attempted outside of project context")
+            QMessageBox.warning(
+                self, "Project Required",
+                "PDFs can only be opened through projects.\n\n"
+                "Please create a new project or open an existing project."
+            )
+            return False
+
+        # Store the path
+        self.current_pdf_path = pdf_path
+
+        # Show left panel
+        print("👈 Showing left panel...")
+        self.show_left_panel()
+
+        try:
+            if hasattr(self.pdf_canvas, 'load_pdf'):
+                print(f"📋 Calling pdf_canvas.load_pdf({pdf_path})")
+                result = self.pdf_canvas.load_pdf(pdf_path)
+                print(f"📋 load_pdf returned: {result}")
+
+                # Update controls
+                if hasattr(self, 'update_page_controls'):
+                    self.update_page_controls()
+                if hasattr(self, 'update_zoom_controls'):
+                    self.update_zoom_controls()
+
+                if result:
+                    print("✅ PDF loading succeeded")
+                    filename = Path(pdf_path).name
+
+                    # Update status displays
+                    if hasattr(self, 'statusBar') and self.statusBar():
+                        self.statusBar().showMessage(f"Loaded: {filename}", 3000)
+                    if hasattr(self, 'field_info_label'):
+                        self.field_info_label.setText(f"Loaded: {filename}")
+                    if hasattr(self, 'doc_info_label'):
+                        self.doc_info_label.setText(f"Document: {filename}")
+
+                    return True
+                else:
+                    print("❌ PDF loading failed")
+                    QMessageBox.critical(self, "Error", "Failed to load PDF file")
+                    return False
+            else:
+                print("⚠️ PDF canvas not available")
+                QMessageBox.warning(self, "Error", "PDF viewer not available")
+                return False
+
+        except Exception as e:
+            print(f"❌ Error loading PDF: {e}")
+            QMessageBox.critical(self, "Error", f"Failed to load PDF:\n{str(e)}")
+            return False
 
     def open_pdf(self):
         """Open PDF file dialog and load selected file"""
