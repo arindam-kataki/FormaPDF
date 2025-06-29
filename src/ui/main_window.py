@@ -67,18 +67,22 @@ except ImportError:
     create_app_icon = None
     ICON_UTILS_AVAILABLE = False
 
-
-class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin):
+from .toolbar_manager import ToolbarManager
+class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
     """Main application window with safe fallbacks"""
 
     def __init__(self):
         super().__init__()
         self.current_pdf_path = None
+
+        self.init_toolbar_manager()
+        self.init_project_management()  # type: ignore
+
         self.init_ui()
         self.setup_connections()
         self.setup_scroll_tracking()
         self.setup_scroll_timer()
-        self.init_project_management()  # type: ignore
+
 
     def setup_scroll_timer(self):
         """Setup timer-based scroll rendering"""
@@ -302,7 +306,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin):
         print(f"  V scroll policy: {self.scroll_area.verticalScrollBarPolicy()}")
         return self.scroll_area
 
-    def create_toolbar(self):
+    def depecated_create_toolbar(self):
         """Create complete toolbar with page jump and zoom controls"""
         # Create main toolbar
         toolbar = QToolBar("Main Toolbar")
