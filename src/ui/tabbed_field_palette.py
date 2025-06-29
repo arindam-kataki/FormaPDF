@@ -36,10 +36,10 @@ class ControlsTab(QWidget):
         self._create_field_types_section(layout)
 
         # Field Preview Section
-        self._create_preview_section(layout)
+        #self._create_preview_section(layout)
 
         # Quick Actions Section
-        self._create_quick_actions_section(layout)
+        #self._create_quick_actions_section(layout)
 
         layout.addStretch()
         self.setLayout(layout)
@@ -193,7 +193,7 @@ class ControlsTab(QWidget):
         self.highlight_field_type(field_type, True)
 
         # Update preview
-        self._update_preview(field_type)
+        #self._update_preview(field_type)
 
         # Emit signal
         self.fieldRequested.emit(field_type)
@@ -327,7 +327,7 @@ class PropertiesTab(QWidget):
             parent_layout.addWidget(self.properties_panel)
         except:
             # Fallback if PropertiesPanel not available
-            properties_group = QGroupBox("Properties")
+            properties_group = QGroupBox("Properties_2")
             properties_layout = QVBoxLayout()
 
             self.properties_placeholder = QLabel("Properties panel will appear here when a control is selected")
@@ -349,46 +349,47 @@ class PropertiesTab(QWidget):
 
             self.properties_panel = None
 
-    def _on_control_selected(self, control_text):
-        """Called when dropdown selection changes - FIXED"""
-        print(f"🔽 Dropdown selected: '{control_text}'")
+    def _on_control_selected(self):
+        """Handle control selection from dropdown - update FieldManager as source of truth"""
+        try:
+            current_index = self.control_dropdown.currentIndex()
+            field_id = self.control_dropdown.itemData(current_index)
 
-        if control_text == "No controls available":
-            self.current_field = None
-            self._update_properties_display(None)
-            self._update_canvas_highlighting(None)
-            return
+            print(f"🔽 DROPDOWN: User selected control: {field_id}")
 
-        # Find the field
-        field_id = self.control_dropdown.currentData()
-        print(f"  🔍 Looking for field ID: {field_id}")
+            if field_id and self.field_manager:
+                field = self.field_manager.get_field_by_id(field_id)
+                if field:
+                    # UPDATE FIELDMANAGER as source of truth
+                    self.field_manager.select_field(field, multi_select=False)
+                    print(f"  📋 FieldManager updated - selected: {field_id}")
 
-        if field_id and self.field_manager:
-            field = self.field_manager.get_field_by_id(field_id)
-            if field:
-                print(f"  ✅ Found field: {field.id}")
+                    # Update local state
+                    self.current_field = field
+                    self._update_properties_display(field)
 
-                # Update current field
-                self.current_field = field
+                    # Notify main window to update canvas visuals
+                    self._notify_main_window(field)
+                    print("  📤 Propagated to main window")
 
-                # Update properties panel (this was missing!)
-                self._update_properties_display(field)
-                print("  📋 Properties panel updated")
-
-                # Update canvas highlighting without propagating to main window
-                self._update_canvas_highlighting(field)
-                print("  🎨 Canvas highlighting updated")
-
-                # Update info label
-                field_type = getattr(field, 'field_type', 'unknown')
-                if hasattr(field_type, 'value'):
-                    field_type = field_type.value
-                self.control_info_label.setText(f"Editing: {str(field_type).title()} ({field.id})")
+                    # CRITICAL: Force canvas overlay repaint
+                    main_window = self._find_main_window()
+                    if main_window and hasattr(main_window, 'pdf_canvas'):
+                        main_window.pdf_canvas.draw_overlay()
+                        print("  🎨 Canvas overlay repainted")
 
             else:
-                print(f"  ❌ Field not found for ID: {field_id}")
-        else:
-            print(f"  ⚠️ No field_id ({field_id}) or no field_manager")
+                # Clear selection in FieldManager
+                if self.field_manager:
+                    self.field_manager.clear_selection()
+                    print("  🧹 FieldManager selection cleared")
+
+                self.current_field = None
+                self._update_properties_display(None)
+                self._notify_main_window(None)
+
+        except Exception as e:
+            print(f"❌ Error in dropdown selection: {e}")
 
     def _notify_main_window_selection(self, field):
         """Notify the main window that a field has been selected from dropdown"""

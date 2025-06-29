@@ -7,7 +7,7 @@ from typing import Dict, Optional, Any
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QSpinBox, QCheckBox, QTextEdit, QGroupBox, QGridLayout,
-    QComboBox, QSlider, QColorDialog, QPushButton, QFrame
+    QComboBox, QSlider, QColorDialog, QPushButton, QFrame, QSizePolicy
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QColor
@@ -160,10 +160,10 @@ class PropertiesPanel(QWidget):
         layout.setSpacing(5)
 
         # Title
-        self.title_label = QLabel("Properties")
+        self.title_label = QLabel("Properties_3")
         self.title_label.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         self.title_label.setStyleSheet("color: #2c3e50; margin-bottom: 10px;")
-        layout.addWidget(self.title_label)
+        #layout.addWidget(self.title_label)
 
         # Scrollable properties area
         self.properties_widget = QWidget()
@@ -174,7 +174,7 @@ class PropertiesPanel(QWidget):
         layout.addStretch()
 
         self.setLayout(layout)
-        self.show_no_selection()
+        #self.show_no_selection()
 
     def show_no_selection(self):
         """Show message when no field is selected"""
@@ -215,7 +215,7 @@ class PropertiesPanel(QWidget):
         self.clear_properties()
 
         # Field header with type and ID
-        self._create_field_header(field)
+        #self._create_field_header(field)
 
         # Basic properties (always shown)
         self._create_basic_properties(field)
@@ -373,28 +373,55 @@ class PropertiesPanel(QWidget):
         text_group = QGroupBox("Text Properties")
         text_layout = QVBoxLayout()
 
+        # Set proper spacing and margins
+        text_layout.setSpacing(8)
+        text_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Set minimum height for the entire group
+        text_group.setMinimumHeight(140)
+
         # Default value
-        text_layout.addWidget(QLabel("Default Value:"))
+        default_label = QLabel("Default Value:")
+        default_label.setMinimumHeight(20)
+        text_layout.addWidget(default_label)
+
         value_widget = TextPropertyWidget("value", str(field.value))
         value_widget.connect_signal(lambda value: self._emit_property_change("value", value))
+        value_widget.widget.setMinimumHeight(25)
+        value_widget.widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         text_layout.addWidget(value_widget.widget)
         self.property_widgets["value"] = value_widget
+
+        # Add spacing between sections
+        text_layout.addSpacing(5)
 
         # Multiline option
         multiline_widget = BoolPropertyWidget("multiline", field.properties.get("multiline", False))
         multiline_widget.connect_signal(lambda value: self._emit_property_change("multiline", value))
         multiline_widget.widget.setText("Multiline Text")
+        multiline_widget.widget.setMinimumHeight(20)
+        multiline_widget.widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         text_layout.addWidget(multiline_widget.widget)
         self.property_widgets["multiline"] = multiline_widget
 
+        # Add spacing between sections
+        text_layout.addSpacing(5)
+
         # Placeholder text
-        text_layout.addWidget(QLabel("Placeholder:"))
+        placeholder_label = QLabel("Placeholder:")
+        placeholder_label.setMinimumHeight(20)
+        text_layout.addWidget(placeholder_label)
+
         placeholder_widget = TextPropertyWidget("placeholder", field.properties.get("placeholder", ""))
         placeholder_widget.connect_signal(lambda value: self._emit_property_change("placeholder", value))
+        placeholder_widget.widget.setMinimumHeight(25)
+        placeholder_widget.widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         text_layout.addWidget(placeholder_widget.widget)
         self.property_widgets["placeholder"] = placeholder_widget
 
+        # Set the layout and add to properties
         text_group.setLayout(text_layout)
+        text_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.properties_layout.addWidget(text_group)
 
     def _create_checkbox_properties(self, field: FormField):

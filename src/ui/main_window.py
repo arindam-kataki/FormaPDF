@@ -119,12 +119,15 @@ class PDFViewerMainWindow(QMainWindow):
         main_layout.addWidget(self.splitter)
 
         # Create panels
-        left_panel = self.create_left_panel()
+        self.left_panel = self.create_left_panel()
         center_panel = self.create_center_panel()
 
-        self.splitter.addWidget(left_panel)
+        # Initially hide left panel until PDF is loaded
+        self.left_panel.setVisible(False)
+
+        self.splitter.addWidget(self.left_panel)
         self.splitter.addWidget(center_panel)
-        self.splitter.setSizes([300, 900])
+        self.splitter.setSizes([0, 1200])
 
         # Create UI components
         self.create_toolbar()
@@ -165,8 +168,49 @@ class PDFViewerMainWindow(QMainWindow):
         left_widget.setLayout(left_layout)
         left_widget.setMaximumWidth(350)
         left_widget.setMinimumWidth(250)
+        left_widget.setVisible(False)
 
         return left_widget
+
+    def show_left_panel(self):
+        """Show the left panel and adjust splitter sizes"""
+        if hasattr(self, 'left_panel'):
+            print("📋 Making left panel visible...")
+            self.left_panel.setVisible(True)
+
+            # Force immediate layout update before rendering
+            self.left_panel.updateGeometry()
+            self.splitter.updateGeometry()
+            QApplication.processEvents()  # Process pending layout events
+
+            # Restore normal proportions: 25% left, 75% center
+            total_width = self.width()
+            left_width = max(250, min(350, total_width * 0.25))
+            center_width = total_width - left_width
+            self.splitter.setSizes([int(left_width), int(center_width)])
+
+            print(f"✅ Left panel shown with width: {left_width}px")
+        else:
+            print("⚠️ Left panel reference not found")
+
+    def hide_left_panel(self):
+        """Hide the left panel and give full space to center"""
+        if hasattr(self, 'left_panel'):
+            print("📋 Hiding left panel...")
+            self.left_panel.setVisible(False)
+            # Give all space to center panel
+            self.splitter.setSizes([0, self.width()])
+            print("✅ Left panel hidden")
+        else:
+            print("⚠️ Left panel reference not found")
+
+    def toggle_left_panel(self):
+        """Toggle the visibility of the left panel"""
+        if hasattr(self, 'left_panel'):
+            if self.left_panel.isVisible():
+                self.hide_left_panel()
+            else:
+                self.show_left_panel()
 
     def create_center_panel(self) -> QWidget:
         """Create center panel with PDF viewer"""
@@ -325,6 +369,14 @@ class PDFViewerMainWindow(QMainWindow):
         self.grid_action.setToolTip("Toggle grid display")
         self.grid_action.triggered.connect(self.toggle_grid)
         toolbar.addAction(self.grid_action)
+
+        # Panel toggle
+        self.panel_toggle_action = QAction("📋 Panel", self)
+        self.panel_toggle_action.setCheckable(True)
+        self.panel_toggle_action.setChecked(False)  # Initially hidden
+        self.panel_toggle_action.setToolTip("Show/hide controls and properties panel")
+        self.panel_toggle_action.triggered.connect(self.toggle_left_panel)
+        toolbar.addAction(self.panel_toggle_action)
 
         toolbar.addSeparator()
 
@@ -605,6 +657,9 @@ class PDFViewerMainWindow(QMainWindow):
             print(f"🔍 Opening PDF file: {file_path}")
             print(f"📁 File exists: {Path(file_path).exists()}")
             print(f"📏 File size: {Path(file_path).stat().st_size if Path(file_path).exists() else 'N/A'} bytes")
+
+            print("👈 Showing left panel before PDF rendering...")
+            self.show_left_panel()
 
             try:
                 if hasattr(self.pdf_canvas, 'load_pdf'):

@@ -358,7 +358,7 @@ class PropertiesPanel(QWidget):
         layout = QVBoxLayout()
 
         # Title
-        title = QLabel("Properties")
+        title = QLabel("Properties_1")
         title.setFont(QFont("Arial", 12, QFont.Weight.Bold))
         layout.addWidget(title)
 
