@@ -17,6 +17,14 @@ from PyQt6.QtGui import QAction, QKeySequence, QFont
 from PyQt6.QtCore import Qt, pyqtSlot, QSettings, QRect
 
 # Safe imports with fallbacks
+
+from typing import TYPE_CHECKING, Dict, Any
+if TYPE_CHECKING:
+    from .project_management_mixin import ProjectManagementMixin
+
+# Import the mixin
+from .project_management_mixin import ProjectManagementMixin
+
 try:
     from ui.pdf_canvas import PDFCanvas
     PDF_CANVAS_AVAILABLE = True
@@ -70,6 +78,7 @@ class PDFViewerMainWindow(QMainWindow):
         self.setup_connections()
         self.setup_scroll_tracking()
         self.setup_scroll_timer()
+        self.init_project_management()  # type: ignore
 
     def setup_scroll_timer(self):
         """Setup timer-based scroll rendering"""
@@ -212,6 +221,34 @@ class PDFViewerMainWindow(QMainWindow):
             else:
                 self.show_left_panel()
 
+    def create_menu_bar(self):
+        """Create menu bar using project management mixin"""
+        menubar = self.menuBar()
+
+        # File Menu - handled by mixin
+        file_menu = menubar.addMenu("&File")
+        self.create_project_menu_items(file_menu)  # type: ignore
+
+        file_menu.addSeparator()
+
+        # Exit
+        exit_action = QAction("E&xit", self)
+        exit_action.setShortcut(QKeySequence.StandardKey.Quit)
+        exit_action.triggered.connect(self.close)
+        file_menu.addAction(exit_action)
+
+        # Your other menus
+        edit_menu = menubar.addMenu("&Edit")
+        view_menu = menubar.addMenu("&View")
+        tools_menu = menubar.addMenu("&Tools")
+        help_menu = menubar.addMenu("&Help")
+
+        about_action = QAction("&About", self)
+        about_action.triggered.connect(self.show_about)
+        help_menu.addAction(about_action)
+
+
+
     def create_center_panel(self) -> QWidget:
         """Create center panel with PDF viewer"""
         # Scroll area for PDF canvas
@@ -274,6 +311,9 @@ class PDFViewerMainWindow(QMainWindow):
         toolbar.setMovable(False)
         toolbar.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextBesideIcon)
         self.addToolBar(toolbar)
+
+        # ADD THIS LINE - Project management buttons (handled by mixin)
+        project_actions = self.create_project_toolbar_actions(toolbar)  # type: ignore
 
         # File operations
         open_action = QAction("📁 Open", self)
