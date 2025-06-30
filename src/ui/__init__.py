@@ -9,12 +9,14 @@ from .properties_panel import PropertiesPanel
 from .main_window import PDFViewerMainWindow
 from .field_renderer import FieldRenderer
 from .drag_handler import DragHandler, SelectionHandler
+from .grid_control_popup import GridControlPopup
 
 __all__ = [
     'PDFCanvas',
     'EnhancedFieldPalette',
     'PropertiesPanel',
     'PDFViewerMainWindow',
+    'GridControlPopup'
     'FieldRenderer',
     'DragHandler',
     'SelectionHandler'

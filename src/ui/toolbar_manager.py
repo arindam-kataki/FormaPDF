@@ -24,7 +24,7 @@ except ImportError:
     print("Warning: PyQt6 widgets not fully available")
     QT_AVAILABLE = False
 
-
+from .grid_control_popup import GridControlPopup
 class ToolbarManager:
     """
     Mixin class that manages adaptive toolbar functionality
@@ -130,7 +130,7 @@ class ToolbarManager:
         self.project_section_actions = [new_action, open_action]
 
     def _create_document_section(self):
-        """Create document navigation controls (hidden initially)"""
+        """Create document navigation controls with page spinner (hidden initially)"""
         print("  📖 Creating document section...")
 
         # Add separator
@@ -138,149 +138,278 @@ class ToolbarManager:
         self.toolbar_separators['doc_sep1'] = self.main_toolbar.actions()[-1]
 
         # Navigation controls
-        self.prev_action = QAction("⬅️ Previous", self)
+        self.prev_action = QAction("⬅️", self)
         self.prev_action.setToolTip("Previous page (Left Arrow)")
         self.prev_action.setShortcut("Left")
         self.prev_action.triggered.connect(self._safe_call('previous_page'))
         self.main_toolbar.addAction(self.prev_action)
 
-        self.next_action = QAction("➡️ Next", self)
+        # Page spinner for jumping to specific page
+        from PyQt6.QtWidgets import QSpinBox
+        page_label = QLabel("Page:")
+        page_label.setStyleSheet("QLabel { margin: 0 5px; }")
+        self.page_label_action = self.main_toolbar.addWidget(page_label)
+
+        self.page_spinbox = QSpinBox()
+        self.page_spinbox.setMinimum(1)
+        self.page_spinbox.setMaximum(1)  # Will be updated when PDF loads
+        self.page_spinbox.setValue(1)
+        self.page_spinbox.setToolTip("Jump to page number")
+        self.page_spinbox.setMinimumWidth(60)
+        self.page_spinbox.valueChanged.connect(self._safe_call('jump_to_page'))
+        self.page_spinbox_action = self.main_toolbar.addWidget(self.page_spinbox)
+
+        # Page info display (total pages)
+        self.page_info_label = QLabel("of 1")
+        self.page_info_label.setMinimumWidth(40)
+        self.page_info_label.setStyleSheet("QLabel { margin: 0 5px; color: #666; }")
+        self.page_info_action = self.main_toolbar.addWidget(self.page_info_label)
+
+        self.next_action = QAction("➡️", self)
         self.next_action.setToolTip("Next page (Right Arrow)")
         self.next_action.setShortcut("Right")
         self.next_action.triggered.connect(self._safe_call('next_page'))
         self.main_toolbar.addAction(self.next_action)
 
-        # Page info display
-        self.page_info_label = QLabel("Page 1 of 1")
-        self.page_info_label.setMinimumWidth(80)
-        self.page_info_label.setStyleSheet("QLabel { margin: 0 10px; color: #666; }")
-        self.page_info_action = self.main_toolbar.addWidget(self.page_info_label)
-
         # Store document actions
         self.document_section_actions = [
-            self.prev_action, self.next_action, self.page_info_action
+            self.prev_action, self.page_label_action, self.page_spinbox_action,
+            self.page_info_action, self.next_action
         ]
 
         print(f"    ✅ Added {len(self.document_section_actions)} document actions")
 
     def _create_view_section(self):
-        """Create view and zoom controls (hidden initially)"""
+        """Create view and zoom controls with dropdown and grid popup (hidden initially)"""
         print("  👁️ Creating view section...")
 
         # Add separator
         self.main_toolbar.addSeparator()
         self.toolbar_separators['view_sep1'] = self.main_toolbar.actions()[-1]
 
-        # Zoom out
+        # Zoom out button
         self.zoom_out_action = QAction("🔍-", self)
         self.zoom_out_action.setToolTip("Zoom out (Ctrl+-)")
         self.zoom_out_action.setShortcut("Ctrl+-")
         self.zoom_out_action.triggered.connect(self._safe_call('zoom_out'))
         self.main_toolbar.addAction(self.zoom_out_action)
 
-        # Zoom level display
-        self.zoom_level_label = QLabel("100%")
-        self.zoom_level_label.setMinimumWidth(50)
-        self.zoom_level_label.setStyleSheet("QLabel { margin: 0 5px; color: #666; font-weight: bold; }")
-        self.zoom_level_action = self.main_toolbar.addWidget(self.zoom_level_label)
+        # Zoom dropdown for precise control
+        from PyQt6.QtWidgets import QComboBox
+        self.zoom_combo = QComboBox()
+        self.zoom_combo.addItems([
+            "25%", "50%", "75%", "100%", "125%", "150%", "200%", "300%", "400%",
+            "Fit Width", "Fit Page"
+        ])
+        self.zoom_combo.setCurrentText("100%")
+        self.zoom_combo.setToolTip("Select zoom level or fit option")
+        self.zoom_combo.setMinimumWidth(100)
+        self.zoom_combo.setMaximumWidth(120)
+        self.zoom_combo.setEditable(True)  # Allow custom zoom values
+        self.zoom_combo.currentTextChanged.connect(self._safe_call('zoom_changed'))
+        self.zoom_combo_action = self.main_toolbar.addWidget(self.zoom_combo)
 
-        # Zoom in
+        # Zoom in button
         self.zoom_in_action = QAction("🔍+", self)
         self.zoom_in_action.setToolTip("Zoom in (Ctrl++)")
         self.zoom_in_action.setShortcut("Ctrl++")
         self.zoom_in_action.triggered.connect(self._safe_call('zoom_in'))
         self.main_toolbar.addAction(self.zoom_in_action)
 
-        # Fit controls
-        self.fit_width_action = QAction("📏", self)
-        self.fit_width_action.setToolTip("Fit to width")
-        self.fit_width_action.triggered.connect(self.fit_to_width)
-        self.main_toolbar.addAction(self.fit_width_action)
-
-        self.fit_page_action = QAction("📄", self)
-        self.fit_page_action.setToolTip("Fit to page")
-        self.fit_page_action.triggered.connect(self.fit_to_page)
-        self.main_toolbar.addAction(self.fit_page_action)
-
         # Second separator before grid
         self.main_toolbar.addSeparator()
         self.toolbar_separators['view_sep2'] = self.main_toolbar.actions()[-1]
 
-        # Grid dropdown button
-        self._create_grid_dropdown()
+        # Grid control popup button (replacing complex dropdown)
+        self._create_grid_popup_control()
 
-        # Store view actions
+        # Store view actions (include all view-related controls)
         self.view_section_actions = [
-            self.zoom_out_action, self.zoom_level_action, self.zoom_in_action,
-            self.fit_width_action, self.fit_page_action, self.grid_action
+            self.zoom_out_action, self.zoom_combo_action, self.zoom_in_action,
+            self.grid_action
         ]
 
         print(f"    ✅ Added {len(self.view_section_actions)} view actions")
 
-    def _create_grid_dropdown(self):
-        """Create grid dropdown menu button"""
-        print("    📐 Creating grid dropdown...")
+    def _create_grid_popup_control(self):
+        """Create grid control button that opens popup instead of dropdown"""
+        print("    📐 Creating grid popup control...")
 
-        self.grid_button = QToolButton()
-        self.grid_button.setText("📐 Grid")
-        self.grid_button.setToolTip("Grid options and controls")
-        self.grid_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        # Simple grid toggle button
+        self.grid_action = QAction("📐", self)
+        self.grid_action.setCheckable(True)  # Shows when popup is open
+        self.grid_action.setToolTip("Grid Settings")
+        self.grid_action.triggered.connect(self.toggle_grid_popup)
+        self.main_toolbar.addAction(self.grid_action)
 
-        # Create the dropdown menu
-        self.grid_menu = QMenu(self.grid_button)
+        # Create the grid control popup (import at method level to avoid circular imports)
+        try:
+            from .grid_control_popup import GridControlPopup
+            self.grid_popup = GridControlPopup(self)
+            self.grid_popup.hide()  # Start hidden
 
-        # Toggle grid visibility
-        self.toggle_grid_action = QAction("👁️ Show Grid", self)
-        self.toggle_grid_action.setCheckable(True)
-        self.toggle_grid_action.setChecked(self.grid_visible)
-        self.toggle_grid_action.triggered.connect(self.toggle_grid_visibility)
-        self.grid_menu.addAction(self.toggle_grid_action)
+            # Connect popup signals to main window methods
+            self._connect_grid_popup_signals()
 
-        self.grid_menu.addSeparator()
+            print("      ✅ Grid popup control created successfully")
 
-        # Grid spacing controls
-        self.increase_grid_action = QAction("➕ Increase Spacing", self)
-        self.increase_grid_action.setToolTip("Make grid squares larger")
-        self.increase_grid_action.triggered.connect(self.increase_grid_spacing)
-        self.grid_menu.addAction(self.increase_grid_action)
+        except ImportError as e:
+            print(f"      ⚠️ Could not import GridControlPopup: {e}")
+            print("      📝 Creating fallback grid toggle")
 
-        self.decrease_grid_action = QAction("➖ Decrease Spacing", self)
-        self.decrease_grid_action.setToolTip("Make grid squares smaller")
-        self.decrease_grid_action.triggered.connect(self.decrease_grid_spacing)
-        self.grid_menu.addAction(self.decrease_grid_action)
+            # Fallback: simple grid toggle without popup
+            self.grid_action.setToolTip("Toggle grid display")
+            self.grid_action.triggered.disconnect()  # Remove popup trigger
+            self.grid_action.triggered.connect(self._safe_call('toggle_grid_visibility'))
+            self.grid_popup = None
 
-        self.grid_menu.addSeparator()
+    def _connect_grid_popup_signals(self):
+        """Connect grid popup signals to appropriate methods"""
+        if not hasattr(self, 'grid_popup') or self.grid_popup is None:
+            return
 
-        # Grid position controls
-        self.move_grid_left_action = QAction("⬅️ Move Left", self)
-        self.move_grid_left_action.triggered.connect(lambda: self.move_grid(-5, 0))
-        self.grid_menu.addAction(self.move_grid_left_action)
+        print("      🔗 Connecting grid popup signals...")
 
-        self.move_grid_right_action = QAction("➡️ Move Right", self)
-        self.move_grid_right_action.triggered.connect(lambda: self.move_grid(5, 0))
-        self.grid_menu.addAction(self.move_grid_right_action)
+        # Connect each signal to the appropriate handler
+        self.grid_popup.grid_visibility_changed.connect(self._on_grid_visibility_changed)
+        self.grid_popup.grid_spacing_changed.connect(self._on_grid_spacing_changed)
+        self.grid_popup.grid_offset_changed.connect(self._on_grid_offset_changed)
+        self.grid_popup.grid_color_changed.connect(self._on_grid_color_changed)
+        self.grid_popup.grid_reset_requested.connect(self._on_grid_reset_requested)
 
-        self.move_grid_up_action = QAction("⬆️ Move Up", self)
-        self.move_grid_up_action.triggered.connect(lambda: self.move_grid(0, -5))
-        self.grid_menu.addAction(self.move_grid_up_action)
+        print("      ✅ Grid popup signals connected")
 
-        self.move_grid_down_action = QAction("⬇️ Move Down", self)
-        self.move_grid_down_action.triggered.connect(lambda: self.move_grid(0, 5))
-        self.grid_menu.addAction(self.move_grid_down_action)
+    # =========================
+    # GRID POPUP EVENT HANDLERS
+    # =========================
 
-        self.grid_menu.addSeparator()
+    def toggle_grid_popup(self):
+        """Toggle grid popup visibility"""
+        if not hasattr(self, 'grid_popup') or self.grid_popup is None:
+            print("⚠️ Grid popup not available")
+            return
 
-        # Reset grid
-        self.reset_grid_action = QAction("🔄 Reset Grid", self)
-        self.reset_grid_action.setToolTip("Reset grid to default position and spacing")
-        self.reset_grid_action.triggered.connect(self.reset_grid)
-        self.grid_menu.addAction(self.reset_grid_action)
+        if self.grid_popup.isVisible():
+            # Hide popup
+            self.grid_popup.hide_with_animation()
+            self.grid_action.setChecked(False)
+            print("📐 Grid popup hidden")
+        else:
+            # Show popup near the grid button
+            button_pos = self._get_grid_button_position()
+            self.grid_popup.show_with_animation(button_pos)
+            self.grid_action.setChecked(True)
+            print("📐 Grid popup shown")
 
-        # Assign menu to button and add to toolbar
-        self.grid_button.setMenu(self.grid_menu)
-        self.grid_action = self.main_toolbar.addWidget(self.grid_button)
+    def _get_grid_button_position(self):
+        """Get the position of the grid button for popup positioning"""
+        try:
+            # Get the toolbar and find the grid action
+            toolbar_rect = self.main_toolbar.geometry()
 
-        print("      ✅ Grid dropdown created with 8 actions")
+            # Approximate position based on toolbar location
+            # This is a simple approximation - in practice, you might need more precise positioning
+            grid_button_x = toolbar_rect.right() - 100  # Approximate position
+            grid_button_y = toolbar_rect.bottom()
+
+            # Convert to global coordinates
+            global_pos = self.mapToGlobal(toolbar_rect.bottomRight())
+            global_pos.setX(grid_button_x)
+
+            return global_pos
+
+        except Exception as e:
+            print(f"⚠️ Error getting grid button position: {e}")
+            # Fallback to center of main window
+            center = self.geometry().center()
+            return center
+
+    def _on_grid_visibility_changed(self, enabled: bool):
+        """Handle grid visibility change from popup"""
+        print(f"📐 Grid visibility changed: {enabled}")
+        self.grid_visible = enabled
+
+        # Update the PDF canvas if available
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            if hasattr(self.pdf_canvas, 'set_grid_visible'):
+                self.pdf_canvas.set_grid_visible(enabled)
+            elif hasattr(self.pdf_canvas, 'show_grid'):
+                self.pdf_canvas.show_grid = enabled
+                if hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
+
+    def _on_grid_spacing_changed(self, spacing: int):
+        """Handle grid spacing change from popup"""
+        print(f"📐 Grid spacing changed: {spacing}px")
+        self.grid_spacing = spacing
+
+        # Update the PDF canvas if available
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            if hasattr(self.pdf_canvas, 'set_grid_spacing'):
+                self.pdf_canvas.set_grid_spacing(spacing)
+            elif hasattr(self.pdf_canvas, 'grid_spacing'):
+                self.pdf_canvas.grid_spacing = spacing
+                if hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
+
+    def _on_grid_offset_changed(self, offset_x: int, offset_y: int):
+        """Handle grid offset change from popup"""
+        print(f"📐 Grid offset changed: ({offset_x}, {offset_y})")
+        self.grid_offset_x = offset_x
+        self.grid_offset_y = offset_y
+
+        # Update the PDF canvas if available
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            if hasattr(self.pdf_canvas, 'set_grid_offset'):
+                self.pdf_canvas.set_grid_offset(offset_x, offset_y)
+            else:
+                # Try individual properties
+                if hasattr(self.pdf_canvas, 'grid_offset_x'):
+                    self.pdf_canvas.grid_offset_x = offset_x
+                if hasattr(self.pdf_canvas, 'grid_offset_y'):
+                    self.pdf_canvas.grid_offset_y = offset_y
+                if hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
+
+    def _on_grid_color_changed(self, color):
+        """Handle grid color change from popup"""
+        print(f"📐 Grid color changed: {color.name()}")
+
+        # Update the PDF canvas if available
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            if hasattr(self.pdf_canvas, 'set_grid_color'):
+                self.pdf_canvas.set_grid_color(color)
+            elif hasattr(self.pdf_canvas, 'grid_color'):
+                self.pdf_canvas.grid_color = color
+                if hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
+
+    def _on_grid_reset_requested(self):
+        """Handle grid reset request from popup"""
+        print("📐 Grid reset requested")
+
+        # Reset internal state
+        self.grid_spacing = 20
+        self.grid_offset_x = 0
+        self.grid_offset_y = 0
+        self.grid_visible = False
+
+        # Update the PDF canvas if available
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            if hasattr(self.pdf_canvas, 'reset_grid'):
+                self.pdf_canvas.reset_grid()
+            else:
+                # Manual reset
+                if hasattr(self.pdf_canvas, 'grid_spacing'):
+                    self.pdf_canvas.grid_spacing = 20
+                if hasattr(self.pdf_canvas, 'grid_offset_x'):
+                    self.pdf_canvas.grid_offset_x = 0
+                if hasattr(self.pdf_canvas, 'grid_offset_y'):
+                    self.pdf_canvas.grid_offset_y = 0
+                if hasattr(self.pdf_canvas, 'show_grid'):
+                    self.pdf_canvas.show_grid = False
+                if hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
 
     def _create_tools_section(self):
         """Create tools section (hidden initially)"""

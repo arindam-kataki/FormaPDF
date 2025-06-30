@@ -143,8 +143,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.splitter.setSizes([0, 1200])
 
         # Create UI components
-        self.create_toolbar()
         self.create_status_bar()
+        self.create_toolbar()
         self.setup_scroll_shortcuts()
         self.enable_smooth_scrolling()
 
@@ -321,7 +321,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         open_action = QAction("📁 Open", self)
         open_action.setToolTip("Open PDF file (Ctrl+O)")
         open_action.setShortcut("Ctrl+O")
-        open_action.triggered.connect(self.open_pdf)
+        #open_action.triggered.connect(self.open_pdf)
         toolbar.addAction(open_action)
 
         save_action = QAction("💾 Save", self)
@@ -795,7 +795,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             QMessageBox.critical(self, "Error", f"Failed to load PDF:\n{str(e)}")
             return False
 
-    def open_pdf(self):
+    def deprecated_open_pdf(self):
         """Open PDF file dialog and load selected file"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Open PDF File", "", "PDF Files (*.pdf);;All Files (*)"
