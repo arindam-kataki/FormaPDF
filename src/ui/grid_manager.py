@@ -298,10 +298,16 @@ class GridManager(QObject):
         pen.setWidth(1)
         painter.setPen(pen)
 
-        # Scale grid with zoom
-        scaled_spacing = int(self.settings.spacing * zoom_level)
-        scaled_offset_x = int(self.settings.offset_x * zoom_level)
-        scaled_offset_y = int(self.settings.offset_y * zoom_level)
+        # Apply zoom scaling only if sync_with_zoom is enabled
+        if self.settings.sync_with_zoom:
+            scaled_spacing = int(self.settings.spacing * zoom_level)
+            scaled_offset_x = int(self.settings.offset_x * zoom_level)
+            scaled_offset_y = int(self.settings.offset_y * zoom_level)
+        else:
+            # Use original values for fixed pixel grid
+            scaled_spacing = self.settings.spacing
+            scaled_offset_x = self.settings.offset_x
+            scaled_offset_y = self.settings.offset_y
 
         # Skip if grid would be too dense
         if scaled_spacing < 2:

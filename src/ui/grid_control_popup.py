@@ -69,7 +69,7 @@ class GridControlPopup(QWidget):
         )
 
         # Set size and make it non-modal
-        self.setFixedSize(280, 220)
+        self.setFixedSize(280, 240)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
 
         # Set window title for taskbar
@@ -98,7 +98,7 @@ class GridControlPopup(QWidget):
         self.sync_zoom_checkbox = QCheckBox("Scale with zoom")
         self.sync_zoom_checkbox.setChecked(self.sync_with_zoom_enabled)
         self.sync_zoom_checkbox.setToolTip("When checked, grid scales with PDF zoom level")
-        layout.addWidget(self.sync_zoom_checkbox)
+        main_layout.addWidget(self.sync_zoom_checkbox)
 
         # Spacing control (same pattern for all three controls)
         spacing_layout = QHBoxLayout()
