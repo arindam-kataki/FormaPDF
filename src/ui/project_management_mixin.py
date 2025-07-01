@@ -203,12 +203,12 @@ class ProjectManagementMixin:
         open_action.triggered.connect(self.open_project)
         toolbar.addAction(open_action)
 
-        # Save Project
+        # Arindam Save Project
         self.save_action = QAction("💾 Save", self)
         self.save_action.setToolTip("Save project (Ctrl+S)")
         self.save_action.setShortcut("Ctrl+S")
         self.save_action.triggered.connect(self.save_project)
-        self.save_action.setEnabled(False)
+        #self.save_action.setEnabled(False)
         toolbar.addAction(self.save_action)
 
         return [self.save_action]  # Return actions that should be managed by project state

@@ -780,6 +780,12 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                     if hasattr(self, 'doc_info_label'):
                         self.doc_info_label.setText(f"Document: {filename}")
 
+                    if hasattr(self, 'update_toolbar_state'):
+                        self.update_toolbar_state("project_loaded")
+                        print("🔧 Toolbar state updated to show all controls")
+                    else:
+                        print("❌ update_toolbar_state method not available")
+
                     return True
                 else:
                     print("❌ PDF loading failed")

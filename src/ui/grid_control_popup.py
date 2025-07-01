@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-GridControlPopup - Draggable floating grid control window
-Provides a modern, non-modal popup for grid settings that stays visible until dismissed
+GridControlPopup Final v3 - Complete draggable floating grid control window
+Provides a modern, non-modal popup for comprehensive grid settings with snap functionality
 """
 
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QCheckBox, QSpinBox, QSlider, QPushButton, QColorDialog,
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QCheckBox, QSpinBox, QPushButton, QColorDialog,
     QFrame, QApplication
 )
 from PyQt6.QtCore import Qt, QPoint, pyqtSignal, QPropertyAnimation, QEasingCurve, QRect
@@ -15,7 +15,7 @@ from PyQt6.QtGui import QColor, QPalette, QFont, QMouseEvent, QPainter, QPen, QB
 
 class GridControlPopup(QWidget):
     """
-    Draggable, floating grid control window
+    Draggable, floating grid control window with snap functionality
 
     Features:
     - Stays on top but non-modal
@@ -23,6 +23,7 @@ class GridControlPopup(QWidget):
     - Live preview as you adjust settings
     - Clean, compact design with rounded corners
     - Smooth show/hide animations
+    - Snap to grid functionality
     """
 
     # Signals for communicating with main application
@@ -31,19 +32,18 @@ class GridControlPopup(QWidget):
     grid_offset_changed = pyqtSignal(int, int)  # x, y
     grid_color_changed = pyqtSignal(QColor)
     grid_reset_requested = pyqtSignal()
-    snap_to_grid_changed = pyqtSignal(bool)
+    snap_to_grid_changed = pyqtSignal(bool)  # Snap to grid signal
 
     def __init__(self, parent=None):
-        """Initialize the grid control popup with snap functionality"""
         super().__init__(parent)
 
-        # Grid state - now includes snap functionality
+        # Grid state
         self.grid_enabled = False
-        self.snap_enabled = False  # NEW: Snap to grid state
+        self.snap_enabled = False
         self.grid_spacing = 20
         self.grid_offset_x = 0
         self.grid_offset_y = 0
-        self.grid_color = QColor(200, 200, 200, 128)
+        self.grid_color = QColor(200, 200, 200, 128)  # Light gray with transparency
 
         # Dragging state
         self.dragging = False
@@ -74,7 +74,7 @@ class GridControlPopup(QWidget):
         self.setWindowTitle("Grid Controls")
 
     def setup_ui(self):
-        """Create the compact grid control interface with snap to grid functionality"""
+        """Create the compact grid control interface"""
         main_layout = QVBoxLayout()
         main_layout.setContentsMargins(12, 8, 12, 12)
         main_layout.setSpacing(8)
@@ -82,143 +82,78 @@ class GridControlPopup(QWidget):
         # Title bar with drag handle
         self.create_title_bar(main_layout)
 
-        # Grid control checkboxes section
-        grid_checkboxes_layout = QVBoxLayout()
-        grid_checkboxes_layout.setSpacing(4)
-
         # Grid visibility toggle
         self.grid_checkbox = QCheckBox("Show Grid")
         self.grid_checkbox.setChecked(self.grid_enabled)
-        self.grid_checkbox.setFont(QFont("", 11, QFont.Weight.Medium))
-        grid_checkboxes_layout.addWidget(self.grid_checkbox)
+        main_layout.addWidget(self.grid_checkbox)
 
-        # Snap to grid toggle
+        # Snap to grid toggle (NOT indented)
         self.snap_checkbox = QCheckBox("Snap to Grid")
         self.snap_checkbox.setChecked(self.snap_enabled)
         self.snap_checkbox.setEnabled(self.grid_enabled)  # Only enabled when grid is visible
-        self.snap_checkbox.setFont(QFont("", 11))
-        self.snap_checkbox.setStyleSheet("QCheckBox { margin-left: 16px; color: #6c757d; }")
-        grid_checkboxes_layout.addWidget(self.snap_checkbox)
+        main_layout.addWidget(self.snap_checkbox)
 
-        main_layout.addLayout(grid_checkboxes_layout)
-
-        # Add separator line after checkboxes
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet("QFrame { color: #dee2e6; margin: 4px 0px; }")
-        main_layout.addWidget(separator)
-
-        # Spacing control
+        # Spacing control (same pattern for all three controls)
         spacing_layout = QHBoxLayout()
-        spacing_layout.setSpacing(8)
-
-        spacing_label = QLabel("Spacing:")
-        spacing_label.setMinimumWidth(65)
-        spacing_layout.addWidget(spacing_label)
+        spacing_layout.addWidget(QLabel("Spacing:"))
 
         self.spacing_spinbox = QSpinBox()
         self.spacing_spinbox.setRange(5, 100)
         self.spacing_spinbox.setValue(self.grid_spacing)
         self.spacing_spinbox.setSuffix("px")
         self.spacing_spinbox.setMinimumWidth(70)
-        self.spacing_spinbox.setMaximumWidth(75)
         spacing_layout.addWidget(self.spacing_spinbox)
-
-        self.spacing_slider = QSlider(Qt.Orientation.Horizontal)
-        self.spacing_slider.setRange(5, 100)
-        self.spacing_slider.setValue(self.grid_spacing)
-        self.spacing_slider.setMinimumWidth(120)
-        spacing_layout.addWidget(self.spacing_slider)
+        spacing_layout.addStretch()
 
         main_layout.addLayout(spacing_layout)
 
-        # X Offset control
+        # X Offset control (SAME PATTERN as spacing)
         x_offset_layout = QHBoxLayout()
-        x_offset_layout.setSpacing(8)
-
-        x_offset_label = QLabel("X Offset:")
-        x_offset_label.setMinimumWidth(65)
-        x_offset_layout.addWidget(x_offset_label)
+        x_offset_layout.addWidget(QLabel("X Offset:"))
 
         self.offset_x_spinbox = QSpinBox()
         self.offset_x_spinbox.setRange(-50, 50)
         self.offset_x_spinbox.setValue(self.grid_offset_x)
         self.offset_x_spinbox.setSuffix("px")
         self.offset_x_spinbox.setMinimumWidth(70)
-        self.offset_x_spinbox.setMaximumWidth(75)
         x_offset_layout.addWidget(self.offset_x_spinbox)
-
-        self.offset_x_slider = QSlider(Qt.Orientation.Horizontal)
-        self.offset_x_slider.setRange(-50, 50)
-        self.offset_x_slider.setValue(self.grid_offset_x)
-        self.offset_x_slider.setMinimumWidth(120)
-        self.offset_x_slider.setObjectName("offset_slider")  # For special styling
-        x_offset_layout.addWidget(self.offset_x_slider)
+        x_offset_layout.addStretch()
 
         main_layout.addLayout(x_offset_layout)
 
-        # Y Offset control
+        # Y Offset control (SAME PATTERN as spacing)
         y_offset_layout = QHBoxLayout()
-        y_offset_layout.setSpacing(8)
-
-        y_offset_label = QLabel("Y Offset:")
-        y_offset_label.setMinimumWidth(65)
-        y_offset_layout.addWidget(y_offset_label)
+        y_offset_layout.addWidget(QLabel("Y Offset:"))
 
         self.offset_y_spinbox = QSpinBox()
         self.offset_y_spinbox.setRange(-50, 50)
         self.offset_y_spinbox.setValue(self.grid_offset_y)
         self.offset_y_spinbox.setSuffix("px")
         self.offset_y_spinbox.setMinimumWidth(70)
-        self.offset_y_spinbox.setMaximumWidth(75)
         y_offset_layout.addWidget(self.offset_y_spinbox)
-
-        self.offset_y_slider = QSlider(Qt.Orientation.Horizontal)
-        self.offset_y_slider.setRange(-50, 50)
-        self.offset_y_slider.setValue(self.grid_offset_y)
-        self.offset_y_slider.setMinimumWidth(120)
-        self.offset_y_slider.setObjectName("offset_slider")  # For special styling
-        y_offset_layout.addWidget(self.offset_y_slider)
+        y_offset_layout.addStretch()
 
         main_layout.addLayout(y_offset_layout)
 
-        # Add some spacing before bottom controls
-        main_layout.addSpacing(6)
-
         # Color and reset controls
         bottom_layout = QHBoxLayout()
-        bottom_layout.setSpacing(8)
 
-        # Color picker section
         color_layout = QHBoxLayout()
-        color_layout.setSpacing(6)
-
-        color_label = QLabel("Color:")
-        color_label.setMinimumWidth(40)
-        color_layout.addWidget(color_label)
-
+        color_layout.addWidget(QLabel("Color:"))
         self.color_button = QPushButton()
-        self.color_button.setFixedSize(32, 25)
-        self.color_button.setToolTip("Click to change grid color")
-        self.color_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.color_button.setFixedSize(30, 25)
         self.update_color_button()
         color_layout.addWidget(self.color_button)
-
-        # Add stretch to push reset button to the right
         color_layout.addStretch()
 
-        bottom_layout.addLayout(color_layout)
-
-        # Reset button
         self.reset_button = QPushButton("Reset")
-        self.reset_button.setFixedWidth(65)
-        self.reset_button.setToolTip("Reset all grid settings to defaults")
-        self.reset_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.reset_button.setFixedWidth(60)
+
+        bottom_layout.addLayout(color_layout)
         bottom_layout.addWidget(self.reset_button)
 
         main_layout.addLayout(bottom_layout)
 
-        # Set the final layout
         self.setLayout(main_layout)
 
     def create_title_bar(self, main_layout):
@@ -297,26 +232,6 @@ class GridControlPopup(QWidget):
                 outline: none;
             }
 
-            QSlider::groove:horizontal {
-                border: 1px solid #ced4da;
-                height: 6px;
-                border-radius: 3px;
-                background-color: #e9ecef;
-            }
-
-            QSlider::handle:horizontal {
-                background-color: #0d6efd;
-                border: 1px solid #0d6efd;
-                width: 14px;
-                height: 14px;
-                border-radius: 7px;
-                margin: -4px 0;
-            }
-
-            QSlider::handle:horizontal:hover {
-                background-color: #0b5ed7;
-            }
-
             QPushButton {
                 background-color: #6c757d;
                 color: white;
@@ -334,36 +249,19 @@ class GridControlPopup(QWidget):
             QPushButton:pressed {
                 background-color: #495057;
             }
-
-            QFrame[frameShape="4"] {
-                background-color: #f1f3f4;
-                border: 1px solid #e3e6ea;
-                border-radius: 4px;
-            }
         """)
 
     def setup_connections(self):
         """Connect all signals and slots"""
         # Grid controls
         self.grid_checkbox.toggled.connect(self.on_grid_visibility_changed)
+        self.snap_checkbox.toggled.connect(self.on_snap_to_grid_changed)
         self.spacing_spinbox.valueChanged.connect(self.on_spacing_changed)
-        self.spacing_slider.valueChanged.connect(self.on_spacing_changed)
         self.offset_x_spinbox.valueChanged.connect(self.on_offset_changed)
         self.offset_y_spinbox.valueChanged.connect(self.on_offset_changed)
         self.color_button.clicked.connect(self.on_color_button_clicked)
         self.reset_button.clicked.connect(self.on_reset_clicked)
         self.close_button.clicked.connect(self.hide_with_animation)
-        self.snap_checkbox.toggled.connect(self.on_snap_to_grid_changed)
-
-        # Sync spinbox and slider
-        self.spacing_spinbox.valueChanged.connect(self.spacing_slider.setValue)
-        self.spacing_slider.valueChanged.connect(self.spacing_spinbox.setValue)
-
-    def on_snap_to_grid_changed(self, enabled: bool):
-        """Handle snap to grid toggle"""
-        self.snap_enabled = enabled
-        self.snap_to_grid_changed.emit(enabled)
-        print(f"📐 Snap to grid: {'enabled' if enabled else 'disabled'}")
 
     def update_color_button(self):
         """Update color button appearance to show current color"""
@@ -388,12 +286,22 @@ class GridControlPopup(QWidget):
         self.grid_enabled = enabled
         self.grid_visibility_changed.emit(enabled)
 
+        # Enable/disable snap based on grid visibility
+        self.snap_checkbox.setEnabled(enabled)
+        if not enabled:
+            self.snap_checkbox.setChecked(False)
+            self.snap_enabled = False
+
         # Enable/disable other controls based on grid visibility
         self.spacing_spinbox.setEnabled(enabled)
-        self.spacing_slider.setEnabled(enabled)
         self.offset_x_spinbox.setEnabled(enabled)
         self.offset_y_spinbox.setEnabled(enabled)
         self.color_button.setEnabled(enabled)
+
+    def on_snap_to_grid_changed(self, enabled: bool):
+        """Handle snap to grid toggle"""
+        self.snap_enabled = enabled
+        self.snap_to_grid_changed.emit(enabled)
 
     def on_spacing_changed(self, value: int):
         """Handle spacing changes"""
@@ -426,17 +334,20 @@ class GridControlPopup(QWidget):
         self.grid_offset_x = 0
         self.grid_offset_y = 0
         self.grid_color = QColor(200, 200, 200, 128)
+        self.snap_enabled = False
 
         # Update UI
         self.spacing_spinbox.setValue(self.grid_spacing)
         self.offset_x_spinbox.setValue(self.grid_offset_x)
         self.offset_y_spinbox.setValue(self.grid_offset_y)
+        self.snap_checkbox.setChecked(self.snap_enabled)
         self.update_color_button()
 
         # Emit signals
         self.grid_spacing_changed.emit(self.grid_spacing)
         self.grid_offset_changed.emit(self.grid_offset_x, self.grid_offset_y)
         self.grid_color_changed.emit(self.grid_color)
+        self.snap_to_grid_changed.emit(self.snap_enabled)
         self.grid_reset_requested.emit()
 
     # =========================
@@ -530,9 +441,10 @@ class GridControlPopup(QWidget):
 
     def set_grid_state(self, enabled: bool, spacing: int = 20,
                        offset_x: int = 0, offset_y: int = 0,
-                       color: QColor = None):
+                       color: QColor = None, snap_enabled: bool = False):
         """Update grid state from external source"""
         self.grid_enabled = enabled
+        self.snap_enabled = snap_enabled
         self.grid_spacing = spacing
         self.grid_offset_x = offset_x
         self.grid_offset_y = offset_y
@@ -542,6 +454,7 @@ class GridControlPopup(QWidget):
 
         # Update UI controls
         self.grid_checkbox.setChecked(enabled)
+        self.snap_checkbox.setChecked(snap_enabled)
         self.spacing_spinbox.setValue(spacing)
         self.offset_x_spinbox.setValue(offset_x)
         self.offset_y_spinbox.setValue(offset_y)
@@ -551,6 +464,7 @@ class GridControlPopup(QWidget):
         """Get current grid configuration"""
         return {
             'enabled': self.grid_enabled,
+            'snap_enabled': self.snap_enabled,
             'spacing': self.grid_spacing,
             'offset_x': self.grid_offset_x,
             'offset_y': self.grid_offset_y,
@@ -573,6 +487,9 @@ if __name__ == "__main__":
     # Connect signals for demo
     popup.grid_visibility_changed.connect(
         lambda enabled: print(f"Grid visibility: {enabled}")
+    )
+    popup.snap_to_grid_changed.connect(
+        lambda enabled: print(f"Snap to grid: {enabled}")
     )
     popup.grid_spacing_changed.connect(
         lambda spacing: print(f"Grid spacing: {spacing}px")

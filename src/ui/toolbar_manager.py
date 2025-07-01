@@ -93,8 +93,8 @@ class ToolbarManager:
         self._create_tools_section()
 
         # Set initial state
-        self.update_toolbar_state("no_project")
         self.toolbar_initialized = True
+        self.update_toolbar_state("no_project")
 
         print("✅ Adaptive toolbar created")
 
@@ -124,10 +124,16 @@ class ToolbarManager:
 
         open_action = QAction("📁 Open", self)
         open_action.setToolTip("Open existing project")
-        open_action.triggered.connect(self._safe_call('open_project'))
+        open_action.triggered.connect(self._safe_call('open_projectx'))
         self.main_toolbar.addAction(open_action)
 
-        self.project_section_actions = [new_action, open_action]
+        about_action = QAction("ℹ️ About", self)
+        about_action.setToolTip("About PDF Voice Editor")
+        about_action.triggered.connect(self._safe_call('show_info'))
+        self.main_toolbar.addAction(about_action)
+
+        # UPDATE THIS LINE - include about_action
+        self.project_section_actions = [new_action, open_action, about_action]
 
     def _create_document_section(self):
         """Create document navigation controls with page spinner (hidden initially)"""
@@ -156,7 +162,7 @@ class ToolbarManager:
         self.page_spinbox.setValue(1)
         self.page_spinbox.setToolTip("Jump to page number")
         self.page_spinbox.setMinimumWidth(60)
-        self.page_spinbox.valueChanged.connect(self._safe_call('jump_to_page'))
+        self.page_spinbox.valueChanged.connect(self.on_page_spinner_changed)
         self.page_spinbox_action = self.main_toolbar.addWidget(self.page_spinbox)
 
         # Page info display (total pages)
@@ -178,6 +184,99 @@ class ToolbarManager:
         ]
 
         print(f"    ✅ Added {len(self.document_section_actions)} document actions")
+
+    def on_page_spinner_changed(self, page_number: int):
+        """Handle page spinner value change"""
+        print(f"🔧 Page spinner changed to: {page_number}")
+
+        # Call the main window's jump method with the page number
+        if hasattr(self, 'jump_to_page_continuous'):
+            try:
+                self.jump_to_page_continuous(page_number)
+            except Exception as e:
+                print(f"⚠️ Error jumping to page {page_number}: {e}")
+        else:
+            print("⚠️ jump_to_page_continuous method not found")
+
+    def on_zoom_dropdown_changed(self, text: str):
+        """Handle zoom dropdown selection from toolbar"""
+        print(f"🔍 Zoom dropdown changed to: {text}")
+
+        if text == "Fit Width":
+            if hasattr(self, 'fit_to_width'):
+                self.fit_to_width()
+            else:
+                print("⚠️ fit_to_width method not found")
+        elif text == "Fit Page":
+            if hasattr(self, 'fit_to_page'):
+                self.fit_to_page()
+            else:
+                print("⚠️ fit_to_page method not found")
+        else:
+            # Parse percentage value
+            try:
+                # Remove % sign and any other characters
+                zoom_text = text.replace('%', '').strip()
+                zoom_percent = float(zoom_text)
+                zoom_level = zoom_percent / 100.0
+
+                # Clamp zoom level to reasonable bounds
+                zoom_level = max(0.1, min(zoom_level, 10.0))  # 10% to 1000%
+
+                print(f"🔍 Setting zoom level to {zoom_level} ({int(zoom_level * 100)}%)")
+
+                # Call zoom method on PDF canvas
+                if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'set_zoom'):
+                    self.pdf_canvas.set_zoom(zoom_level)
+                    # Update status
+                    if hasattr(self, 'statusBar'):
+                        self.statusBar().showMessage(f"Zoom: {int(zoom_level * 100)}%", 1000)
+                else:
+                    print("⚠️ No zoom method available on PDF canvas")
+
+            except ValueError:
+                print(f"⚠️ Invalid zoom value: {text}")
+
+    def on_zoom_changed(self, text: str):
+        """Handle zoom dropdown selection"""
+        print(f"🔍 Zoom changed to: {text}")
+
+        if text == "Fit Width":
+            if hasattr(self, 'fit_to_width'):
+                self.fit_to_width()
+            else:
+                print("⚠️ fit_to_width method not found")
+        elif text == "Fit Page":
+            if hasattr(self, 'fit_to_page'):
+                self.fit_to_page()
+            else:
+                print("⚠️ fit_to_page method not found")
+        else:
+            # Parse percentage value
+            try:
+                # Remove % sign and any other characters
+                zoom_text = text.replace('%', '').strip()
+                zoom_percent = float(zoom_text)
+                zoom_level = zoom_percent / 100.0
+
+                # Clamp zoom level to reasonable bounds
+                zoom_level = max(0.1, min(zoom_level, 10.0))  # 10% to 1000%
+
+                print(f"🔍 Setting zoom level to {zoom_level} ({int(zoom_level * 100)}%)")
+
+                # Call zoom method
+                if hasattr(self, 'set_zoom_level'):
+                    self.set_zoom_level(zoom_level)
+                elif hasattr(self.pdf_canvas, 'set_zoom'):
+                    self.pdf_canvas.set_zoom(zoom_level)
+                    # Update status
+                    if hasattr(self, 'statusBar'):
+                        self.statusBar().showMessage(f"Zoom: {int(zoom_level * 100)}%", 1000)
+                else:
+                    print("⚠️ No zoom method available")
+
+            except ValueError:
+                print(f"⚠️ Invalid zoom value: {text}")
 
     def _create_view_section(self):
         """Create view and zoom controls with dropdown and grid popup (hidden initially)"""
@@ -206,7 +305,7 @@ class ToolbarManager:
         self.zoom_combo.setMinimumWidth(100)
         self.zoom_combo.setMaximumWidth(120)
         self.zoom_combo.setEditable(True)  # Allow custom zoom values
-        self.zoom_combo.currentTextChanged.connect(self._safe_call('zoom_changed'))
+        self.zoom_combo.currentTextChanged.connect(self.on_zoom_dropdown_changed)
         self.zoom_combo_action = self.main_toolbar.addWidget(self.zoom_combo)
 
         # Zoom in button
@@ -466,37 +565,41 @@ class ToolbarManager:
             print(f"⚠️ Unknown toolbar state: {state}")
 
     def _show_project_only(self):
-        """Show only project management buttons"""
-        print("  📄 Showing project-only toolbar")
+        """Show only essential buttons: New, Open, About"""
+        print("  📄 Showing minimal toolbar (no workspace loaded)")
 
-        # Show project section
-        self._set_actions_visible(self.project_section_actions, True)
+        # Show ONLY New, Open, About
+        essential_actions = []
+        for action in self.project_section_actions:
+            action_text = action.text().lower()
+            if any(keyword in action_text for keyword in ['new', 'open', 'about']):
+                action.setVisible(True)
+                essential_actions.append(action)
+            else:
+                action.setVisible(False)
 
-        # Hide all other sections
+        # Hide ALL other sections completely
         self._set_actions_visible(self.document_section_actions, False)
         self._set_actions_visible(self.view_section_actions, False)
         self._set_actions_visible(self.tools_section_actions, False)
 
-        # Hide separators
+        # Hide ALL separators
         for separator in self.toolbar_separators.values():
             separator.setVisible(False)
 
     def _show_project_and_basic(self):
-        """Show project + basic document controls (when project loaded but no PDF)"""
-        print("  📖 Showing project + basic controls")
+        """Show all controls when project is loaded"""
+        print("  📖 Showing all toolbar controls (project loaded)")
 
-        # Show project section
-        self._set_actions_visible(self.project_section_actions, True)
+        # Show ALL sections and ENABLE them
+        self._set_actions_visible(self.project_section_actions, True, enabled=True)
+        self._set_actions_visible(self.document_section_actions, True, enabled=True)  # ← Enable!
+        self._set_actions_visible(self.view_section_actions, True, enabled=True)  # ← Enable!
+        self._set_actions_visible(self.tools_section_actions, True, enabled=True)  # ← Enable!
 
-        # Show basic document controls (but disabled)
-        self._set_actions_visible(self.document_section_actions, True, enabled=False)
-
-        # Hide view and tools
-        self._set_actions_visible(self.view_section_actions, False)
-        self._set_actions_visible(self.tools_section_actions, False)
-
-        # Show relevant separators
-        self.toolbar_separators.get('doc_sep1', QAction()).setVisible(True)
+        # Show all separators
+        for separator in self.toolbar_separators.values():
+            separator.setVisible(True)
 
     def _show_all_controls(self):
         """Show all toolbar controls (when PDF is loaded)"""
@@ -622,15 +725,117 @@ class ToolbarManager:
 
     def fit_to_width(self):
         """Fit PDF to window width"""
+        print("📏 Fitting to width...")
         if hasattr(self.pdf_canvas, 'fit_to_width'):
-            self.pdf_canvas.fit_to_width()
+            # Get available width from scroll area
+            if hasattr(self, 'scroll_area'):
+                available_width = self.scroll_area.viewport().width()
+            else:
+                # Fallback to main window width minus some margin
+                available_width = self.width() - 100  # Leave some margin
+
+            print(f"📏 Available width: {available_width}px")
+            self.pdf_canvas.fit_to_width(available_width)
+        elif hasattr(self.pdf_canvas, 'fit_width'):
+            self.pdf_canvas.fit_width()
+        else:
+            print("⚠️ fit_to_width not available on PDF canvas")
+
+        # Update zoom display after fitting
+        if hasattr(self, 'auto_update_from_pdf_canvas'):
             self.auto_update_from_pdf_canvas()
 
     def fit_to_page(self):
-        """Fit entire PDF page to window"""
-        if hasattr(self.pdf_canvas, 'fit_to_page'):
-            self.pdf_canvas.fit_to_page()
+        """Fit entire PDF page to window - calculate exact zoom needed"""
+        print("📄 Fitting page to viewport...")
+
+        if not hasattr(self, 'scroll_area') or not hasattr(self, 'pdf_canvas'):
+            print("⚠️ Missing scroll_area or pdf_canvas")
+            return
+
+        if not hasattr(self.pdf_canvas, 'set_zoom'):
+            print("⚠️ PDF canvas has no set_zoom method")
+            return
+
+        # Get available viewport dimensions (subtract margins for scrollbars/padding)
+        viewport = self.scroll_area.viewport()
+        available_width = viewport.width() - 40  # Leave margin for scrollbars
+        available_height = viewport.height() - 40
+
+        print(f"📄 Available viewport: {available_width}x{available_height}px")
+
+        # Get actual page dimensions from PDF
+        page_width = None
+        page_height = None
+
+        # Method 1: Try get_page_size if available
+        if hasattr(self.pdf_canvas, 'get_page_size'):
+            try:
+                page_width, page_height = self.pdf_canvas.get_page_size()
+                print(f"📄 Page size from get_page_size(): {page_width}x{page_height}px")
+            except Exception as e:
+                print(f"⚠️ get_page_size() failed: {e}")
+
+        # Method 2: Try getting from PDF document
+        if (page_width is None or page_height is None) and hasattr(self.pdf_canvas, 'pdf_document'):
+            try:
+                doc = self.pdf_canvas.pdf_document
+                if doc and doc.page_count > 0:
+                    # Get current page or first page
+                    current_page = getattr(self.pdf_canvas, 'current_page', 0)
+                    page = doc[current_page]
+                    rect = page.rect
+                    page_width = rect.width
+                    page_height = rect.height
+                    print(f"📄 Page size from PDF document: {page_width}x{page_height}px")
+            except Exception as e:
+                print(f"⚠️ PDF document page size failed: {e}")
+
+        # Method 3: Try getting from canvas widget size
+        if (page_width is None or page_height is None):
+            try:
+                current_zoom = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+                canvas_width = self.pdf_canvas.width()
+                canvas_height = self.pdf_canvas.height()
+                # Estimate original page size
+                page_width = canvas_width / current_zoom if current_zoom > 0 else canvas_width
+                page_height = canvas_height / current_zoom if current_zoom > 0 else canvas_height
+                print(f"📄 Estimated page size from canvas: {page_width}x{page_height}px")
+            except Exception as e:
+                print(f"⚠️ Canvas size estimation failed: {e}")
+
+        if page_width is None or page_height is None or page_width <= 0 or page_height <= 0:
+            print("❌ Could not determine page dimensions for fit page")
+            return
+
+        # Calculate zoom ratios to fit both dimensions
+        width_zoom = available_width / page_width
+        height_zoom = available_height / page_height
+
+        # Use the smaller ratio to ensure ENTIRE page fits in viewport
+        fit_zoom = min(width_zoom, height_zoom)
+
+        # Clamp to reasonable bounds
+        fit_zoom = max(0.05, min(fit_zoom, 20.0))  # 5% to 2000%
+
+        print(f"📄 Calculated fit page zoom: {fit_zoom:.3f} ({int(fit_zoom * 100)}%)")
+        print(f"   Width ratio: {width_zoom:.3f}, Height ratio: {height_zoom:.3f}")
+
+        # Apply the calculated zoom
+        self.pdf_canvas.set_zoom(fit_zoom)
+
+        # Update status and zoom dropdown
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(f"Fit Page: {int(fit_zoom * 100)}%", 2000)
+
+        if hasattr(self, 'zoom_combo'):
+            self.zoom_combo.setCurrentText(f"{int(fit_zoom * 100)}%")
+
+        # Update other displays
+        if hasattr(self, 'auto_update_from_pdf_canvas'):
             self.auto_update_from_pdf_canvas()
+
+        print(f"✅ Page fitted to viewport at {int(fit_zoom * 100)}% zoom")
 
     # =========================
     # INTEGRATION HOOKS
