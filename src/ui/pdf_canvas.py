@@ -1177,11 +1177,29 @@ class PDFCanvas(QLabel):
         width = self.page_pixmap.width()
         height = self.page_pixmap.height()
 
-        # Apply zoom scaling to grid size
+        # Check if we should sync with zoom (look for GridManager setting)
+        should_sync_with_zoom = True  # Default behavior
+
+        # Try to get sync_with_zoom setting from main window's GridManager
+        if hasattr(self, 'parent') and self.parent():
+            main_window = self.parent()
+            while main_window and not hasattr(main_window, 'grid_manager'):
+                main_window = main_window.parent()
+
+            if main_window and hasattr(main_window, 'grid_manager'):
+                should_sync_with_zoom = main_window.grid_manager.settings.sync_with_zoom
+
+        # Apply zoom scaling only if sync_with_zoom is enabled
         zoom_level = getattr(self, 'zoom_level', 1.0)
-        scaled_grid_size = int(self.grid_size * zoom_level)
-        scaled_offset_x = int(self.grid_offset_x * zoom_level)
-        scaled_offset_y = int(self.grid_offset_y * zoom_level)
+        if should_sync_with_zoom:
+            scaled_grid_size = int(self.grid_size * zoom_level)
+            scaled_offset_x = int(self.grid_offset_x * zoom_level)
+            scaled_offset_y = int(self.grid_offset_y * zoom_level)
+        else:
+            # Use original values for fixed pixel grid
+            scaled_grid_size = self.grid_size
+            scaled_offset_x = self.grid_offset_x
+            scaled_offset_y = self.grid_offset_y
 
         # Skip grid if too small at current zoom
         if scaled_grid_size < 2:
