@@ -112,7 +112,8 @@ class GridControlPopup(QWidget):
         x_offset_layout.addWidget(QLabel("X Offset:"))
 
         self.offset_x_spinbox = QSpinBox()
-        self.offset_x_spinbox.setRange(-50, 50)
+        max_offset = self.grid_spacing - 1
+        self.offset_x_spinbox.setRange(-max_offset, max_offset)
         self.offset_x_spinbox.setValue(self.grid_offset_x)
         self.offset_x_spinbox.setSuffix("px")
         self.offset_x_spinbox.setMinimumWidth(70)
@@ -126,7 +127,8 @@ class GridControlPopup(QWidget):
         y_offset_layout.addWidget(QLabel("Y Offset:"))
 
         self.offset_y_spinbox = QSpinBox()
-        self.offset_y_spinbox.setRange(-50, 50)
+        max_offset = self.grid_spacing - 1
+        self.offset_y_spinbox.setRange(-max_offset, max_offset)
         self.offset_y_spinbox.setValue(self.grid_offset_y)
         self.offset_y_spinbox.setSuffix("px")
         self.offset_y_spinbox.setMinimumWidth(70)
@@ -155,6 +157,38 @@ class GridControlPopup(QWidget):
         main_layout.addLayout(bottom_layout)
 
         self.setLayout(main_layout)
+
+    def update_offset_ranges(self):
+        """Update offset spinbox ranges based on current spacing"""
+        max_offset = self.grid_spacing - 1
+
+        # Store current values
+        current_x = self.offset_x_spinbox.value()
+        current_y = self.offset_y_spinbox.value()
+
+        # Update ranges
+        self.offset_x_spinbox.setRange(-max_offset, max_offset)
+        self.offset_y_spinbox.setRange(-max_offset, max_offset)
+
+        # Clamp current values to new range if needed
+        if current_x > max_offset:
+            self.offset_x_spinbox.setValue(max_offset)
+            self.grid_offset_x = max_offset
+        elif current_x < -max_offset:
+            self.offset_x_spinbox.setValue(-max_offset)
+            self.grid_offset_x = -max_offset
+
+        if current_y > max_offset:
+            self.offset_y_spinbox.setValue(max_offset)
+            self.grid_offset_y = max_offset
+        elif current_y < -max_offset:
+            self.offset_y_spinbox.setValue(-max_offset)
+            self.grid_offset_y = -max_offset
+
+        # Emit offset change if values were clamped
+        if (current_x != self.offset_x_spinbox.value() or
+                current_y != self.offset_y_spinbox.value()):
+            self.grid_offset_changed.emit(self.grid_offset_x, self.grid_offset_y)
 
     def create_title_bar(self, main_layout):
         """Create custom title bar for dragging"""
@@ -306,6 +340,10 @@ class GridControlPopup(QWidget):
     def on_spacing_changed(self, value: int):
         """Handle spacing changes"""
         self.grid_spacing = value
+
+        # Update offset ranges when spacing changes
+        self.update_offset_ranges()
+
         self.grid_spacing_changed.emit(value)
 
     def on_offset_changed(self):
@@ -328,6 +366,38 @@ class GridControlPopup(QWidget):
             self.update_color_button()
             self.grid_color_changed.emit(color)
 
+    def update_offset_ranges(self):
+        """Update offset spinbox ranges based on current spacing"""
+        max_offset = self.grid_spacing - 1
+
+        # Store current values
+        current_x = self.offset_x_spinbox.value()
+        current_y = self.offset_y_spinbox.value()
+
+        # Update ranges
+        self.offset_x_spinbox.setRange(-max_offset, max_offset)
+        self.offset_y_spinbox.setRange(-max_offset, max_offset)
+
+        # Clamp current values to new range if needed
+        if current_x > max_offset:
+            self.offset_x_spinbox.setValue(max_offset)
+            self.grid_offset_x = max_offset
+        elif current_x < -max_offset:
+            self.offset_x_spinbox.setValue(-max_offset)
+            self.grid_offset_x = -max_offset
+
+        if current_y > max_offset:
+            self.offset_y_spinbox.setValue(max_offset)
+            self.grid_offset_y = max_offset
+        elif current_y < -max_offset:
+            self.offset_y_spinbox.setValue(-max_offset)
+            self.grid_offset_y = -max_offset
+
+        # Emit offset change if values were clamped
+        if (current_x != self.offset_x_spinbox.value() or
+                current_y != self.offset_y_spinbox.value()):
+            self.grid_offset_changed.emit(self.grid_offset_x, self.grid_offset_y)
+
     def on_reset_clicked(self):
         """Reset all grid settings to defaults"""
         self.grid_spacing = 20
@@ -338,9 +408,9 @@ class GridControlPopup(QWidget):
 
         # Update UI
         self.spacing_spinbox.setValue(self.grid_spacing)
+        self.update_offset_ranges()  # Update ranges before setting values
         self.offset_x_spinbox.setValue(self.grid_offset_x)
         self.offset_y_spinbox.setValue(self.grid_offset_y)
-        self.snap_checkbox.setChecked(self.snap_enabled)
         self.update_color_button()
 
         # Emit signals
@@ -456,6 +526,7 @@ class GridControlPopup(QWidget):
         self.grid_checkbox.setChecked(enabled)
         self.snap_checkbox.setChecked(snap_enabled)
         self.spacing_spinbox.setValue(spacing)
+        self.update_offset_ranges()  # Update ranges after setting spacing
         self.offset_x_spinbox.setValue(offset_x)
         self.offset_y_spinbox.setValue(offset_y)
         self.update_color_button()

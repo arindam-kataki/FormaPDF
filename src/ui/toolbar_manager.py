@@ -487,6 +487,7 @@ class ToolbarManager:
                 elif hasattr(self.pdf_canvas, 'update'):
                     self.pdf_canvas.update()
 
+
     def _on_grid_color_changed(self, color):
         """Handle grid color change from popup"""
         print(f"📐 Grid color changed: {color.name()}")
