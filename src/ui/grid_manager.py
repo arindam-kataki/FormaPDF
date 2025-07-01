@@ -22,6 +22,7 @@ class GridSettings:
     color: QColor = None
     opacity: float = 0.7
     snap_enabled: bool = False
+    sync_with_zoom: bool = False
 
     def __post_init__(self):
         if self.color is None:
@@ -36,7 +37,8 @@ class GridSettings:
             'offset_y': self.offset_y,
             'color': self.color.getRgb(),
             'opacity': self.opacity,
-            'snap_enabled': self.snap_enabled
+            'snap_enabled': self.snap_enabled,
+            'sync_with_zoom': self.sync_with_zoom
         }
 
     @classmethod
@@ -48,7 +50,8 @@ class GridSettings:
         settings.offset_x = data.get('offset_x', 0)
         settings.offset_y = data.get('offset_y', 0)
         settings.opacity = data.get('opacity', 0.7)
-        settings.snap_enabled = data.get('snap_enabled', False)
+        settings.snap_enabled = data.get('snap_enabled', False),
+        settings.sync_with_zoom=data.get('sync_with_zoom', False)
 
         # Handle color
         color_rgba = data.get('color', (128, 128, 128, 180))
@@ -80,6 +83,7 @@ class GridManager(QObject):
     grid_spacing_changed = pyqtSignal(int)
     grid_offset_changed = pyqtSignal(int, int)
     snap_changed = pyqtSignal(bool)
+    sync_with_zoom_changed = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -269,6 +273,18 @@ class GridManager(QObject):
         return (snapped_x, snapped_y)
 
     # =========================
+    # ZOOM
+    # =========================
+
+    def set_sync_with_zoom(self, sync_enabled: bool) -> None:
+        """Set whether grid should sync with zoom level"""
+        if self.settings.sync_with_zoom != sync_enabled:
+            self.settings.sync_with_zoom = sync_enabled
+            self.sync_with_zoom_changed.emit(sync_enabled)
+            self.grid_changed.emit(self.settings)
+            print(f"📐 Grid zoom sync: {'enabled' if sync_enabled else 'disabled'}")
+
+    # =========================
     # DRAWING
     # =========================
 
@@ -436,6 +452,7 @@ class GridManager(QObject):
         self.grid_spacing_changed.emit(self.settings.spacing)
         self.grid_offset_changed.emit(self.settings.offset_x, self.settings.offset_y)
         self.snap_changed.emit(self.settings.snap_enabled)
+        self.sync_with_zoom_changed.emit(self.settings.sync_with_zoom)  # ADD THIS LINE
         self._emit_grid_changed()
 
 

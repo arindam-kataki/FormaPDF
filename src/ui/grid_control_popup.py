@@ -33,6 +33,7 @@ class GridControlPopup(QWidget):
     grid_color_changed = pyqtSignal(QColor)
     grid_reset_requested = pyqtSignal()
     snap_to_grid_changed = pyqtSignal(bool)  # Snap to grid signal
+    sync_with_zoom_changed = pyqtSignal(bool)
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,6 +41,7 @@ class GridControlPopup(QWidget):
         # Grid state
         self.grid_enabled = False
         self.snap_enabled = False
+        self.sync_with_zoom_enabled = False
         self.grid_spacing = 20
         self.grid_offset_x = 0
         self.grid_offset_y = 0
@@ -92,6 +94,11 @@ class GridControlPopup(QWidget):
         self.snap_checkbox.setChecked(self.snap_enabled)
         self.snap_checkbox.setEnabled(self.grid_enabled)  # Only enabled when grid is visible
         main_layout.addWidget(self.snap_checkbox)
+
+        self.sync_zoom_checkbox = QCheckBox("Scale with zoom")
+        self.sync_zoom_checkbox.setChecked(self.sync_with_zoom_enabled)
+        self.sync_zoom_checkbox.setToolTip("When checked, grid scales with PDF zoom level")
+        layout.addWidget(self.sync_zoom_checkbox)
 
         # Spacing control (same pattern for all three controls)
         spacing_layout = QHBoxLayout()
@@ -290,6 +297,7 @@ class GridControlPopup(QWidget):
         # Grid controls
         self.grid_checkbox.toggled.connect(self.on_grid_visibility_changed)
         self.snap_checkbox.toggled.connect(self.on_snap_to_grid_changed)
+        self.sync_zoom_checkbox.toggled.connect(self.on_sync_zoom_changed)
         self.spacing_spinbox.valueChanged.connect(self.on_spacing_changed)
         self.offset_x_spinbox.valueChanged.connect(self.on_offset_changed)
         self.offset_y_spinbox.valueChanged.connect(self.on_offset_changed)
@@ -337,6 +345,12 @@ class GridControlPopup(QWidget):
         self.snap_enabled = enabled
         self.snap_to_grid_changed.emit(enabled)
 
+    def on_sync_zoom_changed(self, checked: bool):
+        """Handle sync with zoom checkbox change"""
+        self.sync_with_zoom_enabled = checked
+        self.sync_with_zoom_changed.emit(checked)
+        print(f"📐 Sync with zoom: {'enabled' if checked else 'disabled'}")
+
     def on_spacing_changed(self, value: int):
         """Handle spacing changes"""
         self.grid_spacing = value
@@ -365,6 +379,12 @@ class GridControlPopup(QWidget):
             self.grid_color = color
             self.update_color_button()
             self.grid_color_changed.emit(color)
+
+    def update_sync_with_zoom(self, sync_enabled: bool):
+        """Update sync with zoom checkbox from external source"""
+        if self.sync_with_zoom_enabled != sync_enabled:
+            self.sync_with_zoom_enabled = sync_enabled
+            self.sync_zoom_checkbox.setChecked(sync_enabled)
 
     def update_offset_ranges(self):
         """Update offset spinbox ranges based on current spacing"""

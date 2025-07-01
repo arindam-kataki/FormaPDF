@@ -84,6 +84,7 @@ class GridIntegrator(QObject):
         self.grid_manager.grid_offset_changed.connect(self._on_manager_offset_changed)
         self.grid_manager.snap_changed.connect(self._on_manager_snap_changed)
         self.grid_manager.grid_changed.connect(self._on_manager_grid_changed)
+        self.grid_manager.sync_with_zoom_changed.connect(self._on_manager_sync_zoom_changed)
 
     def _connect_grid_popup(self) -> None:
         """Connect GridControlPopup signals"""
@@ -108,6 +109,9 @@ class GridIntegrator(QObject):
 
         if hasattr(self.grid_popup, 'grid_reset_requested'):
             self.grid_popup.grid_reset_requested.connect(self._on_popup_reset_requested)
+
+        if hasattr(self.grid_popup, 'sync_with_zoom_changed'):
+            self.grid_popup.sync_with_zoom_changed.connect(self._on_popup_sync_zoom_changed)
 
     def _connect_pdf_canvas(self) -> None:
         """Connect PDFCanvas integration"""
@@ -191,6 +195,32 @@ class GridIntegrator(QObject):
 
         finally:
             self.sync_in_progress = False
+
+    @pyqtSlot(bool)
+    def _on_manager_sync_zoom_changed(self, sync_enabled: bool) -> None:
+        """Handle sync with zoom change from GridManager"""
+        if self.sync_in_progress:
+            return
+
+        self.sync_in_progress = True
+
+        # Update popup
+        if self.grid_popup and hasattr(self.grid_popup, 'update_sync_with_zoom'):
+            self.grid_popup.update_sync_with_zoom(sync_enabled)
+
+        # Update toolbar if it has sync controls
+        if self.toolbar_manager and hasattr(self.toolbar_manager, 'update_sync_with_zoom'):
+            self.toolbar_manager.update_sync_with_zoom(sync_enabled)
+
+        self.sync_in_progress = False
+
+    @pyqtSlot(bool)
+    def _on_popup_sync_zoom_changed(self, sync_enabled: bool) -> None:
+        """Handle sync with zoom change from popup"""
+        if self.sync_in_progress or not self.grid_manager:
+            return
+
+        self.grid_manager.set_sync_with_zoom(sync_enabled)
 
     @pyqtSlot(int)
     def _on_manager_spacing_changed(self, spacing: int) -> None:
@@ -405,6 +435,7 @@ class GridIntegrator(QObject):
         self._on_manager_spacing_changed(settings.spacing)
         self._on_manager_offset_changed(settings.offset_x, settings.offset_y)
         self._on_manager_snap_changed(settings.snap_enabled)
+        self._on_manager_sync_zoom_changed(settings.sync_with_zoom)
 
         print("📐 All components synchronized with GridManager")
 

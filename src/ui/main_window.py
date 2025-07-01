@@ -121,8 +121,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             print("🔧 Testing GridManager with loaded PDF...")
 
             # Show grid
-            self.grid_manager.show_grid()
-            print(f"Grid visible: {self.grid_manager.is_grid_visible()}")
+            #self.grid_manager.show_grid()
+            #print(f"Grid visible: {self.grid_manager.is_grid_visible()}")
 
             # Try setting a blue color
             blue_color = QColor(0, 100, 200, 150)  # Blue with transparency
