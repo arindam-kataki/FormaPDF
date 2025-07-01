@@ -430,12 +430,20 @@ class ToolbarManager:
 
         # Update the PDF canvas if available
         if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            if hasattr(self.pdf_canvas, 'set_grid_visible'):
-                self.pdf_canvas.set_grid_visible(enabled)
-            elif hasattr(self.pdf_canvas, 'show_grid'):
-                self.pdf_canvas.show_grid = enabled
-                if hasattr(self.pdf_canvas, 'update'):
-                    self.pdf_canvas.update()
+            # Set the grid visibility property
+            self.pdf_canvas.show_grid = enabled
+
+            # Force redraw of overlay to show/hide grid
+            if hasattr(self.pdf_canvas, 'draw_overlay'):
+                self.pdf_canvas.draw_overlay()
+                print(f"📐 Called draw_overlay() to update grid display")
+            elif hasattr(self.pdf_canvas, 'update'):
+                self.pdf_canvas.update()
+                print(f"📐 Called update() as fallback")
+
+            print(f"📐 PDF canvas show_grid is now: {self.pdf_canvas.show_grid}")
+        else:
+            print("⚠️ PDF canvas not available for grid update")
 
     def _on_grid_spacing_changed(self, spacing: int):
         """Handle grid spacing change from popup"""
@@ -444,12 +452,17 @@ class ToolbarManager:
 
         # Update the PDF canvas if available
         if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            if hasattr(self.pdf_canvas, 'set_grid_spacing'):
-                self.pdf_canvas.set_grid_spacing(spacing)
-            elif hasattr(self.pdf_canvas, 'grid_spacing'):
-                self.pdf_canvas.grid_spacing = spacing
-                if hasattr(self.pdf_canvas, 'update'):
-                    self.pdf_canvas.update()
+            # PDF canvas uses 'grid_size' not 'grid_spacing'
+            self.pdf_canvas.grid_size = spacing
+
+            # Force redraw of overlay to show new spacing
+            if hasattr(self.pdf_canvas, 'draw_overlay'):
+                self.pdf_canvas.draw_overlay()
+                print(f"📐 Updated grid_size to {spacing}px and redrawn")
+            elif hasattr(self.pdf_canvas, 'update'):
+                self.pdf_canvas.update()
+
+            print(f"📐 PDF canvas grid_size is now: {self.pdf_canvas.grid_size}")
 
     def _on_grid_offset_changed(self, offset_x: int, offset_y: int):
         """Handle grid offset change from popup"""
@@ -467,7 +480,11 @@ class ToolbarManager:
                     self.pdf_canvas.grid_offset_x = offset_x
                 if hasattr(self.pdf_canvas, 'grid_offset_y'):
                     self.pdf_canvas.grid_offset_y = offset_y
-                if hasattr(self.pdf_canvas, 'update'):
+                    # Force redraw of overlay to show new offset
+                if hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+                    print(f"📐 Updated grid offset and redrawn")
+                elif hasattr(self.pdf_canvas, 'update'):
                     self.pdf_canvas.update()
 
     def _on_grid_color_changed(self, color):
