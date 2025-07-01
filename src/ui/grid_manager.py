@@ -1,0 +1,499 @@
+#!/usr/bin/env python3
+"""
+Enhanced Grid Manager - Complete grid functionality with show/hide and color selection
+Integrates with existing GridControlPopup and PDF Canvas architecture
+"""
+
+from PyQt6.QtWidgets import QColorDialog
+from PyQt6.QtCore import QObject, pyqtSignal, QTimer
+from PyQt6.QtGui import QColor, QPainter, QPen, QBrush
+from dataclasses import dataclass
+from typing import Optional, Tuple, Dict, Any
+import json
+
+
+@dataclass
+class GridSettings:
+    """Data class for grid configuration"""
+    visible: bool = False
+    spacing: int = 20
+    offset_x: int = 0
+    offset_y: int = 0
+    color: QColor = None
+    opacity: float = 0.7
+    snap_enabled: bool = False
+
+    def __post_init__(self):
+        if self.color is None:
+            self.color = QColor(128, 128, 128, 180)  # Default gray with transparency
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization"""
+        return {
+            'visible': self.visible,
+            'spacing': self.spacing,
+            'offset_x': self.offset_x,
+            'offset_y': self.offset_y,
+            'color': self.color.getRgb(),
+            'opacity': self.opacity,
+            'snap_enabled': self.snap_enabled
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'GridSettings':
+        """Create from dictionary"""
+        settings = cls()
+        settings.visible = data.get('visible', False)
+        settings.spacing = data.get('spacing', 20)
+        settings.offset_x = data.get('offset_x', 0)
+        settings.offset_y = data.get('offset_y', 0)
+        settings.opacity = data.get('opacity', 0.7)
+        settings.snap_enabled = data.get('snap_enabled', False)
+
+        # Handle color
+        color_rgba = data.get('color', (128, 128, 128, 180))
+        if isinstance(color_rgba, (list, tuple)) and len(color_rgba) >= 3:
+            settings.color = QColor(*color_rgba[:4])
+        else:
+            settings.color = QColor(128, 128, 128, 180)
+
+        return settings
+
+
+class GridManager(QObject):
+    """
+    Enhanced Grid Manager - Centralized grid functionality
+
+    Features:
+    - Show/Hide grid with visual feedback
+    - Customizable grid color with alpha channel
+    - Grid spacing and offset controls
+    - Snap-to-grid functionality
+    - Settings persistence
+    - Integration with existing popup and canvas
+    """
+
+    # Signals
+    grid_changed = pyqtSignal(GridSettings)  # Emitted when any grid setting changes
+    grid_visibility_changed = pyqtSignal(bool)
+    grid_color_changed = pyqtSignal(QColor)
+    grid_spacing_changed = pyqtSignal(int)
+    grid_offset_changed = pyqtSignal(int, int)
+    snap_changed = pyqtSignal(bool)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        # Grid settings
+        self.settings = GridSettings()
+
+        # Color presets for quick selection
+        self.color_presets = [
+            QColor(128, 128, 128, 180),  # Default gray
+            QColor(200, 200, 200, 150),  # Light gray
+            QColor(100, 100, 100, 200),  # Dark gray
+            QColor(0, 100, 200, 160),  # Blue
+            QColor(200, 100, 0, 160),  # Orange
+            QColor(100, 200, 0, 160),  # Green
+            QColor(200, 0, 100, 160),  # Pink
+            QColor(150, 0, 150, 160),  # Purple
+        ]
+
+        # Update timer for performance
+        self.update_timer = QTimer()
+        self.update_timer.setSingleShot(True)
+        self.update_timer.timeout.connect(self._emit_grid_changed)
+
+    # =========================
+    # CORE GRID FUNCTIONALITY
+    # =========================
+
+    def show_grid(self) -> None:
+        """Show the grid"""
+        if not self.settings.visible:
+            self.settings.visible = True
+            self.grid_visibility_changed.emit(True)
+            self._schedule_update()
+            print("📐 Grid shown")
+
+    def hide_grid(self) -> None:
+        """Hide the grid"""
+        if self.settings.visible:
+            self.settings.visible = False
+            self.grid_visibility_changed.emit(False)
+            self._schedule_update()
+            print("📐 Grid hidden")
+
+    def toggle_grid(self) -> bool:
+        """Toggle grid visibility and return new state"""
+        if self.settings.visible:
+            self.hide_grid()
+        else:
+            self.show_grid()
+        return self.settings.visible
+
+    def is_grid_visible(self) -> bool:
+        """Check if grid is currently visible"""
+        return self.settings.visible
+
+    # =========================
+    # COLOR MANAGEMENT
+    # =========================
+
+    def set_grid_color(self, color: QColor) -> None:
+        """Set grid color with validation"""
+        if color.isValid() and color != self.settings.color:
+            self.settings.color = color
+            self.grid_color_changed.emit(color)
+            self._schedule_update()
+            print(f"📐 Grid color changed to: {color.name()} (alpha: {color.alpha()})")
+
+    def get_grid_color(self) -> QColor:
+        """Get current grid color"""
+        return self.settings.color
+
+    def show_color_picker(self, parent=None) -> bool:
+        """Show color picker dialog and update grid color"""
+        color = QColorDialog.getColor(
+            self.settings.color,
+            parent,
+            "Select Grid Color",
+            QColorDialog.ColorDialogOption.ShowAlphaChannel
+        )
+
+        if color.isValid():
+            self.set_grid_color(color)
+            return True
+        return False
+
+    def set_color_from_preset(self, preset_index: int) -> None:
+        """Set color from preset list"""
+        if 0 <= preset_index < len(self.color_presets):
+            self.set_grid_color(self.color_presets[preset_index])
+
+    def get_color_presets(self) -> list[QColor]:
+        """Get list of color presets"""
+        return self.color_presets.copy()
+
+    # =========================
+    # GRID PROPERTIES
+    # =========================
+
+    def set_spacing(self, spacing: int) -> None:
+        """Set grid spacing (5-100 pixels)"""
+        spacing = max(5, min(spacing, 100))
+        if spacing != self.settings.spacing:
+            self.settings.spacing = spacing
+            self.grid_spacing_changed.emit(spacing)
+            self._schedule_update()
+            print(f"📐 Grid spacing: {spacing}px")
+
+    def get_spacing(self) -> int:
+        """Get current grid spacing"""
+        return self.settings.spacing
+
+    def set_offset(self, x: int, y: int) -> None:
+        """Set grid offset"""
+        x = max(-50, min(x, 50))
+        y = max(-50, min(y, 50))
+
+        if x != self.settings.offset_x or y != self.settings.offset_y:
+            self.settings.offset_x = x
+            self.settings.offset_y = y
+            self.grid_offset_changed.emit(x, y)
+            self._schedule_update()
+            print(f"📐 Grid offset: ({x}, {y})")
+
+    def get_offset(self) -> Tuple[int, int]:
+        """Get current grid offset"""
+        return (self.settings.offset_x, self.settings.offset_y)
+
+    def set_opacity(self, opacity: float) -> None:
+        """Set grid opacity (0.0 - 1.0)"""
+        opacity = max(0.0, min(opacity, 1.0))
+        if abs(opacity - self.settings.opacity) > 0.01:
+            self.settings.opacity = opacity
+            # Update color alpha based on opacity
+            color = self.settings.color
+            color.setAlphaF(opacity)
+            self.set_grid_color(color)
+
+    def get_opacity(self) -> float:
+        """Get current grid opacity"""
+        return self.settings.opacity
+
+    # =========================
+    # SNAP TO GRID
+    # =========================
+
+    def enable_snap(self) -> None:
+        """Enable snap to grid"""
+        if not self.settings.snap_enabled:
+            self.settings.snap_enabled = True
+            self.snap_changed.emit(True)
+            print("🧲 Snap to grid enabled")
+
+    def disable_snap(self) -> None:
+        """Disable snap to grid"""
+        if self.settings.snap_enabled:
+            self.settings.snap_enabled = False
+            self.snap_changed.emit(False)
+            print("🧲 Snap to grid disabled")
+
+    def toggle_snap(self) -> bool:
+        """Toggle snap to grid and return new state"""
+        if self.settings.snap_enabled:
+            self.disable_snap()
+        else:
+            self.enable_snap()
+        return self.settings.snap_enabled
+
+    def is_snap_enabled(self) -> bool:
+        """Check if snap to grid is enabled"""
+        return self.settings.snap_enabled
+
+    def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0) -> Tuple[float, float]:
+        """Snap a point to the nearest grid intersection"""
+        if not self.settings.snap_enabled or not self.settings.visible:
+            return (x, y)
+
+        # Scale grid with zoom
+        scaled_spacing = self.settings.spacing * zoom_level
+        scaled_offset_x = self.settings.offset_x * zoom_level
+        scaled_offset_y = self.settings.offset_y * zoom_level
+
+        # Calculate snapped coordinates
+        snapped_x = round((x - scaled_offset_x) / scaled_spacing) * scaled_spacing + scaled_offset_x
+        snapped_y = round((y - scaled_offset_y) / scaled_spacing) * scaled_spacing + scaled_offset_y
+
+        return (snapped_x, snapped_y)
+
+    # =========================
+    # DRAWING
+    # =========================
+
+    def draw_grid(self, painter: QPainter, width: int, height: int, zoom_level: float = 1.0) -> None:
+        """Draw grid on the given painter"""
+        if not self.settings.visible:
+            return
+
+        # Create pen with current color and opacity
+        pen = QPen(self.settings.color)
+        pen.setWidth(1)
+        painter.setPen(pen)
+
+        # Scale grid with zoom
+        scaled_spacing = int(self.settings.spacing * zoom_level)
+        scaled_offset_x = int(self.settings.offset_x * zoom_level)
+        scaled_offset_y = int(self.settings.offset_y * zoom_level)
+
+        # Skip if grid would be too dense
+        if scaled_spacing < 2:
+            return
+
+        # Draw vertical lines
+        start_x = scaled_offset_x % scaled_spacing
+        for x in range(start_x, width, scaled_spacing):
+            painter.drawLine(x, 0, x, height)
+
+        # Draw horizontal lines
+        start_y = scaled_offset_y % scaled_spacing
+        for y in range(start_y, height, scaled_spacing):
+            painter.drawLine(0, y, width, y)
+
+    # =========================
+    # PRESET MANAGEMENT
+    # =========================
+
+    def reset_to_defaults(self) -> None:
+        """Reset all grid settings to defaults"""
+        self.settings = GridSettings()
+        self._emit_all_signals()
+        print("📐 Grid settings reset to defaults")
+
+    def apply_quick_preset(self, preset_name: str) -> None:
+        """Apply a quick preset configuration"""
+        presets = {
+            'fine': GridSettings(visible=True, spacing=10, color=QColor(150, 150, 150, 120)),
+            'normal': GridSettings(visible=True, spacing=20, color=QColor(128, 128, 128, 180)),
+            'coarse': GridSettings(visible=True, spacing=40, color=QColor(100, 100, 100, 200)),
+            'blueprint': GridSettings(visible=True, spacing=25, color=QColor(0, 100, 200, 150)),
+            'design': GridSettings(visible=True, spacing=15, color=QColor(200, 100, 0, 140)),
+        }
+
+        if preset_name in presets:
+            self.settings = presets[preset_name]
+            self._emit_all_signals()
+            print(f"📐 Applied '{preset_name}' preset")
+
+    # =========================
+    # SETTINGS PERSISTENCE
+    # =========================
+
+    def save_settings(self, filepath: str) -> bool:
+        """Save grid settings to file"""
+        try:
+            with open(filepath, 'w') as f:
+                json.dump(self.settings.to_dict(), f, indent=2)
+            print(f"💾 Grid settings saved to {filepath}")
+            return True
+        except Exception as e:
+            print(f"⚠️ Failed to save grid settings: {e}")
+            return False
+
+    def load_settings(self, filepath: str) -> bool:
+        """Load grid settings from file"""
+        try:
+            with open(filepath, 'r') as f:
+                data = json.load(f)
+            self.settings = GridSettings.from_dict(data)
+            self._emit_all_signals()
+            print(f"📂 Grid settings loaded from {filepath}")
+            return True
+        except Exception as e:
+            print(f"⚠️ Failed to load grid settings: {e}")
+            return False
+
+    def get_settings(self) -> GridSettings:
+        """Get current grid settings (copy)"""
+        return GridSettings(
+            visible=self.settings.visible,
+            spacing=self.settings.spacing,
+            offset_x=self.settings.offset_x,
+            offset_y=self.settings.offset_y,
+            color=QColor(self.settings.color),
+            opacity=self.settings.opacity,
+            snap_enabled=self.settings.snap_enabled
+        )
+
+    def set_settings(self, settings: GridSettings) -> None:
+        """Set grid settings from GridSettings object"""
+        self.settings = GridSettings(
+            visible=settings.visible,
+            spacing=settings.spacing,
+            offset_x=settings.offset_x,
+            offset_y=settings.offset_y,
+            color=QColor(settings.color),
+            opacity=settings.opacity,
+            snap_enabled=settings.snap_enabled
+        )
+        self._emit_all_signals()
+
+    # =========================
+    # INTEGRATION METHODS
+    # =========================
+
+    def connect_to_popup(self, popup) -> None:
+        """Connect to existing GridControlPopup"""
+        if hasattr(popup, 'grid_visibility_changed'):
+            popup.grid_visibility_changed.connect(lambda visible: setattr(self.settings, 'visible', visible))
+        if hasattr(popup, 'grid_color_changed'):
+            popup.grid_color_changed.connect(self.set_grid_color)
+        if hasattr(popup, 'grid_spacing_changed'):
+            popup.grid_spacing_changed.connect(self.set_spacing)
+        if hasattr(popup, 'grid_offset_changed'):
+            popup.grid_offset_changed.connect(self.set_offset)
+        if hasattr(popup, 'snap_to_grid_changed'):
+            popup.snap_to_grid_changed.connect(lambda enabled: setattr(self.settings, 'snap_enabled', enabled))
+
+        print("🔗 Connected to GridControlPopup")
+
+    def connect_to_canvas(self, canvas) -> None:
+        """Connect to PDF canvas for drawing"""
+        # Connect our signals to canvas methods
+        self.grid_changed.connect(lambda settings: self._update_canvas(canvas, settings))
+        print("🔗 Connected to PDF Canvas")
+
+    def _update_canvas(self, canvas, settings: GridSettings) -> None:
+        """Update canvas with new grid settings"""
+        if hasattr(canvas, 'set_grid_visible'):
+            canvas.set_grid_visible(settings.visible)
+        if hasattr(canvas, 'set_grid_color'):
+            canvas.set_grid_color(settings.color)
+        if hasattr(canvas, 'set_grid_spacing'):
+            canvas.set_grid_spacing(settings.spacing)
+        if hasattr(canvas, 'set_grid_offset'):
+            canvas.set_grid_offset(settings.offset_x, settings.offset_y)
+        if hasattr(canvas, 'update'):
+            canvas.update()
+
+    # =========================
+    # PRIVATE METHODS
+    # =========================
+
+    def _schedule_update(self) -> None:
+        """Schedule a delayed update to avoid too many signals"""
+        self.update_timer.start(50)  # 50ms delay
+
+    def _emit_grid_changed(self) -> None:
+        """Emit the main grid changed signal"""
+        self.grid_changed.emit(self.settings)
+
+    def _emit_all_signals(self) -> None:
+        """Emit all individual signals (used when loading settings)"""
+        self.grid_visibility_changed.emit(self.settings.visible)
+        self.grid_color_changed.emit(self.settings.color)
+        self.grid_spacing_changed.emit(self.settings.spacing)
+        self.grid_offset_changed.emit(self.settings.offset_x, self.settings.offset_y)
+        self.snap_changed.emit(self.settings.snap_enabled)
+        self._emit_grid_changed()
+
+
+# =========================
+# USAGE EXAMPLE
+# =========================
+
+def example_usage():
+    """Example of how to use the GridManager"""
+    from PyQt6.QtWidgets import QApplication
+    import sys
+
+    app = QApplication(sys.argv)
+
+    # Create grid manager
+    grid_manager = GridManager()
+
+    # Connect signals for demo
+    grid_manager.grid_visibility_changed.connect(
+        lambda visible: print(f"Grid visibility: {visible}")
+    )
+    grid_manager.grid_color_changed.connect(
+        lambda color: print(f"Grid color: {color.name()}")
+    )
+    grid_manager.grid_spacing_changed.connect(
+        lambda spacing: print(f"Grid spacing: {spacing}px")
+    )
+
+    # Demo operations
+    print("=== Grid Manager Demo ===")
+
+    # Show grid
+    grid_manager.show_grid()
+
+    # Change color
+    grid_manager.set_grid_color(QColor(0, 100, 200, 150))
+
+    # Change spacing
+    grid_manager.set_spacing(30)
+
+    # Set offset
+    grid_manager.set_offset(5, -3)
+
+    # Enable snap
+    grid_manager.enable_snap()
+
+    # Test snap functionality
+    snapped = grid_manager.snap_point_to_grid(47.3, 83.7)
+    print(f"Point (47.3, 83.7) snapped to {snapped}")
+
+    # Apply preset
+    grid_manager.apply_quick_preset('blueprint')
+
+    # Save settings
+    grid_manager.save_settings('grid_settings.json')
+
+    print("Demo completed!")
+
+
+if __name__ == "__main__":
+    example_usage()

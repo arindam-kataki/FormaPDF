@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QScrollArea, QLabel, QToolBar, QStatusBar, QPushButton,
     QComboBox, QFileDialog, QMessageBox, QApplication
 )
-from PyQt6.QtGui import QAction, QKeySequence, QFont
+from PyQt6.QtGui import QAction, QKeySequence, QFont, QColor
 from PyQt6.QtCore import Qt, pyqtSlot, QSettings, QRect
 
 # Safe imports with fallbacks
@@ -68,6 +68,12 @@ except ImportError:
     ICON_UTILS_AVAILABLE = False
 
 from .toolbar_manager import ToolbarManager
+try:
+    from src.ui.grid_manager import GridManager
+    print("✅ GridManager import successful")
+except ImportError as e:
+    print(f"❌ GridManager import failed: {e}")
+
 class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
     """Main application window with safe fallbacks"""
 
@@ -83,7 +89,6 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.setup_scroll_tracking()
         self.setup_scroll_timer()
 
-
     def setup_scroll_timer(self):
         """Setup timer-based scroll rendering"""
         from PyQt6.QtCore import QTimer
@@ -98,6 +103,79 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.needs_zoom_update = False
 
         print("✅ Timer-based scroll rendering initialized")
+
+    def setup_enhanced_grid(self):
+        """Set up enhanced grid functionality"""
+        try:
+            from src.ui.grid_manager import GridManager
+            from PyQt6.QtGui import QColor
+
+            # Create the grid manager
+            self.grid_manager = GridManager(self)
+
+            # CONNECT TO YOUR CANVAS
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.connect_grid_to_canvas()
+
+            # Test basic functionality
+            print("🔧 Testing GridManager with loaded PDF...")
+
+            # Show grid
+            self.grid_manager.show_grid()
+            print(f"Grid visible: {self.grid_manager.is_grid_visible()}")
+
+            # Try setting a blue color
+            blue_color = QColor(0, 100, 200, 150)  # Blue with transparency
+            self.grid_manager.set_grid_color(blue_color)
+            print(f"Grid color set to: {blue_color.name()}")
+
+            # Set spacing
+            self.grid_manager.set_spacing(25)
+            print(f"Grid spacing: {self.grid_manager.get_spacing()}px")
+
+            print("✅ GridManager basic test completed!")
+
+        except Exception as e:
+            print(f"❌ GridManager test failed: {e}")
+
+    def connect_grid_to_canvas(self):
+        """Connect GridManager to PDF canvas"""
+        # Connect GridManager changes to canvas updates
+        self.grid_manager.grid_visibility_changed.connect(self.update_canvas_grid_visibility)
+        self.grid_manager.grid_color_changed.connect(self.update_canvas_grid_color)
+        self.grid_manager.grid_spacing_changed.connect(self.update_canvas_grid_spacing)
+        self.grid_manager.grid_offset_changed.connect(self.update_canvas_grid_offset)
+
+        print("🔗 GridManager connected to canvas")
+
+    def update_canvas_grid_visibility(self, visible):
+        """Update canvas grid visibility"""
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            self.pdf_canvas.show_grid = visible
+            self.pdf_canvas.draw_overlay()  # This will trigger the redraw
+            print(f"📐 Canvas grid visibility updated: {visible}")
+
+    def update_canvas_grid_color(self, color):
+        """Update canvas grid color"""
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            self.pdf_canvas.grid_color = color
+            self.pdf_canvas.draw_overlay()  # This will trigger the redraw
+            print(f"📐 Canvas grid color updated: {color.name()}")
+
+    def update_canvas_grid_spacing(self, spacing):
+        """Update canvas grid spacing"""
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            self.pdf_canvas.grid_size = spacing  # Your canvas uses grid_size
+            self.pdf_canvas.draw_overlay()  # This will trigger the redraw
+            print(f"📐 Canvas grid spacing updated: {spacing}px")
+
+    def update_canvas_grid_offset(self, offset_x, offset_y):
+        """Update canvas grid offset"""
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            self.pdf_canvas.grid_offset_x = offset_x
+            self.pdf_canvas.grid_offset_y = offset_y
+            self.pdf_canvas.draw_overlay()  # This will trigger the redraw
+            print(f"📐 Canvas grid offset updated: ({offset_x}, {offset_y})")
 
     def init_ui(self):
         """Initialize the user interface"""
@@ -785,6 +863,9 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                         print("🔧 Toolbar state updated to show all controls")
                     else:
                         print("❌ update_toolbar_state method not available")
+
+                    if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                        self.setup_enhanced_grid()
 
                     return True
                 else:
