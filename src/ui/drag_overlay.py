@@ -57,6 +57,9 @@ class DragOverlay(QWidget):
         self.current_drag_pos = start_pos
         self.zoom_level = zoom_level
 
+        # ✅ Reset cursor-to-field offset for new drag
+        self._cursor_to_field_offset = None
+
         # Calculate initial ghost positions
         self.update_ghost_positions()
 
@@ -313,6 +316,92 @@ class DragOverlay(QWidget):
             return True  # Default to valid if validation fails
 
     def draw_drag_feedback(self, painter: QPainter):
+        """Draw visual feedback for dragged fields with debug output"""
+        print(
+            f"🎨 draw_drag_feedback called - dragging: {self.is_dragging}, fields: {len(self.drag_fields) if self.drag_fields else 0}")
+
+        if not self.is_dragging or not self.drag_fields:
+            print("🚫 Not drawing - not dragging or no fields")
+            return
+
+        print(f"🎯 Drawing ghosts for {len(self.drag_fields)} fields")
+        print(f"   Ghost positions available: {len(self.ghost_positions)}")
+
+        # Very visible ghost styling for debugging
+        ghost_color = QColor(255, 0, 0, 150)  # Bright red for visibility
+        ghost_border = QColor(255, 0, 0, 255)  # Solid red border
+
+        ghost_brush = QBrush(ghost_color)
+        ghost_pen = QPen(ghost_border, 4)  # Thick border
+        painter.setBrush(ghost_brush)
+        painter.setPen(ghost_pen)
+
+        ghosts_drawn = 0
+
+        # Draw ghost for each dragged field
+        for field in self.drag_fields:
+            field_id = getattr(field, 'id', None)
+            field_name = getattr(field, 'name', 'unnamed')
+
+            print(f"   Processing field: {field_name} (id: {field_id})")
+
+            if field_id and field_id in self.ghost_positions:
+                ghost_pos = self.ghost_positions[field_id]
+                print(f"   ✅ Found ghost position: {ghost_pos}")
+
+                # Check if position is reasonable
+                if ghost_pos.x() < -2000 or ghost_pos.y() < -2000 or ghost_pos.x() > 10000 or ghost_pos.y() > 10000:
+                    print(f"   ⚠️ Ghost position seems unreasonable: {ghost_pos}")
+                    continue
+
+                # Get field dimensions (scaled by zoom)
+                field_width = int(getattr(field, 'width', 100) * self.zoom_level)
+                field_height = int(getattr(field, 'height', 30) * self.zoom_level)
+
+                print(f"   Drawing rect at {ghost_pos} with size {field_width}x{field_height}")
+
+                # Draw ghost rectangle
+                ghost_rect = QRect(ghost_pos.x(), ghost_pos.y(), field_width, field_height)
+                painter.drawRect(ghost_rect)
+
+                # Draw field name
+                if field_name:
+                    painter.setPen(QPen(QColor(255, 255, 255, 255)))  # White text
+                    font = QFont("Arial", max(8, int(12 * self.zoom_level)))
+                    painter.setFont(font)
+
+                    text_x = ghost_pos.x() + 5
+                    text_y = ghost_pos.y() + 15
+                    painter.drawText(text_x, text_y, field_name)
+
+                    # Restore pen
+                    painter.setPen(ghost_pen)
+
+                ghosts_drawn += 1
+                print(f"   👻 Successfully drew ghost for {field_name}")
+            else:
+                print(f"   ❌ No ghost position for {field_name} (id: {field_id})")
+                print(f"       Available ghost IDs: {list(self.ghost_positions.keys())}")
+
+        print(f"✅ Drew {ghosts_drawn}/{len(self.drag_fields)} ghosts")
+
+        # Draw cursor indicator
+        cursor_x = self.current_drag_pos.x()
+        cursor_y = self.current_drag_pos.y()
+        painter.setPen(QPen(QColor(0, 255, 0, 255), 3))  # Green cursor
+        painter.drawLine(cursor_x - 15, cursor_y, cursor_x + 15, cursor_y)
+        painter.drawLine(cursor_x, cursor_y - 15, cursor_x, cursor_y + 15)
+        print(f"🎯 Drew cursor at {cursor_x}, {cursor_y}")
+
+        # Draw cursor indicator
+        cursor_x = self.current_drag_pos.x()
+        cursor_y = self.current_drag_pos.y()
+        painter.setPen(QPen(QColor(0, 255, 0, 255), 3))  # Green cursor
+        painter.drawLine(cursor_x - 15, cursor_y, cursor_x + 15, cursor_y)
+        painter.drawLine(cursor_x, cursor_y - 15, cursor_x, cursor_y + 15)
+        print(f"🎯 Drew cursor at {cursor_x}, {cursor_y}")
+
+    def deprecated_1_draw_drag_feedback(self, painter: QPainter):
         """
         Draw multi-page aware visual feedback for dragged fields
         Version: 2.1 - Enhanced visibility and debugging
@@ -747,7 +836,7 @@ class DragOverlay(QWidget):
         finally:
             painter.end()
 
-    def draw_drag_feedback(self, painter):
+    def deprecated_2_draw_drag_feedback(self, painter):
         """Draw visual feedback for dragged fields with enhanced visibility"""
         # Enhanced ghost styling for better visibility
         ghost_color = QColor(100, 150, 255, 120)  # More opaque blue
@@ -837,56 +926,70 @@ class DragOverlay(QWidget):
                 self.ghost_positions[field.id] = ghost_pos
 
     def update_ghost_positions(self):
-        """Calculate ghost positions with proper zoom support"""
+        """Calculate ghost positions maintaining cursor offset from field"""
         if not self.is_dragging or not self.drag_fields:
             return
 
         print(f"🎯 Updating ghost positions for {len(self.drag_fields)} fields")
 
-        # ✅ KEY FIX: Convert screen drag offset to document coordinates
-        screen_drag_offset = self.current_drag_pos - self.drag_start_pos
-        doc_drag_offset_x = screen_drag_offset.x() / self.zoom_level
-        doc_drag_offset_y = screen_drag_offset.y() / self.zoom_level
-
-        print(f"   Screen drag offset: {screen_drag_offset}")
-        print(f"   Document drag offset: ({doc_drag_offset_x:.1f}, {doc_drag_offset_y:.1f})")
-        print(f"   Zoom level: {self.zoom_level:.2f}x")
-
-        # Get canvas reference for coordinate conversion
+        # Get canvas reference
         canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
+
+        # Clear previous positions
+        self.ghost_positions.clear()
 
         # Process each dragged field
         for field in self.drag_fields:
+            field_id = getattr(field, 'id', f'field_{id(field)}')
+            field_name = getattr(field, 'name', 'unnamed')
             page_number = getattr(field, 'page_number', 0)
 
-            try:
-                # ✅ Calculate new field position in document coordinates
-                new_field_doc_x = field.x + doc_drag_offset_x
-                new_field_doc_y = field.y + doc_drag_offset_y
+            print(f"   Processing field: {field_name}")
 
-                # Try to use canvas method for accurate screen coordinates
+            try:
+                # Get the field's CURRENT screen position (at drag start)
                 if canvas and hasattr(canvas, 'document_to_screen_coordinates'):
-                    screen_coords = canvas.document_to_screen_coordinates(
-                        page_number, new_field_doc_x, new_field_doc_y
+                    current_field_screen = canvas.document_to_screen_coordinates(
+                        page_number, getattr(field, 'x', 0), getattr(field, 'y', 0)
+                    )
+                    print(f"     Field screen position: {current_field_screen}")
+                else:
+                    current_field_screen = None
+
+                if current_field_screen:
+                    # Calculate the offset from cursor to field at drag start
+                    if not hasattr(self, '_cursor_to_field_offset'):
+                        # First time - calculate and store the offset
+                        self._cursor_to_field_offset = QPoint(
+                            current_field_screen[0] - self.drag_start_pos.x(),
+                            current_field_screen[1] - self.drag_start_pos.y()
+                        )
+                        print(f"     Calculated cursor-to-field offset: {self._cursor_to_field_offset}")
+
+                    # Position ghost maintaining the same offset from cursor
+                    ghost_pos = QPoint(
+                        self.current_drag_pos.x() + self._cursor_to_field_offset.x(),
+                        self.current_drag_pos.y() + self._cursor_to_field_offset.y()
+                    )
+                else:
+                    # Fallback: position relative to cursor
+                    ghost_pos = QPoint(
+                        self.current_drag_pos.x() - 50,
+                        self.current_drag_pos.y() - 15
                     )
 
-                    if screen_coords:
-                        ghost_pos = QPoint(int(screen_coords[0]), int(screen_coords[1]))
-                        self.ghost_positions[field.id] = ghost_pos
-                        print(f"   {field.name}: using canvas conversion -> {ghost_pos}")
-                        continue
-
-                # ✅ Fallback: Manual zoom-aware calculation
-                self._calculate_zoom_aware_ghost_position(field, doc_drag_offset_x, doc_drag_offset_y, canvas)
+                self.ghost_positions[field_id] = ghost_pos
+                print(f"     ✅ Ghost at: {ghost_pos}, cursor at: {self.current_drag_pos}")
 
             except Exception as e:
-                print(f"❌ Error updating ghost for {field.name}: {e}")
-                # Last resort fallback
+                print(f"     ❌ Error: {e}")
                 ghost_pos = QPoint(
                     self.current_drag_pos.x() - 50,
                     self.current_drag_pos.y() - 15
                 )
-                self.ghost_positions[field.id] = ghost_pos
+                self.ghost_positions[field_id] = ghost_pos
+
+        print(f"✅ Ghost positions calculated: {len(self.ghost_positions)} positions")
 
     # new
     def _calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
@@ -976,7 +1079,7 @@ class DragOverlay(QWidget):
         finally:
             painter.end()
 
-    def draw_drag_feedback(self, painter: QPainter):
+    def deprecated_3_draw_drag_feedback(self, painter: QPainter):
         """Draw visual feedback for dragged fields"""
         # Set up ghost styling
         ghost_color = QColor(100, 150, 255, 100)  # Semi-transparent blue
