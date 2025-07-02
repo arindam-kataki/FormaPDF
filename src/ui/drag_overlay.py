@@ -882,7 +882,6 @@ class DragOverlay(QWidget):
             except Exception as e:
                 print(f"❌ Error updating ghost for {field.name}: {e}")
                 # Last resort fallback
-                screen_cursor_offset = self.current_drag_pos - self.drag_start_pos
                 ghost_pos = QPoint(
                     self.current_drag_pos.x() - 50,
                     self.current_drag_pos.y() - 15
