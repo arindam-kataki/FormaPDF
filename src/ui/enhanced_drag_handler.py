@@ -401,8 +401,8 @@ class EnhancedDragHandler(QObject):
         print(f"   Screen offset: {screen_offset}")
 
         # FIXED: Convert screen offset to document offset
-        doc_offset_x = screen_offset.x() / self.zoom_level
-        doc_offset_y = screen_offset.y() / self.zoom_level
+        doc_offset_x = screen_offset.x() #/ self.zoom_level
+        doc_offset_y = screen_offset.y() #/ self.zoom_level
         print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
 
         # Apply document offset to each field

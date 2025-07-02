@@ -2360,6 +2360,7 @@ class PDFCanvas(QLabel):
                 page_num, doc_x, doc_y = doc_coords
                 doc_pos = QPoint(int(doc_x), int(doc_y))
 
+                #self.enhanced_drag_handler.set_zoom_level(self.zoom_level)
                 was_dragging = self.enhanced_drag_handler.handle_mouse_release(doc_pos)
 
                 if was_dragging:
