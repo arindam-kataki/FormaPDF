@@ -98,6 +98,13 @@ class DragOverlay(QWidget):
         self.update_ghost_positions()
         self.update()
 
+    def get_drag_offset(self):
+        """Get the current drag offset in screen coordinates"""
+        if not self.is_dragging:
+            return QPoint(0, 0)
+
+        return self.current_drag_pos - self.drag_start_pos
+
     def deprecated_calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
         """Fallback method for zoom-aware ghost positioning"""
         field_page = getattr(field, 'page_number', 0)
