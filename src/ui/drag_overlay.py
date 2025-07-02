@@ -84,7 +84,7 @@ class DragOverlay(QWidget):
         # Only update the overlay, not the entire canvas
         self.update()
 
-    def _calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
+    def deprecated_calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
         """Fallback method for zoom-aware ghost positioning"""
         field_page = getattr(field, 'page_number', 0)
 
@@ -151,7 +151,7 @@ class DragOverlay(QWidget):
     - Added visual debug indicators (removable)
     """
 
-    def update_ghost_positions(self):
+    def deprecated_update_ghost_positions(self):
         """
         Calculate ghost positions with proper multi-page support
         Version: 2.1
@@ -836,27 +836,103 @@ class DragOverlay(QWidget):
                 )
                 self.ghost_positions[field.id] = ghost_pos
 
-    def deprecated_update_ghost_positions(self):
-        """Calculate ghost positions for all dragged fields"""
+    def update_ghost_positions(self):
+        """Calculate ghost positions with proper zoom support"""
         if not self.is_dragging or not self.drag_fields:
             return
 
-        # Calculate drag offset
-        drag_offset = self.current_drag_pos - self.drag_start_pos
+        print(f"🎯 Updating ghost positions for {len(self.drag_fields)} fields")
 
-        # Update ghost position for each field
+        # ✅ KEY FIX: Convert screen drag offset to document coordinates
+        screen_drag_offset = self.current_drag_pos - self.drag_start_pos
+        doc_drag_offset_x = screen_drag_offset.x() / self.zoom_level
+        doc_drag_offset_y = screen_drag_offset.y() / self.zoom_level
+
+        print(f"   Screen drag offset: {screen_drag_offset}")
+        print(f"   Document drag offset: ({doc_drag_offset_x:.1f}, {doc_drag_offset_y:.1f})")
+        print(f"   Zoom level: {self.zoom_level:.2f}x")
+
+        # Get canvas reference for coordinate conversion
+        canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
+
+        # Process each dragged field
         for field in self.drag_fields:
-            if hasattr(field, 'get_screen_rect'):
-                # Get field's current screen position
-                field_rect = field.get_screen_rect(self.zoom_level)
+            page_number = getattr(field, 'page_number', 0)
 
-                # Apply drag offset
+            try:
+                # ✅ Calculate new field position in document coordinates
+                new_field_doc_x = field.x + doc_drag_offset_x
+                new_field_doc_y = field.y + doc_drag_offset_y
+
+                # Try to use canvas method for accurate screen coordinates
+                if canvas and hasattr(canvas, 'document_to_screen_coordinates'):
+                    screen_coords = canvas.document_to_screen_coordinates(
+                        page_number, new_field_doc_x, new_field_doc_y
+                    )
+
+                    if screen_coords:
+                        ghost_pos = QPoint(int(screen_coords[0]), int(screen_coords[1]))
+                        self.ghost_positions[field.id] = ghost_pos
+                        print(f"   {field.name}: using canvas conversion -> {ghost_pos}")
+                        continue
+
+                # ✅ Fallback: Manual zoom-aware calculation
+                self._calculate_zoom_aware_ghost_position(field, doc_drag_offset_x, doc_drag_offset_y, canvas)
+
+            except Exception as e:
+                print(f"❌ Error updating ghost for {field.name}: {e}")
+                # Last resort fallback
+                screen_cursor_offset = self.current_drag_pos - self.drag_start_pos
                 ghost_pos = QPoint(
-                    field_rect.x() + drag_offset.x(),
-                    field_rect.y() + drag_offset.y()
+                    self.current_drag_pos.x() - 50,
+                    self.current_drag_pos.y() - 15
                 )
-
                 self.ghost_positions[field.id] = ghost_pos
+
+    # new
+    def _calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
+        """Fallback method for zoom-aware ghost positioning"""
+        field_page = getattr(field, 'page_number', 0)
+
+        try:
+            # Calculate new field position in document coordinates
+            new_field_doc_x = field.x + doc_offset_x
+            new_field_doc_y = field.y + doc_offset_y
+
+            # ✅ Convert to screen coordinates manually with zoom
+            ghost_screen_x = int(new_field_doc_x * self.zoom_level)
+            ghost_screen_y = int(new_field_doc_y * self.zoom_level)
+
+            # Add page offset for multi-page documents
+            if canvas and hasattr(canvas, 'get_page_offset'):
+                try:
+                    page_offset_y = canvas.get_page_offset(field_page)
+                    ghost_screen_y += page_offset_y
+                except:
+                    pass
+
+            # Account for scroll position
+            if canvas and hasattr(canvas, 'horizontalScrollBar') and hasattr(canvas, 'verticalScrollBar'):
+                scroll_x = canvas.horizontalScrollBar().value()
+                scroll_y = canvas.verticalScrollBar().value()
+                ghost_screen_x -= scroll_x
+                ghost_screen_y -= scroll_y
+
+            # Account for canvas margins
+            if canvas:
+                canvas_margin_x = getattr(canvas, 'canvas_margin_x', 0)
+                canvas_margin_y = getattr(canvas, 'canvas_margin_y', 0)
+                ghost_screen_x += canvas_margin_x
+                ghost_screen_y += canvas_margin_y
+
+            ghost_pos = QPoint(ghost_screen_x, ghost_screen_y)
+            self.ghost_positions[field.id] = ghost_pos
+
+            print(
+                f"   {field.name} (zoom-aware): doc({new_field_doc_x:.1f}, {new_field_doc_y:.1f}) -> screen({ghost_screen_x}, {ghost_screen_y})")
+
+        except Exception as e:
+            print(f"❌ Error calculating zoom-aware ghost position for {field.name}: {e}")
 
     def end_drag(self) -> bool:
         """
