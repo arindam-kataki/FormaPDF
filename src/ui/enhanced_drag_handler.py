@@ -79,8 +79,8 @@ class EnhancedDragHandler(QObject):
     cursorChanged = pyqtSignal(Qt.CursorShape)
 
     # Signals for drag and resize operations
-    fieldMoved = pyqtSignal(str, int, int)  # field_id, new_x, new_y
-    fieldResized = pyqtSignal(str, int, int, int, int)  # field_id, x, y, width, height
+    fieldMoved = pyqtSignal(str, float, float)  # field_id, new_x, new_y
+    fieldResized = pyqtSignal(str, float, float, float, float)  # field_id, x, y, width, height
     dragStarted = pyqtSignal(str, str)  # field_id, operation_type
     dragProgress = pyqtSignal(str, int, int, int, int)  # field_id, x, y, w, h
     dragCompleted = pyqtSignal(str)  # field_id
@@ -383,6 +383,49 @@ class EnhancedDragHandler(QObject):
             return []
 
     def apply_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions
+        FIXED: Properly convert screen offset to document offset
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos}")
+        print(f"   Final pos: {final_pos}")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # FIXED: Calculate screen offset first
+        screen_offset = final_pos - self.drag_start_pos
+        print(f"   Screen offset: {screen_offset}")
+
+        # FIXED: Convert screen offset to document offset
+        doc_offset_x = screen_offset.x() / self.zoom_level
+        doc_offset_y = screen_offset.y() / self.zoom_level
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+
+            # FIXED: Apply document-space offset
+            new_x = original_x + doc_offset_x
+            new_y = original_y + doc_offset_y
+
+            print(f"   Field {field.id}: ({original_x:.1f}, {original_y:.1f}) → ({new_x:.1f}, {new_y:.1f})")
+
+            # Update field position
+            field.x = new_x
+            field.y = new_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def deprecated_apply_drag_changes(self, final_pos: QPoint):
         """Apply drag offset to actual field positions"""
         selected_fields = self.get_selected_fields()  # ✅ FIXED
         if not selected_fields:
