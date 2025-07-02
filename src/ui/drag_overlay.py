@@ -41,14 +41,7 @@ class DragOverlay(QWidget):
         self.zoom_level = 1.0
 
     def start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
-        """
-        Start dragging operation
-
-        Args:
-            fields: List of field objects being dragged
-            start_pos: Starting position in canvas coordinates
-            zoom_level: Current zoom level for proper scaling
-        """
+        """Start dragging operation"""
         print(f"🎯 DragOverlay: Starting drag with {len(fields)} fields at {start_pos}")
 
         self.is_dragging = True
@@ -57,8 +50,13 @@ class DragOverlay(QWidget):
         self.current_drag_pos = start_pos
         self.zoom_level = zoom_level
 
-        # ✅ Reset cursor-to-field offset for new drag
-        self._cursor_to_field_offset = None
+        # ✅ Reset click offset calculation
+        if hasattr(self, '_click_offset_calculated'):
+            delattr(self, '_click_offset_calculated')
+        if hasattr(self, '_click_offset_x'):
+            delattr(self, '_click_offset_x')
+        if hasattr(self, '_click_offset_y'):
+            delattr(self, '_click_offset_y')
 
         # Calculate initial ghost positions
         self.update_ghost_positions()
@@ -557,7 +555,7 @@ class DragOverlay(QWidget):
                 ghost_pos = self.ghost_positions.get(field.id, "None")
                 print(f"     {i + 1}. {field.name}: page {page_num}, ghost: {ghost_pos}, valid: {has_ghost}")
 
-    def start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
+    def deprecated_start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
         """
         Start dragging operation with v2.1 enhancements
         Version: 2.1
@@ -628,7 +626,35 @@ class DragOverlay(QWidget):
         if hasattr(self, 'drag_overlay') and self.drag_overlay:
             self.drag_overlay.zoom_level = zoom_level
 
-    def start_drag(self, fields, start_pos, zoom_level=1.0):
+    def start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
+        """Start dragging operation"""
+        print(f"🎯 DragOverlay: Starting drag with {len(fields)} fields at {start_pos}")
+
+        self.is_dragging = True
+        self.drag_fields = fields.copy()
+        self.drag_start_pos = start_pos
+        self.current_drag_pos = start_pos
+        self.zoom_level = zoom_level
+
+        # ✅ Reset offset calculation flag
+        if hasattr(self, '_initial_offset_calculated'):
+            delattr(self, '_initial_offset_calculated')
+        if hasattr(self, '_cursor_to_field_x'):
+            delattr(self, '_cursor_to_field_x')
+        if hasattr(self, '_cursor_to_field_y'):
+            delattr(self, '_cursor_to_field_y')
+
+        # Calculate initial ghost positions
+        self.update_ghost_positions()
+
+        # Enable mouse events for the overlay during drag
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, False)
+
+        # Make overlay visible
+        self.show()
+        self.raise_()
+        self.update()
+    def deprecated_2_start_drag(self, fields, start_pos, zoom_level=1.0):
         """Start dragging operation with zoom level"""
         print(f"🎯 Starting zoom-aware drag: {len(fields)} fields at {start_pos} (zoom: {zoom_level:.2f}x)")
 
@@ -926,70 +952,82 @@ class DragOverlay(QWidget):
                 self.ghost_positions[field.id] = ghost_pos
 
     def update_ghost_positions(self):
-        """Calculate ghost positions maintaining cursor offset from field"""
+        """Calculate ghost positions with enhanced debugging"""
         if not self.is_dragging or not self.drag_fields:
             return
-
-        print(f"🎯 Updating ghost positions for {len(self.drag_fields)} fields")
-
-        # Get canvas reference
-        canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
 
         # Clear previous positions
         self.ghost_positions.clear()
 
-        # Process each dragged field
+        # For each field, position ghost relative to cursor
         for field in self.drag_fields:
             field_id = getattr(field, 'id', f'field_{id(field)}')
-            field_name = getattr(field, 'name', 'unnamed')
-            page_number = getattr(field, 'page_number', 0)
 
-            print(f"   Processing field: {field_name}")
+            # Calculate offset only ONCE at drag start
+            if not hasattr(self, '_click_offset_calculated'):
+                print(f"   🔍 CALCULATING INITIAL OFFSET")
+                print(f"   🔍 Drag start position: {self.drag_start_pos}")
+                print(f"   🔍 Zoom level: {self.zoom_level}")
 
-            try:
-                # Get the field's CURRENT screen position (at drag start)
+                # ✅ MULTIPLE METHODS TO GET FIELD POSITION
+                field_screen_x = None
+                field_screen_y = None
+
+                # Method 1: get_screen_rect
+                if hasattr(field, 'get_screen_rect'):
+                    try:
+                        field_screen_rect = field.get_screen_rect(self.zoom_level)
+                        field_screen_x = field_screen_rect.x()
+                        field_screen_y = field_screen_rect.y()
+                        print(f"   📍 Method 1 (get_screen_rect): ({field_screen_x}, {field_screen_y})")
+                    except Exception as e:
+                        print(f"   ❌ Method 1 failed: {e}")
+
+                # Method 2: Canvas conversion
+                canvas = self.parent() if hasattr(self, 'parent') and self.parent() else None
                 if canvas and hasattr(canvas, 'document_to_screen_coordinates'):
-                    current_field_screen = canvas.document_to_screen_coordinates(
-                        page_number, getattr(field, 'x', 0), getattr(field, 'y', 0)
-                    )
-                    print(f"     Field screen position: {current_field_screen}")
-                else:
-                    current_field_screen = None
-
-                if current_field_screen:
-                    # Calculate the offset from cursor to field at drag start
-                    if not hasattr(self, '_cursor_to_field_offset'):
-                        # First time - calculate and store the offset
-                        self._cursor_to_field_offset = QPoint(
-                            current_field_screen[0] - self.drag_start_pos.x(),
-                            current_field_screen[1] - self.drag_start_pos.y()
+                    try:
+                        screen_coords = canvas.document_to_screen_coordinates(
+                            getattr(field, 'page_number', 0),
+                            getattr(field, 'x', 0),
+                            getattr(field, 'y', 0)
                         )
-                        print(f"     Calculated cursor-to-field offset: {self._cursor_to_field_offset}")
+                        if screen_coords:
+                            print(f"   📍 Method 2 (canvas conversion): {screen_coords}")
+                    except Exception as e:
+                        print(f"   ❌ Method 2 failed: {e}")
 
-                    # Position ghost maintaining the same offset from cursor
-                    ghost_pos = QPoint(
-                        self.current_drag_pos.x() + self._cursor_to_field_offset.x(),
-                        self.current_drag_pos.y() + self._cursor_to_field_offset.y()
-                    )
+                # Method 3: Manual calculation
+                try:
+                    manual_x = int(getattr(field, 'x', 0) * self.zoom_level)
+                    manual_y = int(getattr(field, 'y', 0) * self.zoom_level)
+                    print(f"   📍 Method 3 (manual): ({manual_x}, {manual_y})")
+                except Exception as e:
+                    print(f"   ❌ Method 3 failed: {e}")
+
+                # Use the best available position
+                if field_screen_x is not None and field_screen_y is not None:
+                    print(f"   ✅ Using get_screen_rect position: ({field_screen_x}, {field_screen_y})")
+                    # Calculate where user clicked WITHIN the field
+                    self._click_offset_x = self.drag_start_pos.x() - field_screen_x
+                    self._click_offset_y = self.drag_start_pos.y() - field_screen_y
                 else:
-                    # Fallback: position relative to cursor
-                    ghost_pos = QPoint(
-                        self.current_drag_pos.x() - 50,
-                        self.current_drag_pos.y() - 15
-                    )
+                    print(f"   ⚠️ Fallback: Using zero offset")
+                    self._click_offset_x = 0
+                    self._click_offset_y = 0
 
-                self.ghost_positions[field_id] = ghost_pos
-                print(f"     ✅ Ghost at: {ghost_pos}, cursor at: {self.current_drag_pos}")
+                print(f"   📍 Final click offset: ({self._click_offset_x}, {self._click_offset_y})")
+                self._click_offset_calculated = True
 
-            except Exception as e:
-                print(f"     ❌ Error: {e}")
-                ghost_pos = QPoint(
-                    self.current_drag_pos.x() - 50,
-                    self.current_drag_pos.y() - 15
-                )
-                self.ghost_positions[field_id] = ghost_pos
+            # ✅ Position ghost so cursor is at the same spot within the field
+            ghost_pos = QPoint(
+                self.current_drag_pos.x() - self._click_offset_x,
+                self.current_drag_pos.y() - self._click_offset_y
+            )
 
-        print(f"✅ Ghost positions calculated: {len(self.ghost_positions)} positions")
+            self.ghost_positions[field_id] = ghost_pos
+            print(
+                f"   🎯 Cursor: {self.current_drag_pos}, Offset: ({self._click_offset_x}, {self._click_offset_y}), Ghost: {ghost_pos}")
 
     # new
     def _calculate_zoom_aware_ghost_position(self, field, doc_offset_x, doc_offset_y, canvas):
