@@ -161,7 +161,7 @@ class EnhancedDragHandler(QObject):
                     if not self.resize_guide:
                         #self.resize_guide = SimpleResizeGuide(self.canvas)
                         self.resize_guide = ResizeVisualGuide(self.canvas)
-                    self.resize_guide.start_resize(clicked_field, handle)
+                    self.resize_guide.start_resize(clicked_field, handle, self.zoom_level)
 
                     self.dragStarted.emit(clicked_field.id, "resize")
                     return clicked_field

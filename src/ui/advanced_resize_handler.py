@@ -116,8 +116,8 @@ class EnhancedResizeHandler(QObject):
         screen_dy = current_pos.y() - start_pos.y()
 
         # Zoom-aware delta calculation
-        dx = screen_dx / zoom_level if zoom_level != 1.0 else screen_dx
-        dy = screen_dy / zoom_level if zoom_level != 1.0 else screen_dy
+        dx = screen_dx / zoom_level
+        dy = screen_dy / zoom_level
 
         # Check minimum movement threshold
         total_movement = abs(dx) + abs(dy)
