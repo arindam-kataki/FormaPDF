@@ -304,6 +304,24 @@ class EnhancedDragHandler(QObject):
             dx, dy, self.resize_handle, 20, 15
         )
 
+        # 🧲 ADD SNAP TO RESIZE INTEGRATION HERE 🧲
+        # Apply snap to resize if enabled
+        if self._should_snap():
+            # Snap both position and size to grid
+            spacing = self.grid_manager.settings.spacing if hasattr(self.grid_manager, 'settings') else 20
+            zoom_level = getattr(self, 'zoom_level', 1.0)
+            scaled_spacing = spacing * zoom_level
+
+            # Snap position
+            new_x, new_y = self.snap_point_to_grid(new_x, new_y, zoom_level)
+
+            # Snap size to grid intervals
+            new_width = max(scaled_spacing, round(new_width / scaled_spacing) * scaled_spacing)
+            new_height = max(scaled_spacing, round(new_height / scaled_spacing) * scaled_spacing)
+
+            print(f"🧲 Snapped resize: ({new_x:.1f}, {new_y:.1f}) {new_width:.1f}x{new_height:.1f}")
+        # 🧲 END SNAP INTEGRATION 🧲
+
         # Update field with new values
         field.x = new_x
         field.y = new_y
@@ -313,6 +331,31 @@ class EnhancedDragHandler(QObject):
         if hasattr(self, 'resize_guide') and self.resize_guide:
             self.resize_guide.update_resize(field)
 
+    def snap_multiple_fields(self, fields: list, offset_x: float, offset_y: float, zoom_level: float = 1.0):
+        """Snap multiple selected fields maintaining their relative positions"""
+        if not self._should_snap() or not fields:
+            return
+
+        # Find the primary field (first selected)
+        primary_field = fields[0]
+
+        # Calculate new position for primary field
+        new_primary_x = primary_field.x + offset_x
+        new_primary_y = primary_field.y + offset_y
+
+        # Snap the primary field's new position
+        snapped_x, snapped_y = self.snap_point_to_grid(new_primary_x, new_primary_y, zoom_level)
+
+        # Calculate the actual offset after snapping
+        actual_offset_x = snapped_x - primary_field.x
+        actual_offset_y = snapped_y - primary_field.y
+
+        # Apply the snapped offset to all fields
+        for field in fields:
+            field.x += actual_offset_x
+            field.y += actual_offset_y
+
+        print(f"🧲 Snapped {len(fields)} fields with offset ({actual_offset_x:.1f}, {actual_offset_y:.1f})")
 
     def start_drag(self):
         """Start drag operation using overlay"""

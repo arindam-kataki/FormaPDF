@@ -117,6 +117,17 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
                 self.connect_grid_to_canvas()
 
+                # 🧲 ADD SNAP-TO-GRID CONNECTION HERE 🧲
+                # Connect grid manager to drag handler for snap functionality
+                if hasattr(self.pdf_canvas, 'enhanced_drag_handler'):
+                    self.pdf_canvas.enhanced_drag_handler.set_grid_manager(self.grid_manager)
+                    print("🧲 Connected grid manager to drag handler for snap-to-grid")
+                # 🧲 END SNAP CONNECTION 🧲
+
+            # CONNECT TO YOUR CANVAS
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.connect_grid_to_canvas()
+
             # Test basic functionality
             print("🔧 Testing GridManager with loaded PDF...")
 
@@ -799,14 +810,15 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         QTimer.singleShot(2000,
                           lambda: self.field_info_label.setText("Ready") if hasattr(self, 'field_info_label') else None)
 
-    def on_field_resized(self, field_id: str, x: int, y: int, width: int, height: int):
+    def on_field_resized(self, field_id: str, x: float, y: float, width: float, height: float):
         """Handle field resize completion"""
-        print(f"✅ Field {field_id} resized to ({x}, {y}) {width}×{height}")
+        print(f"✅ Field {field_id} resized to ({x:.1f}, {y:.1f}) {width:.1f}×{height:.1f}")
 
         # Update properties panel
         if hasattr(self, 'properties_panel') and self.properties_panel:
             try:
-                self.properties_panel.update_field_values(field_id, x, y, width, height)
+                # Convert to int if properties panel expects int values
+                self.properties_panel.update_field_values(field_id, int(x), int(y), int(width), int(height))
             except Exception as e:
                 print(f"⚠️ Error updating properties after resize: {e}")
 
