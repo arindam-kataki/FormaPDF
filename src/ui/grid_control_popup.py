@@ -345,6 +345,13 @@ class GridControlPopup(QWidget):
         self.snap_enabled = enabled
         self.snap_to_grid_changed.emit(enabled)
 
+        # ⭐ ADD DIRECT CONNECTION IF AVAILABLE ⭐
+        if hasattr(self, 'grid_manager') and self.grid_manager:
+            if enabled:
+                self.grid_manager.enable_snap()
+            else:
+                self.grid_manager.disable_snap()
+
     def on_sync_zoom_changed(self, checked: bool):
         """Handle sync with zoom checkbox change"""
         self.sync_with_zoom_enabled = checked

@@ -416,9 +416,17 @@ class GridManager(QObject):
         if hasattr(popup, 'grid_offset_changed'):
             popup.grid_offset_changed.connect(self.set_offset)
         if hasattr(popup, 'snap_to_grid_changed'):
-            popup.snap_to_grid_changed.connect(lambda enabled: setattr(self.settings, 'snap_enabled', enabled))
+            # ✅ CORRECT: Use the proper enable/disable methods that emit signals
+            popup.snap_to_grid_changed.connect(self._on_popup_snap_changed)
 
         print("🔗 Connected to GridControlPopup")
+
+    def _on_popup_snap_changed(self, enabled: bool):
+        """Handle snap change from popup - use proper methods that emit signals"""
+        if enabled:
+            self.enable_snap()  # This emits snap_changed signal
+        else:
+            self.disable_snap()  # This emits snap_changed signal
 
     def connect_to_canvas(self, canvas) -> None:
         """Connect to PDF canvas for drawing"""
