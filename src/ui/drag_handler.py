@@ -42,7 +42,7 @@ class DragState:
         """Check if drag operation is active"""
         return self.mode != DragMode.NONE
 
-class DragHandler(QObject):
+class _DragHandler(QObject):
     """Handles drag and drop operations for form fields"""
 
     # Type hints for signals to eliminate IDE warnings
@@ -301,4 +301,4 @@ class DragHandler(QObject):
         self.fieldMoved.emit(field.id, field.x, field.y)
 
 
-SelectionHandler = DragHandler
+_SelectionHandler = _DragHandler

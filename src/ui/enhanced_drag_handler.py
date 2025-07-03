@@ -106,9 +106,41 @@ class EnhancedDragHandler(QObject):
         self.resize_field = None
         self.resize_start_field_pos = None  # 🔧 ADD THIS LINE
 
+        self.grid_manager = None
+        self.snap_enabled = False
+
     def set_zoom_level(self, zoom_level: float):
         """Update zoom level for drag calculations"""
         self.zoom_level = zoom_level
+
+    def set_grid_manager(self, grid_manager):
+        """Connect to grid manager for snap functionality"""
+        self.grid_manager = grid_manager
+        if grid_manager:
+            # Connect to snap state changes
+            grid_manager.snap_changed.connect(self.set_snap_enabled)
+            self.snap_enabled = grid_manager.is_snap_enabled()
+            print(f"🧲 Drag handler connected to grid manager, snap: {self.snap_enabled}")
+
+    def set_snap_enabled(self, enabled: bool):
+        """Enable/disable snap functionality"""
+        if self.snap_enabled != enabled:
+            self.snap_enabled = enabled
+            print(f"🧲 Drag handler snap: {'enabled' if enabled else 'disabled'}")
+
+    def _should_snap(self) -> bool:
+        """Check if snap should be applied"""
+        return (self.snap_enabled and
+                self.grid_manager and
+                self.grid_manager.is_snap_enabled() and
+                self.grid_manager.get_settings().visible)
+
+    def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0) -> tuple:
+        """Snap a point to the nearest grid intersection"""
+        if not self._should_snap():
+            return (x, y)
+
+        return self.grid_manager.snap_point_to_grid(x, y, zoom_level)
 
     def handle_mouse_press(self, pos: QPoint, modifiers: Qt.KeyboardModifier, page_num: int = None) -> Optional[Any]:
         """
@@ -194,6 +226,13 @@ class EnhancedDragHandler(QObject):
 
             # Prepare for potential drag
             self.drag_start_pos = pos
+            if self._should_snap():
+                zoom = getattr(self, 'zoom_level', 1.0)
+                snapped_x, snapped_y = self.snap_point_to_grid(pos.x(), pos.y(), zoom)
+                pos = QPoint(int(snapped_x), int(snapped_y))
+                self.drag_start_pos = pos
+                print(f"🧲 Snapped click position: ({snapped_x:.1f}, {snapped_y:.1f})")
+
             self.canvas.draw_overlay()
             print(f"🎯 Enhanced drag handler: {len(self.get_selected_fields())} fields selected")
 
@@ -233,6 +272,12 @@ class EnhancedDragHandler(QObject):
 
         # Update drag if in progress
         if self.is_dragging:
+            # Apply snap to drag position
+            if self._should_snap():
+                zoom = getattr(self, 'zoom_level', 1.0)
+                snapped_x, snapped_y = self.snap_point_to_grid(pos.x(), pos.y(), zoom)
+                pos = QPoint(int(snapped_x), int(snapped_y))
+
             self.drag_overlay.update_drag(pos)
 
         return self.is_dragging
@@ -323,6 +368,12 @@ class EnhancedDragHandler(QObject):
         was_dragging = self.drag_overlay.end_drag()
 
         if was_dragging:
+
+            if self._should_snap():
+                zoom = getattr(self, 'zoom_level', 1.0)
+                snapped_x, snapped_y = self.snap_point_to_grid(pos.x(), pos.y(), zoom)
+                pos = QPoint(int(snapped_x), int(snapped_y))
+                print(f"🧲 Final snap position: ({snapped_x:.1f}, {snapped_y:.1f})")
 
             # Apply drag changes to actual fields
             self.apply_drag_changes(pos)
