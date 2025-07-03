@@ -30,6 +30,12 @@ class ResizeVisualGuide(QWidget):
         # Start hidden
         self.hide()
 
+    def set_zoom_level(self, zoom_level: float):
+        """Update zoom level for visual guide"""
+        self.zoom_level = zoom_level
+        if self.is_resizing and self.resize_field:
+            self.update_resize(self.resize_field)
+
     def reset_state(self):
         """Reset resize state"""
         self.is_resizing = False
@@ -80,20 +86,40 @@ class ResizeVisualGuide(QWidget):
         self.update()
 
     def update_resize(self, field):
-        """Update resize preview"""
+        """Update resize preview with proper coordinate handling"""
         if not self.is_resizing or not field:
             return
 
         # 🔧 FIX: Use canvas coordinate conversion if available
         if hasattr(self.parent(), 'document_to_screen_coordinates'):
+            # Get screen coordinates for top-left corner
             screen_coords = self.parent().document_to_screen_coordinates(
                 field.page_number, field.x, field.y
             )
+
             if screen_coords:
                 screen_x, screen_y = screen_coords
+
+                # 🔧 FIXED: Calculate dimensions using coordinate conversion consistency
+                # Option 1: Use coordinate conversion for both corners
+                bottom_right_coords = self.parent().document_to_screen_coordinates(
+                    field.page_number,
+                    field.x + field.width,
+                    field.y + field.height
+                )
+
+                if bottom_right_coords:
+                    # Calculate screen dimensions from coordinate difference
+                    screen_width = int(bottom_right_coords[0] - screen_x)
+                    screen_height = int(bottom_right_coords[1] - screen_y)
+                else:
+                    # Fallback: direct zoom scaling for dimensions
+                    screen_width = int(field.width * self.zoom_level)
+                    screen_height = int(field.height * self.zoom_level)
+
                 self.current_rect = QRect(
                     int(screen_x), int(screen_y),
-                    int(field.width * self.zoom_level), int(field.height * self.zoom_level)
+                    screen_width, screen_height
                 )
             else:
                 # Fallback to simple multiplication
