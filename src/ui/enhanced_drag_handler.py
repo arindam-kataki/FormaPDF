@@ -249,8 +249,8 @@ class EnhancedDragHandler(QObject):
         start_width, start_height = self.resize_start_size
 
         # Calculate deltas from mouse movement
-        dx = (pos.x() - self.resize_start_pos.x()) / self.zoom_level
-        dy = (pos.y() - self.resize_start_pos.y()) / self.zoom_level
+        dx = (pos.x() - self.resize_start_pos.x()) #/ self.zoom_level
+        dy = (pos.y() - self.resize_start_pos.y()) #/ self.zoom_level
 
         # Calculate new dimensions using ORIGINAL starting values
         from utils.geometry_utils import ResizeCalculator
