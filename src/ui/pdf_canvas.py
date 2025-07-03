@@ -347,6 +347,12 @@ class PDFCanvas(QLabel):
 
             self.page_pixmap.fill(bg_color)
 
+            # ✅ ADD THIS BLOCK HERE:
+            # Update drag overlay size after PDF canvas resize
+            if hasattr(self, 'enhanced_drag_handler') and hasattr(self.enhanced_drag_handler, 'drag_overlay'):
+                self.enhanced_drag_handler.drag_overlay.update_overlay_size()
+                print("📏 Updated drag overlay size after PDF render")
+
             painter = QPainter(self.page_pixmap)
             # painter.setPen(QPen(QColor(255, 255, 255), 1))  # Light silver border
             painter.setRenderHint(QPainter.RenderHint.Antialiasing)

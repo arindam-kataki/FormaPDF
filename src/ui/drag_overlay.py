@@ -28,7 +28,30 @@ class DragOverlay(QWidget):
 
         # Ensure overlay covers entire parent area
         if self.parent():
-            self.resize(self.parent().size())
+            self.update_overlay_size()
+
+    def update_overlay_size(self):
+        """Update overlay size to match PDF content size"""
+        parent = self.parent()
+        if not parent:
+            return
+
+        # Try to get the actual PDF canvas size (which changes with zoom)
+        if hasattr(parent, 'page_pixmap') and parent.page_pixmap:
+            # Use the pixmap size (this includes zoom scaling)
+            pixmap_size = parent.page_pixmap.size()
+            self.resize(pixmap_size)
+            print(f"📏 Drag overlay sized to pixmap: {pixmap_size.width()}x{pixmap_size.height()}")
+        elif hasattr(parent, 'minimumSize'):
+            # Fallback to minimum size
+            min_size = parent.minimumSize()
+            self.resize(min_size)
+            print(f"📏 Drag overlay sized to minimum: {min_size.width()}x{min_size.height()}")
+        else:
+            # Last resort: use parent size
+            parent_size = parent.size()
+            self.resize(parent_size)
+            print(f"📏 Drag overlay sized to parent: {parent_size.width()}x{parent_size.height()}")
 
     def reset_drag_state(self):
         """Reset all drag-related state"""
@@ -40,7 +63,7 @@ class DragOverlay(QWidget):
         self.ghost_positions = {}  # field_id -> QPoint for ghost positions
         self.zoom_level = 1.0
 
-    def start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
+    def deprecated_start_drag(self, fields: List[Any], start_pos: QPoint, zoom_level: float = 1.0):
         """
         Start dragging operation with proper zoom level handling
         FIXED: Ensures zoom level is set before any coordinate calculations
@@ -656,6 +679,9 @@ class DragOverlay(QWidget):
         self.current_drag_pos = start_pos
         self.zoom_level = zoom_level
 
+        # ✅ FIX: Update overlay size to match current zoom level
+        self.update_overlay_size()
+
         # ✅ Reset offset calculation flag
         if hasattr(self, '_initial_offset_calculated'):
             delattr(self, '_initial_offset_calculated')
@@ -1258,5 +1284,6 @@ class DragOverlay(QWidget):
     def resizeEvent(self, event):
         """Handle parent resize to maintain overlay coverage"""
         super().resizeEvent(event)
+        # ✅ FIX: Update to proper content size, not just parent size
         if self.parent():
-            self.resize(self.parent().size())
+            self.update_overlay_size()
