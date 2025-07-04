@@ -278,7 +278,7 @@ class EnhancedDragHandler(QObject):
         # Check if we should start dragging
         if not self.is_dragging:
             drag_distance = (pos - self.drag_start_pos).manhattanLength()
-            if drag_distance > 5:  # Start drag after 5 pixel threshold
+            if drag_distance > 1:  # Start drag after 5 pixel threshold
                 self.start_drag()
 
         # Update drag if in progress
@@ -357,7 +357,10 @@ class EnhancedDragHandler(QObject):
             # Snap both position and size to grid
             spacing = self.grid_manager.settings.spacing if hasattr(self.grid_manager, 'settings') else 20
             zoom_level = getattr(self, 'zoom_level', 1.0)
-            scaled_spacing = spacing * zoom_level
+            if self.grid_manager.settings.sync_with_zoom:
+                effective_spacing = spacing * zoom_level
+            else:
+                effective_spacing = spacing
 
             # Snap position
             new_x, new_y = self.snap_point_to_grid(new_x, new_y, zoom_level)
@@ -524,6 +527,233 @@ class EnhancedDragHandler(QObject):
             return []
 
     def apply_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions with snap support
+        FIXED: Prevent double-snapping by snapping only the offset, not individual fields
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos}")
+        print(f"   Final pos: {final_pos}")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # ⭐ APPLY SNAP TO FINAL POSITION ONLY ONCE ⭐
+        snapped_final_pos = final_pos
+        if self._should_snap():
+            zoom = getattr(self, 'zoom_level', 1.0)
+            snapped_x, snapped_y = self.snap_point_to_grid(final_pos.x(), final_pos.y(), zoom)
+            snapped_final_pos = QPoint(int(snapped_x), int(snapped_y))
+            print(f"🧲 SNAP: Final pos {final_pos} → snapped to {snapped_final_pos}")
+
+        # Calculate screen offset using snapped final position
+        screen_offset = snapped_final_pos - self.drag_start_pos
+        print(f"   Screen offset: {screen_offset}")
+
+        # Convert to document offset (keeping zoom handling as-is)
+        doc_offset_x = screen_offset.x()  # / self.zoom_level
+        doc_offset_y = screen_offset.y()  # / self.zoom_level
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field - NO ADDITIONAL SNAPPING
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+
+            # Simple offset application - snapping already handled above
+            new_x = original_x + doc_offset_x
+            new_y = original_y + doc_offset_y
+
+            print(f"🧲 FIELD '{field.id}' MOVEMENT SUMMARY:")
+            print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+            print(f"   📍 Target position:   ({new_x:.1f}, {new_y:.1f})")
+            print(
+                f"   📏 Total movement:    ({doc_offset_x:.1f}, {doc_offset_y:.1f}) = {(doc_offset_x ** 2 + doc_offset_y ** 2) ** 0.5:.1f}px")
+
+            if self._should_snap():
+                print(f"   🧲 Snap adjustment:   (+0.0, +0.0) = 0.0px")
+
+            # Update field position
+            field.x = new_x
+            field.y = new_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def apply_0_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions with snap support
+        FIXED: Proper coordinate system handling to prevent oversized jumps
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos} (screen coordinates)")
+        print(f"   Final pos: {final_pos} (screen coordinates)")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # 🎯 KEY FIX: Convert screen coordinates to document coordinates FIRST
+        # Both drag_start_pos and final_pos are in screen coordinates
+        # We need to work in document coordinate space for field positioning
+
+        drag_start_doc_x = self.drag_start_pos.x() / self.zoom_level
+        drag_start_doc_y = self.drag_start_pos.y() / self.zoom_level
+        final_doc_x = final_pos.x() / self.zoom_level
+        final_doc_y = final_pos.y() / self.zoom_level
+
+        print(f"   Drag start (doc): ({drag_start_doc_x:.1f}, {drag_start_doc_y:.1f})")
+        print(f"   Final pos (doc): ({final_doc_x:.1f}, {final_doc_y:.1f})")
+
+        # ⭐ APPLY SNAP IN DOCUMENT COORDINATE SPACE ⭐
+        snapped_final_doc_x = final_doc_x
+        snapped_final_doc_y = final_doc_y
+
+        if self._should_snap():
+            # Important: Pass zoom_level=1.0 because we're already in document coordinates
+            # The grid manager will handle zoom scaling internally based on sync_with_zoom setting
+            snapped_final_doc_x, snapped_final_doc_y = self.grid_manager.snap_point_to_grid(
+                final_doc_x, final_doc_y, zoom_level=1.0, max_snap_distance=25.0
+            )
+            print(
+                f"🧲 SNAP (doc coords): ({final_doc_x:.1f}, {final_doc_y:.1f}) → ({snapped_final_doc_x:.1f}, {snapped_final_doc_y:.1f})")
+        else:
+            print(f"🧲 SNAP: Not applied - _should_snap() = {self._should_snap()}")
+
+        # Calculate document offset
+        doc_offset_x = snapped_final_doc_x - drag_start_doc_x
+        doc_offset_y = snapped_final_doc_y - drag_start_doc_y
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field (already in document coordinates)
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+            new_x = original_x + doc_offset_x
+            new_y = original_y + doc_offset_y
+
+            # Calculate movement distances for logging
+            total_movement_x = new_x - original_x
+            total_movement_y = new_y - original_y
+            total_distance = (total_movement_x ** 2 + total_movement_y ** 2) ** 0.5
+
+            print(f"🧲 FIELD '{field.id}' MOVEMENT (CORRECTED):")
+            print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+            print(f"   📍 Final position:    ({new_x:.1f}, {new_y:.1f})")
+            print(
+                f"   📏 Total movement:    ({total_movement_x:+.1f}, {total_movement_y:+.1f}) = {total_distance:.1f}px")
+
+            # Update field position
+            field.x = new_x
+            field.y = new_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def apply_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions with snap support
+        FIXED: Added snap to grid functionality, kept zoom handling as-is
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos}")
+        print(f"   Final pos: {final_pos}")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # ⭐ APPLY SNAP TO FINAL POSITION FIRST ⭐
+        snapped_final_pos = final_pos
+        if self._should_snap():
+            zoom = getattr(self, 'zoom_level', 1.0)
+            snapped_x, snapped_y = self.snap_point_to_grid(final_pos.x(), final_pos.y(), zoom)
+            snapped_final_pos = QPoint(int(snapped_x), int(snapped_y))
+            print(f"🧲 SNAP: Final pos {final_pos} → snapped to {snapped_final_pos}")
+        else:
+            print(f"🧲 SNAP: Not applied - _should_snap() = {self._should_snap()}")
+
+        # Calculate screen offset using snapped final position
+        screen_offset = snapped_final_pos - self.drag_start_pos
+        print(f"   Screen offset: {screen_offset}")
+
+        # ⭐ KEEP ZOOM HANDLING AS-IS (commented out division) ⭐
+        doc_offset_x = screen_offset.x()  # / self.zoom_level
+        doc_offset_y = screen_offset.y()  # / self.zoom_level
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+
+            # ⭐ ENHANCED SNAP LOGGING WITH MOVEMENT DETAILS ⭐
+            if self._should_snap():
+                # Calculate new position
+                new_x = original_x + doc_offset_x
+                new_y = original_y + doc_offset_y
+
+                # Snap the final field position
+                zoom = getattr(self, 'zoom_level', 1.0)
+                snapped_new_x, snapped_new_y = self.snap_point_to_grid(new_x, new_y, zoom)
+
+                # Calculate movement distances
+                total_movement_x = snapped_new_x - original_x
+                total_movement_y = snapped_new_y - original_y
+                total_distance = (total_movement_x ** 2 + total_movement_y ** 2) ** 0.5
+
+                # Calculate snap adjustment
+                snap_adjustment_x = snapped_new_x - new_x
+                snap_adjustment_y = snapped_new_y - new_y
+                snap_adjustment_distance = (snap_adjustment_x ** 2 + snap_adjustment_y ** 2) ** 0.5
+
+                print(f"🧲 FIELD '{field.id}' MOVEMENT SUMMARY:")
+                print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+                print(f"   📍 Target position:   ({new_x:.1f}, {new_y:.1f})")
+                print(f"   📍 Snapped position:  ({snapped_new_x:.1f}, {snapped_new_y:.1f})")
+                print(
+                    f"   📏 Total movement:    ({total_movement_x:+.1f}, {total_movement_y:+.1f}) = {total_distance:.1f}px")
+                print(
+                    f"   🧲 Snap adjustment:   ({snap_adjustment_x:+.1f}, {snap_adjustment_y:+.1f}) = {snap_adjustment_distance:.1f}px")
+
+                # Update field position
+                field.x = snapped_new_x
+                field.y = snapped_new_y
+
+            else:
+                # Normal positioning without snap
+                new_x = original_x + doc_offset_x
+                new_y = original_y + doc_offset_y
+
+                # Calculate movement distances
+                total_movement_x = new_x - original_x
+                total_movement_y = new_y - original_y
+                total_distance = (total_movement_x ** 2 + total_movement_y ** 2) ** 0.5
+
+                print(f"📍 FIELD '{field.id}' MOVEMENT (NO SNAP):")
+                print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+                print(f"   📍 Final position:    ({new_x:.1f}, {new_y:.1f})")
+                print(
+                    f"   📏 Total movement:    ({total_movement_x:+.1f}, {total_movement_y:+.1f}) = {total_distance:.1f}px")
+
+                # Update field position
+                field.x = new_x
+                field.y = new_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def working_1_apply_drag_changes(self, final_pos: QPoint):
         """
         Apply drag offset to actual field positions with snap support
         FIXED: Added snap to grid functionality, kept zoom handling as-is

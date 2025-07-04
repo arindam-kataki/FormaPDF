@@ -157,6 +157,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.grid_manager.grid_color_changed.connect(self.update_canvas_grid_color)
         self.grid_manager.grid_spacing_changed.connect(self.update_canvas_grid_spacing)
         self.grid_manager.grid_offset_changed.connect(self.update_canvas_grid_offset)
+        self.grid_manager.sync_with_zoom_changed.connect(self.update_canvas_sync_with_zoom)
 
         print("🔗 GridManager connected to canvas")
 
@@ -207,6 +208,12 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             self.pdf_canvas.grid_offset_y = offset_y
             self.pdf_canvas.draw_overlay()  # This will trigger the redraw
             print(f"📐 Canvas grid offset updated: ({offset_x}, {offset_y})")
+
+    def update_canvas_sync_with_zoom(self, sync_enabled):
+        """Update canvas when sync with zoom setting changes"""
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+            self.pdf_canvas.draw_overlay()
+            print(f"📐 Canvas sync with zoom updated: {sync_enabled}")
 
     def init_ui(self):
         """Initialize the user interface"""
