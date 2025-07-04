@@ -398,17 +398,31 @@ class GridIntegrator(QObject):
         original_draw_grid = getattr(self.pdf_canvas, '_draw_grid', None)
         original_toggle_grid = getattr(self.pdf_canvas, 'toggle_grid', None)
 
-    # Enhanced grid drawing method
-    def enhanced_draw_grid(painter):
-        """Enhanced grid drawing using GridManager with page boundaries"""
-        if hasattr(self.pdf_canvas, 'page_pixmap') and self.pdf_canvas.page_pixmap:
-            width = self.pdf_canvas.page_pixmap.width()
-            height = self.pdf_canvas.page_pixmap.height()
-            zoom_level = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+        # Enhanced grid drawing method (PROPERLY INDENTED INSIDE THE METHOD)
+        def enhanced_draw_grid(painter):
+            """Enhanced grid drawing using GridManager with page boundaries"""
+            if hasattr(self.pdf_canvas, 'page_pixmap') and self.pdf_canvas.page_pixmap:
+                width = self.pdf_canvas.page_pixmap.width()
+                height = self.pdf_canvas.page_pixmap.height()
+                zoom_level = getattr(self.pdf_canvas, 'zoom_level', 1.0)
 
-            # NEW: Pass canvas for page boundary support
-            self.grid_manager.draw_grid(painter, width, height, zoom_level,
-                                        canvas=self.pdf_canvas)
+                # Pass canvas for page boundary support
+                self.grid_manager.draw_grid(painter, width, height, zoom_level,
+                                            canvas=self.pdf_canvas)
+            else:
+                print("🚫 Enhanced draw_grid: No page_pixmap available")
+
+        # Enhanced toggle method
+        def enhanced_toggle_grid():
+            """Enhanced grid toggle using GridManager"""
+            return self.grid_manager.toggle_grid()
+
+        # Replace methods on the canvas
+        self.pdf_canvas._draw_grid = enhanced_draw_grid
+        self.pdf_canvas.toggle_grid = enhanced_toggle_grid
+
+        print("📐 Enhanced canvas grid methods with GridManager")
+        print(f"📐 Replaced _draw_grid method: {self.pdf_canvas._draw_grid}")
 
     # =========================
     # PUBLIC API
