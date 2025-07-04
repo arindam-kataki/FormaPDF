@@ -88,6 +88,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.setup_connections()
         self.setup_scroll_tracking()
         self.setup_scroll_timer()
+        self.connect_grid_popup_to_manager()
 
     def setup_scroll_timer(self):
         """Setup timer-based scroll rendering"""
@@ -158,6 +159,25 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.grid_manager.grid_offset_changed.connect(self.update_canvas_grid_offset)
 
         print("🔗 GridManager connected to canvas")
+
+    def connect_grid_popup_to_manager(self):
+        """Connect the grid popup to the grid manager"""
+        try:
+            # The popup is created in toolbar manager during init_ui -> create_toolbar
+            if hasattr(self, 'grid_popup') and self.grid_popup and hasattr(self, 'grid_manager'):
+                # Connect the popup to the grid manager
+                self.grid_manager.connect_to_popup(self.grid_popup)
+                # Give popup direct reference to grid manager
+                self.grid_popup.grid_manager = self.grid_manager
+                print("🔗 Connected grid popup to grid manager")
+                return True
+            else:
+                print(
+                    f"❌ Missing components - popup: {hasattr(self, 'grid_popup')}, manager: {hasattr(self, 'grid_manager')}")
+                return False
+        except Exception as e:
+            print(f"❌ Error connecting grid popup: {e}")
+            return False
 
     def update_canvas_grid_visibility(self, visible):
         """Update canvas grid visibility"""
@@ -2085,8 +2105,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         """Handle field movement"""
         print(f"Field {field_id} moved to ({x}, {y})")
 
-    @pyqtSlot(str, int, int, int, int)
-    def on_field_resized(self, field_id: str, x: int, y: int, width: int, height: int):
+    @pyqtSlot(str, float, float, float, float)
+    def on_field_resized(self, field_id: str, x: float, y: float, width: float, height: float):
         """Handle field resize"""
         print(f"Field {field_id} resized to {width}x{height} at ({x}, {y})")
 

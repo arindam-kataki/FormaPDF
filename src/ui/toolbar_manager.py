@@ -375,7 +375,8 @@ class ToolbarManager:
         self.grid_popup.grid_offset_changed.connect(self._on_grid_offset_changed)
         self.grid_popup.grid_color_changed.connect(self._on_grid_color_changed)
         self.grid_popup.grid_reset_requested.connect(self._on_grid_reset_requested)
-
+        self.grid_popup.snap_to_grid_changed.connect(self._on_snap_to_grid_changed)
+        self.grid_popup.sync_with_zoom_changed.connect(self._on_sync_with_zoom_changed)
         print("      ✅ Grid popup signals connected")
 
     # =========================
@@ -424,82 +425,151 @@ class ToolbarManager:
             return center
 
     def _on_grid_visibility_changed(self, enabled: bool):
-        """Handle grid visibility change from popup"""
+        """Handle grid visibility change from popup - route through GridManager"""
         print(f"📐 Grid visibility changed: {enabled}")
-        self.grid_visible = enabled
 
-        # Update the PDF canvas if available
-        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            # Set the grid visibility property
-            self.pdf_canvas.show_grid = enabled
+        # ✅ NEW WAY: Route through GridManager (consistent with snap)
+        main_window = self
+        # Find main window (toolbar manager is a mixin)
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
 
-            # Force redraw of overlay to show/hide grid
-            if hasattr(self.pdf_canvas, 'draw_overlay'):
-                self.pdf_canvas.draw_overlay()
-                print(f"📐 Called draw_overlay() to update grid display")
-            elif hasattr(self.pdf_canvas, 'update'):
-                self.pdf_canvas.update()
-                print(f"📐 Called update() as fallback")
-
-            print(f"📐 PDF canvas show_grid is now: {self.pdf_canvas.show_grid}")
-        else:
-            print("⚠️ PDF canvas not available for grid update")
-
-    def _on_grid_spacing_changed(self, spacing: int):
-        """Handle grid spacing change from popup"""
-        print(f"📐 Grid spacing changed: {spacing}px")
-        self.grid_spacing = spacing
-
-        # Update the PDF canvas if available
-        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            # PDF canvas uses 'grid_size' not 'grid_spacing'
-            self.pdf_canvas.grid_size = spacing
-
-            # Force redraw of overlay to show new spacing
-            if hasattr(self.pdf_canvas, 'draw_overlay'):
-                self.pdf_canvas.draw_overlay()
-                print(f"📐 Updated grid_size to {spacing}px and redrawn")
-            elif hasattr(self.pdf_canvas, 'update'):
-                self.pdf_canvas.update()
-
-            print(f"📐 PDF canvas grid_size is now: {self.pdf_canvas.grid_size}")
-
-    def _on_grid_offset_changed(self, offset_x: int, offset_y: int):
-        """Handle grid offset change from popup"""
-        print(f"📐 Grid offset changed: ({offset_x}, {offset_y})")
-        self.grid_offset_x = offset_x
-        self.grid_offset_y = offset_y
-
-        # Update the PDF canvas if available
-        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            if hasattr(self.pdf_canvas, 'set_grid_offset'):
-                self.pdf_canvas.set_grid_offset(offset_x, offset_y)
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            grid_manager = main_window.grid_manager
+            if enabled:
+                grid_manager.show_grid()
             else:
-                # Try individual properties
-                if hasattr(self.pdf_canvas, 'grid_offset_x'):
-                    self.pdf_canvas.grid_offset_x = offset_x
-                if hasattr(self.pdf_canvas, 'grid_offset_y'):
-                    self.pdf_canvas.grid_offset_y = offset_y
-                    # Force redraw of overlay to show new offset
+                grid_manager.hide_grid()
+            print("✅ Grid visibility routed through GridManager")
+        else:
+            # ❌ Fallback to old way if GridManager not available
+            print("⚠️ GridManager not found, using legacy direct method")
+            self.grid_visible = enabled
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.pdf_canvas.show_grid = enabled
                 if hasattr(self.pdf_canvas, 'draw_overlay'):
                     self.pdf_canvas.draw_overlay()
-                    print(f"📐 Updated grid offset and redrawn")
-                elif hasattr(self.pdf_canvas, 'update'):
-                    self.pdf_canvas.update()
 
+    def _on_grid_spacing_changed(self, spacing: int):
+        """Handle grid spacing change from popup - route through GridManager"""
+        print(f"📐 Grid spacing changed: {spacing}px")
 
-    def _on_grid_color_changed(self, color):
-        """Handle grid color change from popup"""
-        print(f"📐 Grid color changed: {color.name()}")
+        # ✅ Route through GridManager
+        main_window = self
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
 
-        # Update the PDF canvas if available
-        if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
-            if hasattr(self.pdf_canvas, 'set_grid_color'):
-                self.pdf_canvas.set_grid_color(color)
-            elif hasattr(self.pdf_canvas, 'grid_color'):
-                self.pdf_canvas.grid_color = color
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            main_window.grid_manager.set_spacing(spacing)
+            print("✅ Grid spacing routed through GridManager")
+        else:
+            # ❌ Fallback to old way
+            print("⚠️ GridManager not found, using legacy direct method")
+            self.grid_spacing = spacing
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.pdf_canvas.grid_size = spacing
+                if hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+
+    def _on_snap_to_grid_changed(self, enabled: bool):
+        """Handle snap to grid change from popup - route through GridManager"""
+        print(f"📐 Snap to grid changed: {enabled}")
+
+        # ✅ Route through GridManager (consistent with other grid operations)
+        main_window = self
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
+
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            if enabled:
+                main_window.grid_manager.enable_snap()
+            else:
+                main_window.grid_manager.disable_snap()
+            print("✅ Snap to grid routed through GridManager")
+        else:
+            # ❌ Fallback - but this shouldn't happen with new architecture
+            print("⚠️ GridManager not found for snap to grid")
+
+    def _on_sync_with_zoom_changed(self, enabled: bool):
+        """Handle sync with zoom change from popup - route through GridManager"""
+        print(f"📐 Sync with zoom changed: {enabled}")
+
+        # ✅ Route through GridManager (consistent with other grid operations)
+        main_window = self
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
+
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            main_window.grid_manager.set_sync_with_zoom(enabled)
+            print("✅ Sync with zoom routed through GridManager")
+        else:
+            # ❌ Fallback - but this shouldn't happen with new architecture
+            print("⚠️ GridManager not found for sync with zoom")
+            # Legacy fallback if needed
+            if hasattr(self, 'sync_with_zoom_enabled'):
+                self.sync_with_zoom_enabled = enabled
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'set_sync_with_zoom'):
+                    self.pdf_canvas.set_sync_with_zoom(enabled)
+                elif hasattr(self.pdf_canvas, 'sync_with_zoom'):
+                    self.pdf_canvas.sync_with_zoom = enabled
                 if hasattr(self.pdf_canvas, 'update'):
                     self.pdf_canvas.update()
+
+    def _on_grid_offset_changed(self, offset_x: int, offset_y: int):
+        """Handle grid offset change from popup - route through GridManager"""
+        print(f"📐 Grid offset changed: ({offset_x}, {offset_y})")
+
+        # ✅ Route through GridManager
+        main_window = self
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
+
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            main_window.grid_manager.set_offset(offset_x, offset_y)
+            print("✅ Grid offset routed through GridManager")
+        else:
+            # ❌ Fallback to old way
+            print("⚠️ GridManager not found, using legacy direct method")
+            self.grid_offset_x = offset_x
+            self.grid_offset_y = offset_y
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.pdf_canvas.grid_offset_x = offset_x
+                self.pdf_canvas.grid_offset_y = offset_y
+                if hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+
+    def _on_grid_color_changed(self, color):
+        """Handle grid color change from popup - route through GridManager"""
+        print(f"📐 Grid color changed: {color}")
+
+        # ✅ Route through GridManager
+        main_window = self
+        while hasattr(main_window, 'parent') and main_window.parent():
+            main_window = main_window.parent()
+            if hasattr(main_window, 'grid_manager'):
+                break
+
+        if hasattr(main_window, 'grid_manager') and main_window.grid_manager:
+            main_window.grid_manager.set_grid_color(color)
+            print("✅ Grid color routed through GridManager")
+        else:
+            # ❌ Fallback to old way
+            print("⚠️ GridManager not found, using legacy direct method")
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.pdf_canvas.grid_color = color
+                if hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
 
     def _on_grid_reset_requested(self):
         """Handle grid reset request from popup"""

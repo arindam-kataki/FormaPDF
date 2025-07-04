@@ -130,10 +130,21 @@ class EnhancedDragHandler(QObject):
 
     def _should_snap(self) -> bool:
         """Check if snap should be applied"""
-        return (self.snap_enabled and
-                self.grid_manager and
-                self.grid_manager.is_snap_enabled() and
-                self.grid_manager.get_settings().visible)
+        snap_enabled = self.snap_enabled
+        has_grid_manager = self.grid_manager is not None
+        grid_snap_enabled = self.grid_manager.is_snap_enabled() if self.grid_manager else False
+        grid_visible = self.grid_manager.get_settings().visible if self.grid_manager else False
+
+        result = (snap_enabled and has_grid_manager and grid_snap_enabled and grid_visible)
+
+        # ⭐ ADD DEBUG OUTPUT ⭐
+        print(f"🧲 _should_snap(): snap_enabled={snap_enabled}, "
+              f"has_grid_manager={has_grid_manager}, "
+              f"grid_snap_enabled={grid_snap_enabled}, "
+              f"grid_visible={grid_visible}, "
+              f"result={result}")
+
+        return result
 
     def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0) -> tuple:
         """Snap a point to the nearest grid intersection"""
@@ -250,6 +261,42 @@ class EnhancedDragHandler(QObject):
         return clicked_field
 
     def handle_mouse_move(self, pos: QPoint) -> bool:
+        """
+        Handle mouse move - start/update dragging or resizing
+
+        Returns:
+            bool: True if currently dragging or resizing
+        """
+        # Handle resize mode
+        if self.resize_mode and self.resize_field:
+            self._handle_resize_move(pos)
+            return True
+
+        if not self.get_selected_fields():
+            return False
+
+        # Check if we should start dragging
+        if not self.is_dragging:
+            drag_distance = (pos - self.drag_start_pos).manhattanLength()
+            if drag_distance > 5:  # Start drag after 5 pixel threshold
+                self.start_drag()
+
+        # Update drag if in progress
+        if self.is_dragging:
+            # Apply snap to drag position
+            if self._should_snap():
+                zoom = getattr(self, 'zoom_level', 1.0)
+                # 🎯 FIX: Use grid_manager's snap method with distance threshold
+                snapped_x, snapped_y = self.grid_manager.snap_point_to_grid(
+                    pos.x(), pos.y(), zoom, max_snap_distance=25.0
+                )
+                pos = QPoint(int(snapped_x), int(snapped_y))
+
+            self.drag_overlay.update_drag(pos)
+
+        return self.is_dragging
+
+    def working_handle_mouse_move(self, pos: QPoint) -> bool:
         """
         Handle mouse move - start/update dragging or resizing
 
@@ -477,6 +524,69 @@ class EnhancedDragHandler(QObject):
             return []
 
     def apply_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions with snap support
+        FIXED: Added snap to grid functionality, kept zoom handling as-is
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos}")
+        print(f"   Final pos: {final_pos}")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # ⭐ APPLY SNAP TO FINAL POSITION FIRST ⭐
+        snapped_final_pos = final_pos
+        if self._should_snap():
+            zoom = getattr(self, 'zoom_level', 1.0)
+            snapped_x, snapped_y = self.snap_point_to_grid(final_pos.x(), final_pos.y(), zoom)
+            snapped_final_pos = QPoint(int(snapped_x), int(snapped_y))
+            print(f"🧲 SNAP: Final pos {final_pos} → snapped to {snapped_final_pos}")
+        else:
+            print(f"🧲 SNAP: Not applied - _should_snap() = {self._should_snap()}")
+
+        # Calculate screen offset using snapped final position
+        screen_offset = snapped_final_pos - self.drag_start_pos
+        print(f"   Screen offset: {screen_offset}")
+
+        # ⭐ KEEP ZOOM HANDLING AS-IS (commented out division) ⭐
+        doc_offset_x = screen_offset.x()  # / self.zoom_level
+        doc_offset_y = screen_offset.y()  # / self.zoom_level
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+
+            # ⭐ APPLY SNAP AT FIELD LEVEL IF ENABLED ⭐
+            if self._should_snap():
+                # Calculate new position
+                new_x = original_x + doc_offset_x
+                new_y = original_y + doc_offset_y
+
+                # Snap the final field position
+                zoom = getattr(self, 'zoom_level', 1.0)
+                new_x, new_y = self.snap_point_to_grid(new_x, new_y, zoom)
+                print(f"🧲 Snapped field {field.id}: ({original_x:.1f}, {original_y:.1f}) → ({new_x:.1f}, {new_y:.1f})")
+            else:
+                # Normal positioning without snap
+                new_x = original_x + doc_offset_x
+                new_y = original_y + doc_offset_y
+                print(f"   Field {field.id}: ({original_x:.1f}, {original_y:.1f}) → ({new_x:.1f}, {new_y:.1f})")
+
+            # Update field position
+            field.x = new_x
+            field.y = new_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def working_apply_drag_changes(self, final_pos: QPoint):
         """
         Apply drag offset to actual field positions
         FIXED: Properly convert screen offset to document offset

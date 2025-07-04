@@ -256,21 +256,53 @@ class GridManager(QObject):
         """Check if snap to grid is enabled"""
         return self.settings.snap_enabled
 
-    def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0) -> Tuple[float, float]:
-        """Snap a point to the nearest grid intersection"""
+    def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0, max_snap_distance: float = 25.0) -> Tuple[
+        float, float]:
+        """
+        Snap a point to the nearest grid intersection with proper zoom handling
+
+        Args:
+            x, y: Point coordinates to snap (in screen/canvas coordinates)
+            zoom_level: Current zoom level
+            max_snap_distance: Maximum distance to snap (in pixels)
+
+        Returns:
+            Snapped coordinates or original if too far
+        """
         if not self.settings.snap_enabled or not self.settings.visible:
             return (x, y)
 
-        # Scale grid with zoom
-        scaled_spacing = self.settings.spacing * zoom_level
-        scaled_offset_x = self.settings.offset_x * zoom_level
-        scaled_offset_y = self.settings.offset_y * zoom_level
+        # 🎯 KEY FIX: Only scale with zoom if sync_with_zoom is enabled
+        if self.settings.sync_with_zoom:
+            # Grid scales with zoom - use scaled values
+            effective_spacing = self.settings.spacing * zoom_level
+            effective_offset_x = self.settings.offset_x * zoom_level
+            effective_offset_y = self.settings.offset_y * zoom_level
+            snap_mode = "ZOOM-SCALED"
+        else:
+            # Grid is fixed pixel size - ignore zoom level
+            effective_spacing = self.settings.spacing
+            effective_offset_x = self.settings.offset_x
+            effective_offset_y = self.settings.offset_y
+            snap_mode = "FIXED-PIXEL"
 
-        # Calculate snapped coordinates
-        snapped_x = round((x - scaled_offset_x) / scaled_spacing) * scaled_spacing + scaled_offset_x
-        snapped_y = round((y - scaled_offset_y) / scaled_spacing) * scaled_spacing + scaled_offset_y
+        # Calculate potential snapped coordinates
+        snapped_x = round((x - effective_offset_x) / effective_spacing) * effective_spacing + effective_offset_x
+        snapped_y = round((y - effective_offset_y) / effective_spacing) * effective_spacing + effective_offset_y
 
-        return (snapped_x, snapped_y)
+        # Calculate snap distances
+        distance_x = abs(snapped_x - x)
+        distance_y = abs(snapped_y - y)
+        total_distance = (distance_x ** 2 + distance_y ** 2) ** 0.5
+
+        # Only snap if within threshold
+        if total_distance <= max_snap_distance:
+            print(
+                f"🧲 {snap_mode} SNAP: ({x:.1f}, {y:.1f}) → ({snapped_x:.1f}, {snapped_y:.1f}) [distance: {total_distance:.1f}px, spacing: {effective_spacing:.1f}px]")
+            return (snapped_x, snapped_y)
+        else:
+            print(f"🚫 NO SNAP: Distance {total_distance:.1f}px exceeds threshold {max_snap_distance}px")
+            return (x, y)
 
     # =========================
     # ZOOM
@@ -438,14 +470,34 @@ class GridManager(QObject):
         """Update canvas with new grid settings"""
         if hasattr(canvas, 'set_grid_visible'):
             canvas.set_grid_visible(settings.visible)
+        elif hasattr(canvas, 'show_grid'):
+            canvas.show_grid = settings.visible
+
         if hasattr(canvas, 'set_grid_color'):
             canvas.set_grid_color(settings.color)
+        elif hasattr(canvas, 'grid_color'):
+            canvas.grid_color = settings.color
+
         if hasattr(canvas, 'set_grid_spacing'):
             canvas.set_grid_spacing(settings.spacing)
+        elif hasattr(canvas, 'grid_size'):
+            canvas.grid_size = settings.spacing
+
         if hasattr(canvas, 'set_grid_offset'):
             canvas.set_grid_offset(settings.offset_x, settings.offset_y)
-        if hasattr(canvas, 'update'):
+        else:
+            if hasattr(canvas, 'grid_offset_x'):
+                canvas.grid_offset_x = settings.offset_x
+            if hasattr(canvas, 'grid_offset_y'):
+                canvas.grid_offset_y = settings.offset_y
+
+        # Force canvas to redraw
+        if hasattr(canvas, 'draw_overlay'):
+            canvas.draw_overlay()
+        elif hasattr(canvas, 'update'):
             canvas.update()
+
+        print(f"📐 Canvas updated: visible={settings.visible}, spacing={settings.spacing}")
 
     # =========================
     # PRIVATE METHODS
