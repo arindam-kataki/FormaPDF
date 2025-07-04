@@ -522,6 +522,221 @@ class GridManager(QObject):
         self._emit_grid_changed()
 
 
+# =======================================
+# ADVANCED USAGE
+# =======================================
+
+    def draw_grid(self, painter: QPainter, width: int, height: int, zoom_level: float = 1.0,
+                  canvas=None, viewport_rect=None) -> None:
+        """
+        Draw grid with optional page boundary and viewport support
+
+        Args:
+            painter: QPainter object for drawing
+            width: Canvas width (fallback if no page boundaries)
+            height: Canvas height (fallback if no page boundaries)
+            zoom_level: Current zoom level
+            canvas: Optional canvas object with page information
+            viewport_rect: Optional viewport rectangle for optimization
+        """
+        if not self.settings.visible:
+            return
+
+        # Create pen with current color and opacity
+        pen = QPen(self.settings.color)
+        pen.setWidth(1)
+        painter.setPen(pen)
+
+        # Calculate effective spacing and offsets based on zoom settings
+        if self.settings.sync_with_zoom:
+            effective_spacing = int(self.settings.spacing * zoom_level)
+            effective_offset_x = int(self.settings.offset_x * zoom_level)
+            effective_offset_y = int(self.settings.offset_y * zoom_level)
+            snap_mode = "ZOOM-SCALED"
+        else:
+            effective_spacing = self.settings.spacing
+            effective_offset_x = self.settings.offset_x
+            effective_offset_y = self.settings.offset_y
+            snap_mode = "FIXED-PIXEL"
+
+        # Skip if grid would be too dense
+        if effective_spacing < 2:
+            return
+
+        # Choose drawing method based on available information
+        if canvas and hasattr(canvas, 'page_positions') and canvas.page_positions:
+            # Enhanced page-bounded drawing
+            self._draw_page_bounded_grid(painter, canvas, zoom_level, effective_spacing,
+                                         effective_offset_x, effective_offset_y, viewport_rect)
+        else:
+            # Fallback to full canvas drawing
+            self._draw_full_canvas_grid(painter, width, height, effective_spacing,
+                                        effective_offset_x, effective_offset_y)
+
+    def _draw_page_bounded_grid(self, painter: QPainter, canvas, zoom_level: float,
+                                effective_spacing: int, effective_offset_x: int, effective_offset_y: int,
+                                viewport_rect=None):
+        """Draw grid limited to page boundaries with optional viewport optimization"""
+
+        if not hasattr(canvas, 'pdf_document') or not canvas.pdf_document:
+            print("🚫 No PDF document available for page-bounded grid")
+            return
+
+        pages_drawn = 0
+        total_lines = 0
+
+        # Determine drawing bounds (viewport or full canvas)
+        if viewport_rect:
+            draw_left = viewport_rect.left()
+            draw_right = viewport_rect.right()
+            draw_top = viewport_rect.top()
+            draw_bottom = viewport_rect.bottom()
+            print(f"🎯 Drawing grid in viewport: {viewport_rect}")
+        else:
+            draw_left = 0
+            draw_right = getattr(canvas, 'width', lambda: 2000)()
+            draw_top = 0
+            draw_bottom = getattr(canvas, 'height', lambda: 2000)()
+            print(f"🎯 Drawing grid for full canvas: {draw_right}x{draw_bottom}")
+
+        # Process each page
+        for page_num, page_top in enumerate(canvas.page_positions):
+            if page_num >= len(canvas.pdf_document):
+                continue
+
+            # Quick viewport culling
+            if viewport_rect and page_top > draw_bottom:
+                break  # All subsequent pages are below viewport
+
+            # Get page dimensions
+            page = canvas.pdf_document[page_num]
+            page_width = int(page.rect.width * zoom_level)
+            page_height = int(page.rect.height * zoom_level)
+
+            # Page boundaries in screen coordinates
+            page_left = getattr(canvas, 'page_margin_left', 10)  # Standard margin
+            page_right = page_left + page_width
+            page_bottom = page_top + page_height
+
+            # Skip if page doesn't intersect with drawing bounds
+            if (page_bottom < draw_top or page_top > draw_bottom or
+                    page_right < draw_left or page_left > draw_right):
+                continue
+
+            pages_drawn += 1
+
+            # Calculate intersection of page and drawing bounds
+            clip_left = max(page_left, draw_left)
+            clip_right = min(page_right, draw_right)
+            clip_top = max(page_top, draw_top)
+            clip_bottom = min(page_bottom, draw_bottom)
+
+            # Calculate grid start positions for this page
+            # Grid starts from page top-left corner, then apply offset
+            grid_origin_x = page_left + (effective_offset_x % effective_spacing)
+            grid_origin_y = page_top + (effective_offset_y % effective_spacing)
+
+            # Draw vertical lines for this page
+            first_x = grid_origin_x
+            if clip_left > grid_origin_x:
+                # Optimize: jump to first visible line
+                lines_to_skip = (clip_left - grid_origin_x) // effective_spacing
+                first_x = grid_origin_x + (lines_to_skip * effective_spacing)
+
+            x = first_x
+            while x <= clip_right:
+                if x >= clip_left:
+                    painter.drawLine(x, clip_top, x, clip_bottom)
+                    total_lines += 1
+                x += effective_spacing
+
+            # Draw horizontal lines for this page
+            first_y = grid_origin_y
+            if clip_top > grid_origin_y:
+                # Optimize: jump to first visible line
+                lines_to_skip = (clip_top - grid_origin_y) // effective_spacing
+                first_y = grid_origin_y + (lines_to_skip * effective_spacing)
+
+            y = first_y
+            while y <= clip_bottom:
+                if y >= clip_top:
+                    painter.drawLine(clip_left, y, clip_right, y)
+                    total_lines += 1
+                y += effective_spacing
+
+        print(f"🎯 Drew {total_lines} grid lines across {pages_drawn} pages at {zoom_level:.1f}x zoom")
+
+    def _draw_full_canvas_grid(self, painter: QPainter, width: int, height: int,
+                               effective_spacing: int, effective_offset_x: int, effective_offset_y: int):
+        """Fallback method: draw grid across entire canvas"""
+
+        total_lines = 0
+
+        # Draw vertical lines
+        start_x = effective_offset_x % effective_spacing
+        for x in range(start_x, width, effective_spacing):
+            painter.drawLine(x, 0, x, height)
+            total_lines += 1
+
+        # Draw horizontal lines
+        start_y = effective_offset_y % effective_spacing
+        for y in range(start_y, height, effective_spacing):
+            painter.drawLine(0, y, width, y)
+            total_lines += 1
+
+        print(f"🎯 Drew {total_lines} grid lines (full canvas fallback)")
+
+    # Additional helper method for zoom-aware density control
+    def _should_draw_grid_at_zoom(self, zoom_level: float) -> bool:
+        """Determine if grid should be drawn at current zoom level"""
+        if zoom_level < 0.2:
+            return False  # Too zoomed out, grid would be too dense
+        elif zoom_level > 5.0:
+            return True  # Very zoomed in, always show grid
+        else:
+            # Scale grid density based on zoom
+            min_spacing = 3  # Minimum 3 pixels between lines
+            effective_spacing = self.settings.spacing * zoom_level if self.settings.sync_with_zoom else self.settings.spacing
+            return effective_spacing >= min_spacing
+
+    # Enhanced method with zoom density control
+    def draw_grid_with_density_control(self, painter: QPainter, width: int, height: int,
+                                       zoom_level: float = 1.0, canvas=None, viewport_rect=None) -> None:
+        """Enhanced draw_grid with automatic density control"""
+
+        if not self.settings.visible or not self._should_draw_grid_at_zoom(zoom_level):
+            return
+
+        # Apply zoom-based spacing adjustments
+        adjusted_spacing = self.settings.spacing
+        adjusted_offset_x = self.settings.offset_x
+        adjusted_offset_y = self.settings.offset_y
+
+        if zoom_level > 3.0:
+            # At high zoom, double the spacing to avoid visual clutter
+            adjusted_spacing *= 2
+            adjusted_offset_x *= 2
+            adjusted_offset_y *= 2
+            print(f"🎯 High zoom detected ({zoom_level:.1f}x), doubled grid spacing to {adjusted_spacing}px")
+
+        # Temporarily modify settings for this draw call
+        original_spacing = self.settings.spacing
+        original_offset_x = self.settings.offset_x
+        original_offset_y = self.settings.offset_y
+
+        self.settings.spacing = adjusted_spacing
+        self.settings.offset_x = adjusted_offset_x
+        self.settings.offset_y = adjusted_offset_y
+
+        try:
+            # Call the main draw method
+            self.draw_grid(painter, width, height, zoom_level, canvas, viewport_rect)
+        finally:
+            # Restore original settings
+            self.settings.spacing = original_spacing
+            self.settings.offset_x = original_offset_x
+            self.settings.offset_y = original_offset_y
+
 # =========================
 # USAGE EXAMPLE
 # =========================

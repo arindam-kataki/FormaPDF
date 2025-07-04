@@ -710,6 +710,116 @@ class PDFCanvas(QLabel):
         return visible_fields
 
     def _draw_grid_in_viewport_zoomed(self, painter: QPainter, viewport_rect: QRect, zoom_level: float):
+        """Draw grid scaled appropriately for zoom level, limited to page boundaries"""
+        if not self.show_grid:
+            return
+
+        # Scale grid size with zoom level
+        scaled_grid_size = int(self.grid_size * zoom_level)
+
+        # At very high zoom, might want larger grid spacing
+        if zoom_level > 3.0:
+            scaled_grid_size = int(scaled_grid_size * 2)  # Double spacing at high zoom
+
+        # At very low zoom, might want to skip grid entirely
+        if zoom_level < 0.3:
+            return  # Grid would be too dense to be useful
+
+        # Get grid color and opacity from GridManager if available
+        grid_color = None
+        grid_opacity = None
+        scaled_offset_x = 0
+        scaled_offset_y = 0
+
+        # Try to get enhanced settings from GridManager
+        if hasattr(self, 'parent') and self.parent():
+            main_window = self.parent()
+            while main_window and not hasattr(main_window, 'grid_manager'):
+                main_window = main_window.parent()
+
+            if main_window and hasattr(main_window, 'grid_manager'):
+                grid_manager = main_window.grid_manager
+                grid_color = grid_manager.settings.color
+                grid_opacity = grid_manager.settings.opacity
+
+                # Apply offsets with zoom scaling if sync_with_zoom is enabled
+                if grid_manager.settings.sync_with_zoom:
+                    scaled_offset_x = int(grid_manager.settings.offset_x * zoom_level)
+                    scaled_offset_y = int(grid_manager.settings.offset_y * zoom_level)
+                else:
+                    scaled_offset_x = grid_manager.settings.offset_x
+                    scaled_offset_y = grid_manager.settings.offset_y
+
+        # Fallback to default color/opacity if GridManager not available
+        if grid_color is None:
+            from PyQt6.QtGui import QColor
+            grid_color = QColor(getattr(self, 'grid_color', QColor(128, 128, 128)))
+            if hasattr(grid_color, 'setAlphaF'):
+                grid_color.setAlphaF(getattr(self, 'grid_opacity', 0.7))
+
+        pen = QPen(grid_color, 1)
+        painter.setPen(pen)
+
+        # Only draw grid within page boundaries
+        if not hasattr(self, 'page_positions') or not self.page_positions:
+            # Fallback to original behavior if no page position info
+            self._draw_grid_fallback(painter, viewport_rect, scaled_grid_size, scaled_offset_x, scaled_offset_y)
+            return
+
+        pages_drawn = 0
+
+        # Draw grid for each page that intersects with viewport
+        for page_num, page_top in enumerate(self.page_positions):
+            if page_num >= len(self.pdf_document):
+                continue
+
+            # Get page dimensions
+            page = self.pdf_document[page_num]
+            page_width = int(page.rect.width * zoom_level)
+            page_height = int(page.rect.height * zoom_level)
+
+            # Page boundaries in screen coordinates
+            page_left = 10  # Standard horizontal margin from canvas
+            page_right = page_left + page_width
+            page_bottom = page_top + page_height
+
+            # Check if this page intersects with viewport
+            if (page_bottom < viewport_rect.top() or
+                    page_top > viewport_rect.bottom() or
+                    page_right < viewport_rect.left() or
+                    page_left > viewport_rect.right()):
+                continue  # Page not visible in viewport
+
+            pages_drawn += 1
+
+            # Calculate intersection of page and viewport
+            draw_left = max(page_left, viewport_rect.left())
+            draw_right = min(page_right, viewport_rect.right())
+            draw_top = max(page_top, viewport_rect.top())
+            draw_bottom = min(page_bottom, viewport_rect.bottom())
+
+            # Calculate grid start positions for this page
+            # Grid starts from page top-left corner, then apply offset
+            grid_start_x = page_left + (scaled_offset_x % scaled_grid_size)
+            grid_start_y = page_top + (scaled_offset_y % scaled_grid_size)
+
+            # Draw vertical lines for this page (within viewport intersection)
+            x = grid_start_x
+            while x < draw_right:
+                if x >= draw_left:
+                    painter.drawLine(x, draw_top, x, draw_bottom)
+                x += scaled_grid_size
+
+            # Draw horizontal lines for this page (within viewport intersection)
+            y = grid_start_y
+            while y < draw_bottom:
+                if y >= draw_top:
+                    painter.drawLine(draw_left, y, draw_right, y)
+                y += scaled_grid_size
+
+        print(f"🎯 Drew page-bounded grid for {pages_drawn} visible pages at {zoom_level:.1f}x zoom")
+
+    def working_draw_grid_in_viewport_zoomed(self, painter: QPainter, viewport_rect: QRect, zoom_level: float):
         """Draw grid scaled appropriately for zoom level"""
         if not self.show_grid:
             return
