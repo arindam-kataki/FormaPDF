@@ -159,7 +159,33 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.grid_manager.grid_offset_changed.connect(self.update_canvas_grid_offset)
         self.grid_manager.sync_with_zoom_changed.connect(self.update_canvas_sync_with_zoom)
 
-        print("🔗 GridManager connected to canvas")
+        # 🚀 NEW: Replace canvas _draw_grid with direct GridManager method reference
+        if hasattr(self, 'pdf_canvas') and self.pdf_canvas and hasattr(self, 'grid_manager'):
+
+            # Store original method for potential restore
+            original_draw_grid = getattr(self.pdf_canvas, '_draw_grid', None)
+            if original_draw_grid:
+                self.pdf_canvas._original_draw_grid = original_draw_grid
+
+            # Create a bound method that includes canvas parameter
+            def grid_manager_draw_with_canvas(painter):
+                """Direct call to GridManager.draw_grid with canvas parameter"""
+                if hasattr(self.pdf_canvas, 'page_pixmap') and self.pdf_canvas.page_pixmap:
+                    width = self.pdf_canvas.page_pixmap.width()
+                    height = self.pdf_canvas.page_pixmap.height()
+                    zoom_level = getattr(self.pdf_canvas, 'zoom_level', 1.0)
+
+                    # Direct call to GridManager method with canvas parameter
+                    self.grid_manager.draw_grid(painter, width, height, zoom_level, canvas=self.pdf_canvas)
+
+            # Replace the canvas method with direct GridManager reference
+            self.pdf_canvas._draw_grid = grid_manager_draw_with_canvas
+
+            print("🔗 GridManager connected to canvas")
+            print("🎯 Canvas _draw_grid now directly calls GridManager.draw_grid")
+
+        else:
+            print("🔗 GridManager connected to canvas (signal connections only)")
 
     def connect_grid_popup_to_manager(self):
         """Connect the grid popup to the grid manager"""
