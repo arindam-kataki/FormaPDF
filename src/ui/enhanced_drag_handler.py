@@ -529,6 +529,87 @@ class EnhancedDragHandler(QObject):
     def apply_drag_changes(self, final_pos: QPoint):
         """
         Apply drag offset to actual field positions with snap support
+        FIXED: Single snap to prevent double-snapping issues
+        """
+        selected_fields = self.get_selected_fields()
+        if not selected_fields:
+            return
+
+        print(f"🎯 Applying drag changes:")
+        print(f"   Drag start pos: {self.drag_start_pos}")
+        print(f"   Final pos: {final_pos}")
+        print(f"   Zoom level: {self.zoom_level}")
+
+        # Calculate screen offset first (no snapping yet)
+        screen_offset = final_pos - self.drag_start_pos
+        print(f"   Screen offset: {screen_offset}")
+
+        # Convert to document offset (keeping zoom handling as current)
+        doc_offset_x = screen_offset.x()  # / self.zoom_level
+        doc_offset_y = screen_offset.y()  # / self.zoom_level
+        print(f"   Document offset: ({doc_offset_x:.1f}, {doc_offset_y:.1f})")
+
+        # Apply document offset to each field with single snap
+        for field in selected_fields:
+            original_x = field.x
+            original_y = field.y
+
+            # Calculate new position before snapping
+            target_x = original_x + doc_offset_x
+            target_y = original_y + doc_offset_y
+
+            # Apply snap ONCE to the final field position
+            if self._should_snap():
+                zoom = getattr(self, 'zoom_level', 1.0)
+                snapped_x, snapped_y = self.snap_point_to_grid(target_x, target_y, zoom)
+
+                # Calculate movement distances
+                total_movement_x = snapped_x - original_x
+                total_movement_y = snapped_y - original_y
+                total_distance = (total_movement_x ** 2 + total_movement_y ** 2) ** 0.5
+
+                # Calculate snap adjustment
+                snap_adjustment_x = snapped_x - target_x
+                snap_adjustment_y = snapped_y - target_y
+                snap_adjustment_distance = (snap_adjustment_x ** 2 + snap_adjustment_y ** 2) ** 0.5
+
+                print(f"🧲 FIELD '{field.id}' MOVEMENT SUMMARY:")
+                print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+                print(f"   📍 Target position:   ({target_x:.1f}, {target_y:.1f})")
+                print(f"   📍 Snapped position:  ({snapped_x:.1f}, {snapped_y:.1f})")
+                print(
+                    f"   📏 Total movement:    ({total_movement_x:+.1f}, {total_movement_y:+.1f}) = {total_distance:.1f}px")
+                print(
+                    f"   🧲 Snap adjustment:   ({snap_adjustment_x:+.1f}, {snap_adjustment_y:+.1f}) = {snap_adjustment_distance:.1f}px")
+
+                # Update field position to snapped location
+                field.x = snapped_x
+                field.y = snapped_y
+
+            else:
+                # No snapping - use target position directly
+                total_movement_x = target_x - original_x
+                total_movement_y = target_y - original_y
+                total_distance = (total_movement_x ** 2 + total_movement_y ** 2) ** 0.5
+
+                print(f"📍 FIELD '{field.id}' MOVEMENT (NO SNAP):")
+                print(f"   📍 Original position: ({original_x:.1f}, {original_y:.1f})")
+                print(f"   📍 Final position:    ({target_x:.1f}, {target_y:.1f})")
+                print(
+                    f"   📏 Total movement:    ({total_movement_x:+.1f}, {total_movement_y:+.1f}) = {total_distance:.1f}px")
+
+                # Update field position to target location
+                field.x = target_x
+                field.y = target_y
+
+            # Emit field moved signal
+            self.fieldMoved.emit(field.id, field.x, field.y)
+
+        print(f"✅ Updated {len(selected_fields)} field positions")
+
+    def apply_1_drag_changes(self, final_pos: QPoint):
+        """
+        Apply drag offset to actual field positions with snap support
         FIXED: Prevent double-snapping by snapping only the offset, not individual fields
         """
         selected_fields = self.get_selected_fields()
@@ -703,7 +784,30 @@ class EnhancedDragHandler(QObject):
 
                 # Snap the final field position
                 zoom = getattr(self, 'zoom_level', 1.0)
+
+                # Add this BEFORE the snap calculation in your method:
+                print(f"🔍 SNAP DEBUG FOR {field.id}:")
+                print(f"   Original field position: ({original_x:.1f}, {original_y:.1f})")
+                print(f"   Field size: {field.width}x{field.height}")
+                print(f"   Current field bounds:")
+                print(f"     Left: {original_x:.1f}, Right: {original_x + field.width:.1f}")
+                print(f"     Top: {original_y:.1f}, Bottom: {original_y + field.height:.1f}")
+                print(f"   Target position before snap: ({new_x:.1f}, {new_y:.1f})")
+                print(f"   Target bounds before snap:")
+                print(f"     Left: {new_x:.1f}, Right: {new_x + field.width:.1f}")
+                print(f"     Top: {new_y:.1f}, Bottom: {new_y + field.height:.1f}")
+
+                # Your existing snap call:
                 snapped_new_x, snapped_new_y = self.snap_point_to_grid(new_x, new_y, zoom)
+
+                # Add this AFTER the snap calculation:
+                print(f"   Snapped position: ({snapped_new_x:.1f}, {snapped_new_y:.1f})")
+                print(f"   Snapped bounds:")
+                print(f"     Left: {snapped_new_x:.1f}, Right: {snapped_new_x + field.width:.1f}")
+                print(f"     Top: {snapped_new_y:.1f}, Bottom: {snapped_new_y + field.height:.1f}")
+                print(f"   Available grid lines:")
+                print(f"     Vertical: {self.grid_manager.vertical_lines[:10]}")
+                print(f"     Horizontal: {self.grid_manager.horizontal_lines[:10]}")
 
                 # Calculate movement distances
                 total_movement_x = snapped_new_x - original_x
