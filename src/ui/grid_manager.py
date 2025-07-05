@@ -108,6 +108,10 @@ class GridManager(QObject):
         self.update_timer.setSingleShot(True)
         self.update_timer.timeout.connect(self._emit_grid_changed)
 
+        self.vertical_lines = []  # X coordinates of vertical lines
+        self.horizontal_lines = []  # Y coordinates of horizontal lines
+        self.lines_valid = False  # Flag to track if arrays are current
+
     # =========================
     # CORE GRID FUNCTIONALITY
     # =========================
@@ -259,7 +263,7 @@ class GridManager(QObject):
     def snap_point_to_grid(self, x: float, y: float, zoom_level: float = 1.0, max_snap_distance: float = 25.0) -> Tuple[
         float, float]:
         """
-        Snap a point to the nearest grid intersection with proper zoom handling
+        Snap a point to the nearest grid intersection with proper zoom handling and page boundaries
 
         Args:
             x, y: Point coordinates to snap (in screen/canvas coordinates)
@@ -272,7 +276,7 @@ class GridManager(QObject):
         if not self.settings.snap_enabled or not self.settings.visible:
             return (x, y)
 
-        # 🎯 KEY FIX: Only scale with zoom if sync_with_zoom is enabled
+        # Get effective spacing and offset based on sync_with_zoom setting
         if self.settings.sync_with_zoom:
             # Grid scales with zoom - use scaled values
             effective_spacing = self.settings.spacing * zoom_level
@@ -286,14 +290,34 @@ class GridManager(QObject):
             effective_offset_y = self.settings.offset_y
             snap_mode = "FIXED-PIXEL"
 
-        # Calculate potential snapped coordinates
-        snapped_x = round((x - effective_offset_x) / effective_spacing) * effective_spacing + effective_offset_x
-        snapped_y = round((y - effective_offset_y) / effective_spacing) * effective_spacing + effective_offset_y
+        # FIXED: Match the exact same logic as _draw_page_bounded_grid
+        page_margin_left = 10  # This matches getattr(canvas, 'page_margin_left', 10)
+        page_margin_top = 15  # This should match the page_top from page_positions[0]
+
+        # Use the SAME calculation as the grid drawing method
+        grid_origin_x = page_margin_left + (effective_offset_x % effective_spacing)
+        grid_origin_y = page_margin_top + (effective_offset_y % effective_spacing)
+
+        # Calculate snapped coordinates relative to grid origin
+        snapped_x = round((x - grid_origin_x) / effective_spacing) * effective_spacing + grid_origin_x
+        snapped_y = round((y - grid_origin_y) / effective_spacing) * effective_spacing + grid_origin_y
 
         # Calculate snap distances
         distance_x = abs(snapped_x - x)
         distance_y = abs(snapped_y - y)
         total_distance = (distance_x ** 2 + distance_y ** 2) ** 0.5
+
+        # Add this debug output after calculating grid_origin_x and grid_origin_y:
+        print(f"🔍 SNAP DEBUG:")
+        print(f"   Input: ({x:.1f}, {y:.1f})")
+        print(f"   Page margins: ({page_margin_left}, {page_margin_top})")
+        print(f"   Effective offset: ({effective_offset_x}, {effective_offset_y})")
+        print(f"   Grid origin: ({grid_origin_x}, {grid_origin_y})")
+        print(f"   Effective spacing: {effective_spacing}")
+        print(
+            f"   X calc: round(({x} - {grid_origin_x}) / {effective_spacing}) * {effective_spacing} + {grid_origin_x}")
+        print(
+            f"   Y calc: round(({y} - {grid_origin_y}) / {effective_spacing}) * {effective_spacing} + {grid_origin_y}")
 
         # Only snap if within threshold
         if total_distance <= max_snap_distance:
@@ -346,12 +370,28 @@ class GridManager(QObject):
             return
 
         # Draw vertical lines
-        start_x = scaled_offset_x % scaled_spacing
+        # modified start_x = scaled_offset_x % scaled_spacing
+
+        # Draw vertical lines
+        # Fix: Handle zero offset case for perfect alignment
+        if scaled_offset_x % scaled_spacing == 0:
+            start_x = 0
+        else:
+            start_x = scaled_offset_x % scaled_spacing
+
         for x in range(start_x, width, scaled_spacing):
             painter.drawLine(x, 0, x, height)
 
         # Draw horizontal lines
-        start_y = scaled_offset_y % scaled_spacing
+        # modified start_y = scaled_offset_y % scaled_spacing
+
+        # Draw horizontal lines
+        # Fix: Handle zero offset case for perfect alignment
+        if scaled_offset_y % scaled_spacing == 0:
+            start_y = 0
+        else:
+            start_y = scaled_offset_y % scaled_spacing
+
         for y in range(start_y, height, scaled_spacing):
             painter.drawLine(0, y, width, y)
 
@@ -614,7 +654,7 @@ class GridManager(QObject):
             page_height = int(page.rect.height * zoom_level)
 
             # Page boundaries in screen coordinates
-            page_left = getattr(canvas, 'page_margin_left', 10)  # Standard margin
+            page_left = getattr(canvas, 'page_margin_left', 15)  # Standard margin
             page_right = page_left + page_width
             page_bottom = page_top + page_height
 
@@ -633,8 +673,19 @@ class GridManager(QObject):
 
             # Calculate grid start positions for this page
             # Grid starts from page top-left corner, then apply offset
-            grid_origin_x = page_left + (effective_offset_x % effective_spacing)
-            grid_origin_y = page_top + (effective_offset_y % effective_spacing)
+            # modified grid_origin_x = page_left + (effective_offset_x % effective_spacing)
+            # modified grid_origin_y = page_top + (effective_offset_y % effective_spacing)
+
+            if effective_offset_x % effective_spacing == 0:
+                grid_origin_x = page_left
+            else:
+                grid_origin_x = page_left + (effective_offset_x % effective_spacing)
+
+            # Fix: Same for Y offset
+            if effective_offset_y % effective_spacing == 0:
+                grid_origin_y = page_top
+            else:
+                grid_origin_y = page_top + (effective_offset_y % effective_spacing)
 
             # Draw vertical lines for this page
             first_x = grid_origin_x
@@ -673,13 +724,29 @@ class GridManager(QObject):
         total_lines = 0
 
         # Draw vertical lines
-        start_x = effective_offset_x % effective_spacing
+        # modified start_x = effective_offset_x % effective_spacing
+
+        # Draw vertical lines
+        # Fix: Handle zero offset case
+        if effective_offset_x % effective_spacing == 0:
+            start_x = 0
+        else:
+            start_x = effective_offset_x % effective_spacing
+
         for x in range(start_x, width, effective_spacing):
             painter.drawLine(x, 0, x, height)
             total_lines += 1
 
         # Draw horizontal lines
-        start_y = effective_offset_y % effective_spacing
+        # modified start_y = effective_offset_y % effective_spacing
+
+        # Draw horizontal lines
+        # Fix: Handle zero offset case
+        if effective_offset_y % effective_spacing == 0:
+            start_y = 0
+        else:
+            start_y = effective_offset_y % effective_spacing
+
         for y in range(start_y, height, effective_spacing):
             painter.drawLine(0, y, width, y)
             total_lines += 1

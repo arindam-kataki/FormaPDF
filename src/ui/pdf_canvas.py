@@ -304,7 +304,7 @@ class PDFCanvas(QLabel):
         from PyQt6.QtGui import QColor, QPainter, QPen
         from PyQt6.QtCore import QRect
 
-        self.setStyleSheet("border:solid 1px red;");
+        #self.setStyleSheet("border:solid 1px red;");
 
         try:
             print(f"🎨 Rendering all {self.pdf_document.page_count} pages with simple moats")
