@@ -780,6 +780,10 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                     drag_handler = self.pdf_canvas.enhanced_drag_handler
 
                     # Connect enhanced signals if they exist
+                    # 👇 ADD THIS RIGHT HERE:
+                    if hasattr(drag_handler, 'fieldMoved'):
+                        drag_handler.fieldMoved.connect(self.on_field_moved)
+                        print("✅ Connected fieldMoved signal")
                     if hasattr(drag_handler, 'dragStarted'):
                         drag_handler.dragStarted.connect(self.on_drag_started)
                         print("✅ Connected dragStarted signal")
@@ -2193,10 +2197,19 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         except Exception as e:
             print(f"❌ Error handling field click: {e}")
 
-    @pyqtSlot(str, int, int)
-    def on_field_moved(self, field_id: str, x: int, y: int):
-        """Handle field movement"""
-        print(f"Field {field_id} moved to ({x}, {y})")
+    @pyqtSlot(str, float, float)
+    def on_field_moved(self, field_id: str, x: float, y: float):
+        """Handle field movement completion"""
+        print(f"✅ Field {field_id} moved to ({x:.1f}, {y:.1f})")
+
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            field = self._get_field_by_id(field_id)
+            if field:
+                self.properties_panel.update_field_values(
+                    field_id, int(x), int(y), field.width, field.height
+                )
+
+        self.document_modified = True
 
     @pyqtSlot(str, float, float, float, float)
     def on_field_resized(self, field_id: str, x: float, y: float, width: float, height: float):
