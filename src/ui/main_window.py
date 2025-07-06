@@ -698,23 +698,23 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect fieldClicked: {e}")
 
-            if (hasattr(self, 'pdf_canvas') and 
-                self.pdf_canvas is not None and 
-                hasattr(self.pdf_canvas, 'fieldMoved')):
-                try:
-                    self.pdf_canvas.fieldMoved.connect(self.on_field_moved)
-                    print("  ✅ Connected pdf_canvas.fieldMoved")
-                except Exception as e:
-                    print(f"  ⚠️ Failed to connect fieldMoved: {e}")
+            #if (hasattr(self, 'pdf_canvas') and
+            #    self.pdf_canvas is not None and
+            #    hasattr(self.pdf_canvas, 'fieldMoved')):
+            #    try:
+            #        self.pdf_canvas.fieldMoved.connect(self.on_field_moved)
+            #        print("  ✅ Connected pdf_canvas.fieldMoved")
+            #    except Exception as e:
+            #        print(f"  ⚠️ Failed to connect fieldMoved: {e}")
 
-            if (hasattr(self, 'pdf_canvas') and 
-                self.pdf_canvas is not None and 
-                hasattr(self.pdf_canvas, 'fieldResized')):
-                try:
-                    self.pdf_canvas.fieldResized.connect(self.on_field_resized)
-                    print("  ✅ Connected pdf_canvas.fieldResized")
-                except Exception as e:
-                    print(f"  ⚠️ Failed to connect fieldResized: {e}")
+            #if (hasattr(self, 'pdf_canvas') and
+            #    self.pdf_canvas is not None and
+            #    hasattr(self.pdf_canvas, 'fieldResized')):
+            #    try:
+            #        self.pdf_canvas.fieldResized.connect(self.on_field_resized)
+            #        print("  ✅ Connected pdf_canvas.fieldResized")
+            #    except Exception as e:
+            #        print(f"  ⚠️ Failed to connect fieldResized: {e}")
 
             if (hasattr(self, 'pdf_canvas') and 
                 self.pdf_canvas is not None and 
@@ -760,6 +760,27 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
 
             """
 
+            # Debug: Check what components exist
+            print("🔍 Debugging component availability:")
+            print(f"  field_palette exists: {hasattr(self, 'field_palette')}")
+            print(f"  pdf_canvas exists: {hasattr(self, 'pdf_canvas')}")
+            if hasattr(self, 'field_palette'):
+                print(f"  field_palette type: {type(self.field_palette)}")
+            if hasattr(self, 'pdf_canvas'):
+                print(f"  pdf_canvas type: {type(self.pdf_canvas)}")
+
+            # Field palette connections - check both object and signal exist
+            if (hasattr(self, 'field_palette') and
+                    self.field_palette is not None and
+                    hasattr(self.field_palette, 'fieldRequested')):
+                try:
+                    self.field_palette.fieldRequested.connect(self._on_field_type_selected)
+                    print("  ✅ Connected field_palette.fieldRequested")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect fieldRequested: {e}")
+            else:
+                print("  ❌ field_palette or fieldRequested not available")
+
             # 🔧 SIMPLE: Connect canvas selection to properties panel via main window
             if (hasattr(self, 'pdf_canvas') and
                     hasattr(self.pdf_canvas, 'enhanced_drag_handler') and
@@ -771,6 +792,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                 if hasattr(drag_handler, 'selectionChanged'):
                     drag_handler.selectionChanged.connect(self._on_field_selection_changed)
                     print("✅ Connected field selection to main window")
+
 
             if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
                 self.field_palette.fieldRequested.connect(self._on_field_type_selected)
@@ -784,18 +806,23 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                     if hasattr(drag_handler, 'fieldMoved'):
                         drag_handler.fieldMoved.connect(self.on_field_moved)
                         print("✅ Connected fieldMoved signal")
+
                     if hasattr(drag_handler, 'dragStarted'):
                         drag_handler.dragStarted.connect(self.on_drag_started)
                         print("✅ Connected dragStarted signal")
+
                     if hasattr(drag_handler, 'dragProgress'):
                         drag_handler.dragProgress.connect(self.on_drag_progress)
                         print("✅ Connected dragProgress signal")
+
                     if hasattr(drag_handler, 'dragCompleted'):
                         drag_handler.dragCompleted.connect(self.on_drag_completed)
                         print("✅ Connected dragCompleted signal")
+
                     if hasattr(drag_handler, 'fieldResized'):
                         drag_handler.fieldResized.connect(self.on_field_resized)
                         print("✅ Connected fieldResized signal")
+
                         # PDF Canvas field selection connection
                         if (hasattr(self, 'pdf_canvas') and
                                 self.pdf_canvas is not None and
@@ -803,9 +830,11 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                             try:
                                 # Connect selection handler if it exists
                                 selection_handler = self.pdf_canvas.selection_handler
+
                                 if hasattr(selection_handler, 'fieldSelected'):
                                     selection_handler.fieldSelected.connect(self.on_field_selected)
                                     print("  ✅ Connected canvas field selection signal")
+
                                 elif hasattr(selection_handler, 'selectionChanged'):
                                     # Fallback for older signal name
                                     selection_handler.selectionChanged.connect(
@@ -815,6 +844,14 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                             except Exception as e:
                                 print(f"  ⚠️ Failed to connect canvas selection: {e}")
 
+            # Check the specific condition that's failing
+            if hasattr(self, 'field_palette') and hasattr(self, 'pdf_canvas'):
+                print("✅ Both field_palette and pdf_canvas exist - connecting fieldRequested")
+                self.field_palette.fieldRequested.connect(self._on_field_type_selected)
+            else:
+                print("❌ Missing components for fieldRequested connection:")
+                print(f"  field_palette: {hasattr(self, 'field_palette')}")
+                print(f"  pdf_canvas: {hasattr(self, 'pdf_canvas')}")
 
             print("✅ Signal connections setup completed")
 
@@ -903,12 +940,14 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
 
     def on_drag_progress(self, field_id: str, x: int, y: int, w: int, h: int):
         """Handle real-time drag progress"""
-        # Update properties panel if it exists
-        if hasattr(self, 'properties_panel') and self.properties_panel:
+        if self.properties_panel:
             try:
                 self.properties_panel.update_live_values(x, y, w, h)
             except Exception as e:
-                print(f"⚠️ Error updating properties panel: {e}")
+                print(f"⚠️ Error updating properties panel during drag: {e}")
+        else:
+            print(f"⚠️ Error - no properties panel reference")
+
 
         # Update status bar with live coordinates
         if hasattr(self, 'field_info_label'):
@@ -2202,19 +2241,28 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         """Handle field movement completion"""
         print(f"✅ Field {field_id} moved to ({x:.1f}, {y:.1f})")
 
-        if hasattr(self, 'properties_panel') and self.properties_panel:
+        if self.properties_panel:
             field = self._get_field_by_id(field_id)
             if field:
-                self.properties_panel.update_field_values(
+                self.properties_panel.update_field_position_size(
                     field_id, int(x), int(y), field.width, field.height
                 )
+                print(f"🔄 Updated properties panel for moved field {field_id}")
 
         self.document_modified = True
 
     @pyqtSlot(str, float, float, float, float)
     def on_field_resized(self, field_id: str, x: float, y: float, width: float, height: float):
-        """Handle field resize"""
-        print(f"Field {field_id} resized to {width}x{height} at ({x}, {y})")
+        """Handle field resize completion"""
+        print(f"✅ Field {field_id} resized to ({x:.1f}, {y:.1f}) {width:.1f}×{height:.1f}")
+
+        if self.properties_panel:
+            self.properties_panel.update_field_position_size(
+                field_id, int(x), int(y), int(width), int(height)
+            )
+            print(f"🔄 Updated properties panel for resized field {field_id}")
+
+        self.document_modified = True
 
     @pyqtSlot(int, int)
     def on_position_clicked(self, x: int, y: int):

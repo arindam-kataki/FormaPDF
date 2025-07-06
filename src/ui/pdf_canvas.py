@@ -137,11 +137,12 @@ class PDFCanvas(QLabel):
         # Show initial message
         self.show_no_document_message()
 
-        # Setup signal connections
-        self._setup_signal_connections()
-
         if hasattr(self, 'enhanced_drag_handler'):
             self.enhanced_drag_handler.pdf_canvas_ref = self
+            print(f"ℹ️ Enhanced drag handler initialized.")
+
+        # Setup signal connections
+        self._setup_signal_connections()
 
         self._rendering_in_progress = False
 
@@ -172,6 +173,7 @@ class PDFCanvas(QLabel):
             # Connect drag handler signals to PDF canvas signals
             if hasattr(self.enhanced_drag_handler, 'fieldMoved'):
                 self.enhanced_drag_handler.fieldMoved.connect(self.fieldMoved)
+
             if hasattr(self.enhanced_drag_handler, 'fieldResized'):
                 self.enhanced_drag_handler.fieldResized.connect(self.fieldResized)
 

@@ -532,7 +532,7 @@ class EnhancedDragHandler(QObject):
             print(f"⚠️ Error getting selected fields: {e}")
             return []
 
-    def apply_drag_changes(self, final_pos: QPoint):
+    def copy_apply_drag_changes(self, final_pos: QPoint):
         """
         Apply drag offset to actual field positions with snap support
         FIXED: Single snap to prevent double-snapping issues
@@ -860,6 +860,7 @@ class EnhancedDragHandler(QObject):
 
             # Emit field moved signal
             self.fieldMoved.emit(field.id, field.x, field.y)
+            print(f"✅ Emitted field moved signal")
 
         print(f"✅ Updated {len(selected_fields)} field positions")
 
