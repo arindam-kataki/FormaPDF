@@ -1044,6 +1044,47 @@ class PropertiesTab(QWidget):
             self.select_no_control()
             print("   ✅ Dropdown set to 'No controls selected'")
 
+    # In PropertiesTab class (not PropertiesPanel):
+    def update_field_position_size(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Update field position and size from external changes (move/resize operations)"""
+        print(f"🚨 DEBUG: update_field_position_size called with {field_id}")
+
+        # ✅ Check if the field_id matches the dropdown selection
+        current_index = self.control_dropdown.currentIndex()
+        selected_field_id = self.control_dropdown.itemData(current_index)
+
+        print(f"🚨 DEBUG: Dropdown selected field_id = {selected_field_id}")
+        print(f"🚨 DEBUG: Update requested for field_id = {field_id}")
+
+        # Only update if this field is currently selected in the dropdown
+        if selected_field_id != field_id:
+            print(f"🚨 DEBUG: Skipping update - field {field_id} not selected in dropdown")
+            return
+
+        # ✅ Update through the properties panel
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            # Get the field object from field_manager
+            if not self.field_manager:
+                print(f"🚨 DEBUG: No field_manager available")
+                return
+
+            field = self.field_manager.get_field_by_id(field_id)
+            if not field:
+                print(f"🚨 DEBUG: Field {field_id} not found in field_manager")
+                return
+
+            # Update the field object
+            field.x = x
+            field.y = y
+            field.width = width
+            field.height = height
+
+            # Update current_field reference
+            self.current_field = field
+
+            # Call the properties panel update method (the original one)
+            self.properties_panel.update_field_position_size(field_id, x, y, width, height)
+
 class TabbedFieldPalette(QWidget):
     """Main tabbed field palette widget"""
 

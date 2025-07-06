@@ -940,14 +940,21 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
 
     def on_drag_progress(self, field_id: str, x: int, y: int, w: int, h: int):
         """Handle real-time drag progress"""
-        if self.properties_panel:
+        # Use the tabbed field palette approach
+        if (hasattr(self, 'field_palette') and
+                hasattr(self.field_palette, 'properties_tab')):
+            properties_tab = self.field_palette.properties_tab
             try:
-                self.properties_panel.update_live_values(x, y, w, h)
+                # Check if this field is selected in dropdown before updating
+                current_index = properties_tab.control_dropdown.currentIndex()
+                selected_field_id = properties_tab.control_dropdown.itemData(current_index)
+
+                if selected_field_id == field_id and hasattr(properties_tab, 'properties_panel'):
+                    properties_tab.properties_panel.update_live_values(x, y, w, h)
             except Exception as e:
                 print(f"⚠️ Error updating properties panel during drag: {e}")
         else:
-            print(f"⚠️ Error - no properties panel reference")
-
+            print(f"⚠️ Error - no tabbed field palette reference")
 
         # Update status bar with live coordinates
         if hasattr(self, 'field_info_label'):
@@ -1875,7 +1882,6 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         except Exception as e:
             pass  # Fail silently
 
-
     def setup_scroll_shortcuts(self):
         """Setup keyboard shortcuts for scrolling"""
         from PyQt6.QtGui import QShortcut
@@ -2241,13 +2247,18 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         """Handle field movement completion"""
         print(f"✅ Field {field_id} moved to ({x:.1f}, {y:.1f})")
 
-        if self.properties_panel:
-            field = self._get_field_by_id(field_id)
-            if field:
-                self.properties_panel.update_field_position_size(
-                    field_id, int(x), int(y), field.width, field.height
-                )
-                print(f"🔄 Updated properties panel for moved field {field_id}")
+        field = self._get_field_by_id(field_id)
+        if not field:
+            return
+
+        # Use the tabbed field palette approach
+        if (hasattr(self, 'field_palette') and
+                hasattr(self.field_palette, 'properties_tab')):
+            properties_tab = self.field_palette.properties_tab
+            properties_tab.update_field_position_size(field_id, int(x), int(y), field.width, field.height)
+            print("🔄 Updated properties via tabbed field palette")
+        else:
+            print("⚠️ No tabbed field palette found to update")
 
         self.document_modified = True
 
@@ -2256,11 +2267,18 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         """Handle field resize completion"""
         print(f"✅ Field {field_id} resized to ({x:.1f}, {y:.1f}) {width:.1f}×{height:.1f}")
 
-        if self.properties_panel:
-            self.properties_panel.update_field_position_size(
-                field_id, int(x), int(y), int(width), int(height)
-            )
-            print(f"🔄 Updated properties panel for resized field {field_id}")
+        field = self._get_field_by_id(field_id)
+        if not field:
+            return
+
+        # Use the tabbed field palette approach
+        if (hasattr(self, 'field_palette') and
+                hasattr(self.field_palette, 'properties_tab')):
+            properties_tab = self.field_palette.properties_tab
+            properties_tab.update_field_position_size(field_id, int(x), int(y), int(width), int(height))
+            print("🔄 Updated properties via tabbed field palette")
+        else:
+            print("⚠️ No tabbed field palette found to update")
 
         self.document_modified = True
 

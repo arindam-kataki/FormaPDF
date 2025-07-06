@@ -294,6 +294,14 @@ class EnhancedDragHandler(QObject):
 
             self.drag_overlay.update_drag(pos)
 
+            for field in self.get_selected_fields():
+                # Calculate current live position based on drag offset
+                drag_offset = pos - self.drag_start_pos
+                live_x = int(field.x + drag_offset.x())
+                live_y = int(field.y + drag_offset.y())
+
+                self.dragProgress.emit(field.id, live_x, live_y, int(field.width), int(field.height))
+
         return self.is_dragging
 
     def working_handle_mouse_move(self, pos: QPoint) -> bool:
@@ -858,9 +866,12 @@ class EnhancedDragHandler(QObject):
                 field.x = new_x
                 field.y = new_y
 
+            # 🔥 ADD THIS DEBUG LINE:
+            print(f"🚨 DEBUG: About to emit fieldMoved signal for {field.id} at ({field.x:.1f}, {field.y:.1f})")
+
             # Emit field moved signal
-            self.fieldMoved.emit(field.id, field.x, field.y)
-            print(f"✅ Emitted field moved signal")
+            self.fieldMoved.emit(field.id, float(field.x), float(field.y))
+
 
         print(f"✅ Updated {len(selected_fields)} field positions")
 
