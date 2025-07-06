@@ -372,30 +372,35 @@ class PropertiesPanel(QWidget):
         # X position
         pos_layout.addWidget(QLabel("X:"), 0, 0)
         x_widget = NumberPropertyWidget("x", field.x, 0, 2000)
-        x_widget.connect_signal(lambda value: self._emit_property_change("x", value))
+        #x_widget.connect_signal(lambda value: self._emit_property_change("x", value))
         pos_layout.addWidget(x_widget.widget, 0, 1)
         self.property_widgets["x"] = x_widget
 
         # Y position
         pos_layout.addWidget(QLabel("Y:"), 1, 0)
         y_widget = NumberPropertyWidget("y", field.y, 0, 2000)
-        y_widget.connect_signal(lambda value: self._emit_property_change("y", value))
+        #y_widget.connect_signal(lambda value: self._emit_property_change("y", value))
         pos_layout.addWidget(y_widget.widget, 1, 1)
         self.property_widgets["y"] = y_widget
 
         # Width
         pos_layout.addWidget(QLabel("Width:"), 0, 2)
         width_widget = NumberPropertyWidget("width", field.width, 10, 1000)
-        width_widget.connect_signal(lambda value: self._emit_property_change("width", value))
+        #width_widget.connect_signal(lambda value: self._emit_property_change("width", value))
         pos_layout.addWidget(width_widget.widget, 0, 3)
         self.property_widgets["width"] = width_widget
 
         # Height
         pos_layout.addWidget(QLabel("Height:"), 1, 2)
         height_widget = NumberPropertyWidget("height", field.height, 10, 500)
-        height_widget.connect_signal(lambda value: self._emit_property_change("height", value))
+        #height_widget.connect_signal(lambda value: self._emit_property_change("height", value))
         pos_layout.addWidget(height_widget.widget, 1, 3)
         self.property_widgets["height"] = height_widget
+
+        x_widget.connect_signal(lambda value: self._emit_property_change("x", value))
+        y_widget.connect_signal(lambda value: self._emit_property_change("y", value))
+        width_widget.connect_signal(lambda value: self._emit_property_change("width", value))
+        height_widget.connect_signal(lambda value: self._emit_property_change("height", value))
 
         pos_group.setLayout(pos_layout)
         self.properties_layout.addWidget(pos_group)
@@ -634,3 +639,25 @@ class PropertiesPanel(QWidget):
     def clear_field(self):
         """Alias for show_no_selection to maintain compatibility"""
         self.show_no_selection()
+
+    def _emit_geometry_change(self):
+        """Emit geometry change using existing propertyChanged signal"""
+        if not self.current_field:
+            return
+
+        try:
+            # Get current values from widgets
+            x = self.property_widgets["x"].get_value() if "x" in self.property_widgets else self.current_field.x
+            y = self.property_widgets["y"].get_value() if "y" in self.property_widgets else self.current_field.y
+            width = self.property_widgets[
+                "width"].get_value() if "width" in self.property_widgets else self.current_field.width
+            height = self.property_widgets[
+                "height"].get_value() if "height" in self.property_widgets else self.current_field.height
+
+            # Emit using existing signal with special geometry property
+            geometry_value = {"x": int(x), "y": int(y), "width": int(width), "height": int(height)}
+            self.propertyChanged.emit(self.current_field.id, "geometry", geometry_value)
+            print(f"🔄 Properties panel changed geometry: {self.current_field.id} {geometry_value}")
+
+        except Exception as e:
+            print(f"⚠️ Error emitting geometry change: {e}")

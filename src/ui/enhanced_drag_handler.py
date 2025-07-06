@@ -81,6 +81,9 @@ class EnhancedDragHandler(QObject):
     # Signals for drag and resize operations
     fieldMoved = pyqtSignal(str, float, float)  # field_id, new_x, new_y
     fieldResized = pyqtSignal(str, float, float, float, float)  # field_id, x, y, width, height
+
+    fieldGeometryChanged = pyqtSignal(str, int, int, int, int)
+
     dragStarted = pyqtSignal(str, str)  # field_id, operation_type
     dragProgress = pyqtSignal(str, int, int, int, int)  # field_id, x, y, w, h
     dragCompleted = pyqtSignal(str)  # field_id

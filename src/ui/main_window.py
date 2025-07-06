@@ -1307,6 +1307,48 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         print(f"Property change: {field_id}.{property_name} = {value}")
 
         try:
+            field = self._get_field_by_id(field_id)
+            if not field:
+                print(f"⚠️ Field not found: {field_id}")
+                return
+
+            # Handle geometry changes (position and size together)
+            if property_name == "geometry" and isinstance(value, dict):
+                field.x = value.get("x", field.x)
+                field.y = value.get("y", field.y)
+                field.width = value.get("width", field.width)
+                field.height = value.get("height", field.height)
+                print(f"✅ Updated field geometry: ({field.x}, {field.y}) {field.width}×{field.height}")
+            else:
+                # Handle individual property changes (existing logic)
+                if hasattr(field, property_name):
+                    setattr(field, property_name, value)
+                elif hasattr(field, 'properties'):
+                    field.properties[property_name] = value
+
+            # Update the canvas display
+            if hasattr(self.pdf_canvas, 'update_field_display'):
+                self.pdf_canvas.update_field_display(field)
+            elif hasattr(self.pdf_canvas, 'draw_overlay'):
+                self.pdf_canvas.draw_overlay()
+            else:
+                self.pdf_canvas.update()
+
+            # Update status
+            if hasattr(self, 'field_info_label'):
+                self.field_info_label.setText(f"Updated {property_name}: {value}")
+
+        except Exception as e:
+            print(f"❌ Error updating property: {e}")
+            if hasattr(self, 'field_info_label'):
+                self.field_info_label.setText(f"Error updating property: {e}")
+
+    @pyqtSlot(str, str, object)
+    def original_on_property_changed(self, field_id: str, property_name: str, value):
+        """Handle property changes from the Properties tab"""
+        print(f"Property change: {field_id}.{property_name} = {value}")
+
+        try:
             # Find the field and update it
             field = None
 
