@@ -229,12 +229,57 @@ class PropertiesPanel(QWidget):
         # Advanced properties
         self._create_advanced_properties(field)
 
+    def _block_property_signals(self, block: bool):
+        """Block/unblock signals from property widgets to prevent feedback loops"""
+        try:
+            for widget in self.property_widgets.values():
+                if hasattr(widget, 'widget') and hasattr(widget.widget, 'blockSignals'):
+                    widget.widget.blockSignals(block)
+        except Exception as e:
+            print(f"⚠️ Error blocking signals: {e}")
+
+    def update_field_position_size(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Update field position and size from external changes (move/resize operations)"""
+        if not self.current_field or self.current_field.id != field_id:
+            return
+
+        try:
+            # Block signals to prevent feedback loop
+            self._block_property_signals(True)
+
+            # Update the actual field object
+            self.current_field.x = x
+            self.current_field.y = y
+            self.current_field.width = width
+            self.current_field.height = height
+
+            # Update the UI widgets to reflect the changes
+            if "x" in self.property_widgets:
+                self.property_widgets["x"].set_value(x)
+            if "y" in self.property_widgets:
+                self.property_widgets["y"].set_value(y)
+            if "width" in self.property_widgets:
+                self.property_widgets["width"].set_value(width)
+            if "height" in self.property_widgets:
+                self.property_widgets["height"].set_value(height)
+
+            print(f"✅ Properties panel updated for {field_id}: ({x}, {y}) {width}×{height}")
+
+        except Exception as e:
+            print(f"⚠️ Error updating properties panel: {e}")
+        finally:
+            # Ensure signals are re-enabled even if there's an error
+            self._block_property_signals(False)
+
     def update_live_values(self, x: int, y: int, width: int, height: int):
         """Update position and size values during live drag operations"""
         if not self.current_field:
             return
 
         try:
+            # Block signals to prevent triggering property changes during live updates
+            self._block_property_signals(True)
+
             # Update position and size widgets without triggering signals
             if "x" in self.property_widgets:
                 self.property_widgets["x"].set_value(x)
@@ -244,8 +289,12 @@ class PropertiesPanel(QWidget):
                 self.property_widgets["width"].set_value(width)
             if "height" in self.property_widgets:
                 self.property_widgets["height"].set_value(height)
+
         except Exception as e:
             print(f"⚠️ Error in live update: {e}")
+        finally:
+            # Always re-enable signals
+            self._block_property_signals(False)
 
     def update_field_values(self, field_id: str, x: int, y: int, width: int, height: int):
         """Update field values after operation completion"""

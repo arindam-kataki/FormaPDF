@@ -393,6 +393,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         about_action.triggered.connect(self.show_about)
         help_menu.addAction(about_action)
 
+
+
     def create_center_panel(self) -> QWidget:
         """Create center panel with PDF viewer"""
         # Scroll area for PDF canvas
@@ -816,6 +818,64 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             print(f"Warning: Error setting up signal connections: {e}")
             import traceback
             traceback.print_exc()
+
+    @pyqtSlot(str, int, int, int, int)
+    def _on_drag_progress_live(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Handle live drag progress updates"""
+        # Update properties panel in real-time during drag operations
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            self.properties_panel.update_live_values(x, y, width, height)
+
+        # Update status bar with live coordinates
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(f"{field_id}: ({x}, {y}) {width}×{height}")
+
+    @pyqtSlot(str, int, int)
+    def _on_field_moved_final(self, field_id: str, x: int, y: int):
+        """Handle field move completion"""
+        print(f"✅ Field {field_id} moved to ({x}, {y})")
+
+        # Update properties panel with final position
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            # Get the field to get its current size
+            field = self._get_field_by_id(field_id)
+            if field:
+                self.properties_panel.update_field_position_size(
+                    field_id, x, y, field.width, field.height
+                )
+
+        # Mark document as modified
+        self.document_modified = True
+
+        # Update status bar
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(f"Moved {field_id}", 2000)
+
+    @pyqtSlot(str, int, int, int, int)
+    def _on_field_resized_final(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Handle field resize completion"""
+        print(f"✅ Field {field_id} resized to ({x}, {y}) {width}×{height}")
+
+        # Update properties panel with final size and position
+        if hasattr(self, 'properties_panel') and self.properties_panel:
+            self.properties_panel.update_field_position_size(field_id, x, y, width, height)
+
+        # Mark document as modified
+        self.document_modified = True
+
+        # Update status bar
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(f"Resized {field_id}", 2000)
+
+    def _get_field_by_id(self, field_id: str):
+        """Helper method to get field by ID"""
+        try:
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                if hasattr(self.pdf_canvas, 'field_manager'):
+                    return self.pdf_canvas.field_manager.get_field_by_id(field_id)
+        except Exception as e:
+            print(f"⚠️ Error getting field {field_id}: {e}")
+        return None
 
     @pyqtSlot(list)
     def on_multi_selection_changed(self, selected_fields):

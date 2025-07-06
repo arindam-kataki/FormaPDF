@@ -366,16 +366,19 @@ class EnhancedDragHandler(QObject):
             new_x, new_y = self.snap_point_to_grid(new_x, new_y, zoom_level)
 
             # Snap size to grid intervals
-            new_width = max(scaled_spacing, round(new_width / scaled_spacing) * scaled_spacing)
-            new_height = max(scaled_spacing, round(new_height / scaled_spacing) * scaled_spacing)
+            #new_width = max(scaled_spacing, round(new_width / scaled_spacing) * scaled_spacing)
+            #new_height = max(scaled_spacing, round(new_height / scaled_spacing) * scaled_spacing)
 
-            print(f"🧲 Snapped resize: ({new_x:.1f}, {new_y:.1f}) {new_width:.1f}x{new_height:.1f}")
+            #print(f"🧲 Snapped resize: ({new_x:.1f}, {new_y:.1f}) {new_width:.1f}x{new_height:.1f}")
         # 🧲 END SNAP INTEGRATION 🧲
 
         # Update field with new values
         field.x = new_x
         field.y = new_y
         field.resize_to(new_width, new_height)
+
+        # ADD this line:
+        self.dragProgress.emit(field.id, int(field.x), int(field.y), int(field.width), int(field.height))
 
         # Update visual guide
         if hasattr(self, 'resize_guide') and self.resize_guide:
@@ -470,6 +473,9 @@ class EnhancedDragHandler(QObject):
 
             # Apply drag changes to actual fields
             self.apply_drag_changes(pos)
+
+            for field in self.get_selected_fields():
+                self.fieldMoved.emit(field.id, field.x, field.y)
 
             # Emit completion signal
             self.dragCompleted.emit("multiple" if len(self.get_selected_fields()) > 1 else self.get_selected_fields()[0].id)
