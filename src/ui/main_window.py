@@ -853,6 +853,15 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                 print(f"  field_palette: {hasattr(self, 'field_palette')}")
                 print(f"  pdf_canvas: {hasattr(self, 'pdf_canvas')}")
 
+            if (hasattr(self, 'field_palette') and
+                    self.field_palette is not None and
+                    hasattr(self.field_palette, 'propertyChanged')):
+                try:
+                    self.field_palette.propertyChanged.connect(self.on_property_changed)
+                    print("  ✅ Connected field_palette.propertyChanged (includes properties)")
+                except Exception as e:
+                    print(f"  ⚠️ Failed to connect propertyChanged: {e}")
+
             print("✅ Signal connections setup completed")
 
         except Exception as e:

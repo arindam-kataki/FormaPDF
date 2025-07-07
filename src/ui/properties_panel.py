@@ -397,10 +397,10 @@ class PropertiesPanel(QWidget):
         pos_layout.addWidget(height_widget.widget, 1, 3)
         self.property_widgets["height"] = height_widget
 
-        x_widget.connect_signal(lambda value: self._emit_property_change("x", value))
-        y_widget.connect_signal(lambda value: self._emit_property_change("y", value))
-        width_widget.connect_signal(lambda value: self._emit_property_change("width", value))
-        height_widget.connect_signal(lambda value: self._emit_property_change("height", value))
+        x_widget.connect_signal(lambda value: self._emit_geometry_change())
+        y_widget.connect_signal(lambda value: self._emit_geometry_change())
+        width_widget.connect_signal(lambda value: self._emit_geometry_change())
+        height_widget.connect_signal(lambda value: self._emit_geometry_change())
 
         pos_group.setLayout(pos_layout)
         self.properties_layout.addWidget(pos_group)
