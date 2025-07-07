@@ -150,6 +150,7 @@ class PropertiesPanel(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.field_manager = None
         self.current_field: Optional[FormField] = None
         self.property_widgets: Dict[str, PropertyWidget] = {}
         self.init_ui()
@@ -350,8 +351,10 @@ class PropertiesPanel(QWidget):
         # Field name
         basic_layout.addWidget(QLabel("Name:"), 0, 0)
         name_widget = TextPropertyWidget("name", field.name)
-        name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        #name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
         basic_layout.addWidget(name_widget.widget, 0, 1)
+        #name_widget.widget.textChanged.disconnect()  # Remove default connection
+        name_widget.widget.editingFinished.connect(lambda: self.handle_name_change(name_widget.widget.text()))
         self.property_widgets["name"] = name_widget
 
         # Required checkbox
@@ -661,3 +664,164 @@ class PropertiesPanel(QWidget):
 
         except Exception as e:
             print(f"⚠️ Error emitting geometry change: {e}")
+
+# ########################
+# NAME CHANGE
+# ########################
+
+    def _get_field_manager(self):
+        """Get field manager from parent widget"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'field_manager'):
+                return parent.field_manager
+            parent = parent.parent()
+        return None
+
+    def handle_name_change(self, value):
+        """Handle name field changes with validation"""
+        if not self.current_field:
+            return
+
+        # Get the current name
+        current_name = self.current_field.name
+
+        # IMPORTANT: Skip validation if name hasn't actually changed
+        if value == current_name:
+            print(f"✅ Name unchanged: '{value}' - skipping validation")
+            return
+
+        # Validate the new name
+        is_valid, error_message = self.validate_control_name(value, self.current_field)
+
+        if not is_valid:
+            # Show error message
+            self.show_error_message_box(error_message)
+
+            # Revert to original name and select text
+            if "name" in self.property_widgets:
+                name_widget = self.property_widgets["name"]
+                name_widget.widget.setText(self.current_field.name)
+                name_widget.widget.selectAll()
+                name_widget.widget.setFocus()
+        else:
+            # Valid name - update field and emit signal
+            old_name = self.current_field.name
+            self.current_field.name = value
+            self._emit_property_change("name", value)
+            print(f"✅ Renamed control {self.current_field.id}: '{old_name}' -> '{value}'")
+
+    def validate_control_name(self, new_name, current_control_id=None):
+        """Validate control name according to requirements"""
+        import re
+
+        # Check for empty/null
+        if not new_name or not new_name.strip():
+            return False, "Name cannot be empty"
+
+        name = new_name.strip()
+
+        # Check minimum length
+        if len(name) < 1:
+            return False, "Name cannot be empty"
+
+        # Check maximum length
+        if len(name) > 50:
+            return False, "Name too long (maximum 50 characters)"
+
+        # Check starts with letter
+        if not name[0].isalpha():
+            return False, "Name must start with a letter (A-Z, a-z)"
+
+        # Check alphanumeric + underscore + dash only
+        if not re.match(r'^[A-Za-z][A-Za-z0-9_-]*$', name):
+            return False, "Name can only contain letters, numbers, underscores (_), and dashes (-)"
+
+        # Check for consecutive dashes
+        if '--' in name:
+            return False, "Consecutive dashes (--) are not allowed"
+
+        # Check for periods (PDF SFN issue)
+        if '.' in name:
+            return False, "Periods (.) are not allowed in field names"
+
+        # Check uniqueness (case-insensitive)
+        if self.is_name_duplicate(name, current_control_id):
+            return False, f"Name '{name}' is already in use"
+
+        return True, "Valid name"
+
+    def is_name_duplicate(self, name, exclude_control_id=None):
+        """Check if name already exists (case-insensitive)"""
+        if not self.field_manager:
+            self.field_manager = self._get_field_manager()
+
+        existing_names = []
+        for field in self.field_manager.get_all_fields():
+            if exclude_control_id is None or field.id != exclude_control_id:
+                existing_names.append(field.name.lower())
+
+        return name.lower() in existing_names
+
+    def show_error_message_box(self, error_message):
+        """Show error message box only"""
+        from PyQt6.QtWidgets import QMessageBox
+
+        msg_box = QMessageBox()
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Invalid Control Name")
+
+        # Customize message based on error type
+        if "already in use" in error_message:
+            msg_box.setText("Duplicate Control Name")
+            msg_box.setInformativeText(f"{error_message}\n\nPlease choose a unique name.")
+        elif "must start with" in error_message:
+            msg_box.setText("Invalid Name Format")
+            msg_box.setInformativeText(f"{error_message}\n\nExample: Field1, MyControl, Button_A")
+        elif "can only contain" in error_message:
+            msg_box.setText("Invalid Characters")
+            msg_box.setInformativeText(f"{error_message}\n\nAllowed: letters, numbers, underscores (_), dashes (-)")
+        else:
+            msg_box.setText(error_message)
+
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+
+    def apply_name_change(self, new_name, old_name):
+        """Apply validated name change"""
+        # Update the field object
+        self.current_field.name = new_name
+
+        # Update dropdown display
+        self.refresh_control_dropdown_item(self.current_field.id, new_name)
+
+        # Show success message in status bar
+        if hasattr(self, 'statusBar'):
+            self.statusBar().showMessage(f"✅ Renamed to '{new_name}'", 2000)
+
+        # Log the change
+        print(f"✅ Renamed control {self.current_field.id}: '{old_name}' -> '{new_name}'")
+
+    def _get_main_window(self):
+        """Helper to get main window reference"""
+        widget = self
+        while widget.parent():
+            widget = widget.parent()
+            if hasattr(widget, 'statusBar'):
+                return widget
+        return None
+
+    def refresh_control_dropdown_item(self, control_id, new_name):
+        """Update specific dropdown item with new name"""
+        if hasattr(self, 'control_dropdown'):
+            for i in range(self.control_dropdown.count()):
+                if self.control_dropdown.itemData(i) == control_id:
+                    # Update display text with new name
+                    field_type = getattr(self.current_field, 'type', 'unknown')
+                    if hasattr(field_type, 'value'):
+                        field_type = field_type.value
+
+                    new_display = f"{str(field_type).title()} - {new_name}"
+                    self.control_dropdown.setItemText(i, new_display)
+                    break
+
