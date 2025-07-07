@@ -2347,7 +2347,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             print("Selection cleared")
 
     @pyqtSlot(str, str, object)
-    def on_property_changed(self, field_id: str, property_name: str, value):
+    def _on_property_changed(self, field_id: str, property_name: str, value):
         """Handle property changes from the Properties tab"""
         print(f"Property change: {field_id}.{property_name} = {value}")
 
