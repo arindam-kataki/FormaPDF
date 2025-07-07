@@ -1,3 +1,13 @@
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QHBoxLayout, QLabel, QWidget
+
+from ui.border_property_widget import BorderPropertyWidget
+from ui.color_property_widget import ColorPropertyWidget
+from ui.font_property_widget import FontPropertyWidget
+from ui.text_alignment_widget import TextAlignmentWidget
+
+
 class AppearancePropertiesWidget(QWidget):
     """Complete appearance properties widget combining all appearance settings"""
 
