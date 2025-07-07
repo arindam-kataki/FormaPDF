@@ -24,19 +24,39 @@ except ImportError:
 # Try to import field management components
 try:
     from models.field_model import FormField, FieldType, FieldManager
-    from ui.field_renderer import FieldRenderer
+    from ui.enhanced_field_renderer import EnhancedFieldRenderer as FieldRenderer  # Use enhanced version
+    from ui.field_renderer import FieldRenderer as OriginalFieldRenderer  # Keep original as fallback
     from ui.enhanced_drag_handler import EnhancedDragHandler as DragHandler, WorkingSelectionHandler
 
     # Create the SelectionHandler alias
     SelectionHandler = WorkingSelectionHandler
 
     FIELD_COMPONENTS_AVAILABLE = True
-    print("✅ Enhanced field components loaded successfully")
+    ENHANCED_FIELD_RENDERER_AVAILABLE = True
+    print("✅ Enhanced field components (including EnhancedFieldRenderer) loaded successfully")
+
 except ImportError as e:
-    print(f"⚠️ Enhanced field management components not available: {e}")
-    print(f"⚠️ Specific error: {e}")
-    print("   Falling back to minimal versions...")
-    FIELD_COMPONENTS_AVAILABLE = False
+    print(f"⚠️ Enhanced field components not available: {e}")
+    print("   Trying fallback to original FieldRenderer...")
+
+    try:
+        from models.field_model import FormField, FieldType, FieldManager
+        from ui.field_renderer import FieldRenderer as OriginalFieldRenderer
+        from ui.enhanced_drag_handler import EnhancedDragHandler as DragHandler, WorkingSelectionHandler
+
+        # Use original renderer as fallback
+        FieldRenderer = OriginalFieldRenderer
+        SelectionHandler = WorkingSelectionHandler
+
+        FIELD_COMPONENTS_AVAILABLE = True
+        ENHANCED_FIELD_RENDERER_AVAILABLE = False
+        print("⚠️ Using fallback FieldRenderer (original version)")
+
+    except ImportError as e2:
+        print(f"❌ All field management components failed: {e2}")
+        print("   No field functionality will be available")
+        FIELD_COMPONENTS_AVAILABLE = False
+        ENHANCED_FIELD_RENDERER_AVAILABLE = False
 
 
 class MinimalFieldManager:
@@ -153,7 +173,14 @@ class PDFCanvas(QLabel):
                 self.field_manager = FieldManager()
                 self.selection_handler = WorkingSelectionHandler(self.field_manager)
                 self.enhanced_drag_handler = EnhancedDragHandler(self, self.field_manager)
-                self.field_renderer = FieldRenderer()
+                self.field_renderer = FieldRenderer()  # This is now EnhancedFieldRenderer due to import alias
+
+                # Log which renderer is being used
+                if ENHANCED_FIELD_RENDERER_AVAILABLE:
+                    print("✅ Initialized with EnhancedFieldRenderer (appearance properties supported)")
+                else:
+                    print("⚠️ Initialized with original FieldRenderer (basic rendering only)")
+
             except Exception as e:
                 print(f"⚠️ Error initializing full handlers: {e}")
                 self._init_minimal_handlers()

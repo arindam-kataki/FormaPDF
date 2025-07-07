@@ -44,12 +44,39 @@ except ImportError:
     FIELD_PALETTE_AVAILABLE = False
 
 try:
-    from ui.properties_panel import PropertiesPanel
+    from ui.enhanced_properties_panel import EnhancedPropertiesPanel
+    from ui.properties_panel import PropertiesPanel  # Keep original as fallback
     PROPERTIES_PANEL_AVAILABLE = True
+    ENHANCED_PROPERTIES_AVAILABLE = True
 except ImportError:
-    print("Warning: PropertiesPanel not available")
-    PropertiesPanel = None
-    PROPERTIES_PANEL_AVAILABLE = False
+    print("Warning: Enhanced PropertiesPanel not available, falling back to original")
+    try:
+        from ui.properties_panel import PropertiesPanel
+        PROPERTIES_PANEL_AVAILABLE = True
+        ENHANCED_PROPERTIES_AVAILABLE = False
+    except ImportError:
+        print("Warning: PropertiesPanel not available")
+        PropertiesPanel = None
+        PROPERTIES_PANEL_AVAILABLE = False
+        ENHANCED_PROPERTIES_AVAILABLE = False
+
+# Enhanced Field Renderer imports (NEW)
+try:
+    from ui.enhanced_field_renderer import EnhancedFieldRenderer
+    from ui.field_renderer import FieldRenderer  # Keep original as fallback
+    FIELD_RENDERER_AVAILABLE = True
+    ENHANCED_RENDERER_AVAILABLE = True
+except ImportError:
+    print("Warning: Enhanced FieldRenderer not available, falling back to original")
+    try:
+        from ui.field_renderer import FieldRenderer
+        FIELD_RENDERER_AVAILABLE = True
+        ENHANCED_RENDERER_AVAILABLE = False
+    except ImportError:
+        print("Warning: FieldRenderer not available")
+        FieldRenderer = None
+        FIELD_RENDERER_AVAILABLE = False
+        ENHANCED_RENDERER_AVAILABLE = False
 
 try:
     from models.field_model import FormField
@@ -309,16 +336,31 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             self.field_palette.setStyleSheet("border: 1px solid #ccc; padding: 20px;")
             left_layout.addWidget(self.field_palette)
 
-        # Properties panel (with fallback)
-        if PROPERTIES_PANEL_AVAILABLE and PropertiesPanel:
-            self.properties_panel = PropertiesPanel()
+        # Properties panel (with enhanced fallback)
+        if ENHANCED_PROPERTIES_AVAILABLE and EnhancedPropertiesPanel:
+            self.properties_panel = EnhancedPropertiesPanel()
+            print("✅ Using EnhancedPropertiesPanel")
+
+            # Connect enhanced signals
+            if hasattr(self.properties_panel, 'appearanceChanged'):
+                self.properties_panel.appearanceChanged.connect(self.on_field_appearance_changed)
+                self.properties_panel.propertyChanged.connect(self.on_field_property_changed)
+                print("✅ Connected enhanced properties signals")
+
             left_layout.addWidget(self.properties_panel)
+
+        elif PROPERTIES_PANEL_AVAILABLE and PropertiesPanel:
+            self.properties_panel = PropertiesPanel()
+            print("⚠️ Using fallback PropertiesPanel")
+            left_layout.addWidget(self.properties_panel)
+
         else:
             # Fallback widget
             self.properties_panel = QLabel("Properties Panel\n(Not Available)")
             self.properties_panel.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.properties_panel.setStyleSheet("border: 1px solid #ccc; padding: 20px;")
             left_layout.addWidget(self.properties_panel)
+            print("❌ No PropertiesPanel available")
 
         left_widget.setLayout(left_layout)
         left_widget.setMaximumWidth(350)
