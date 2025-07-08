@@ -2693,6 +2693,98 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             properties_tab = self.field_palette.properties_tab
             properties_tab.handle_selection_changed(selected_fields)
 
+    def on_field_appearance_changed(self, appearance_props: dict):
+        """Handle field appearance property changes"""
+        try:
+            # Get the currently selected field from PDF canvas
+            if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+                if field_manager and hasattr(field_manager, 'get_selected_field'):
+                    selected_field = field_manager.get_selected_field()
+                    if selected_field:
+                        # Update field's appearance properties
+                        if 'appearance' not in selected_field.properties:
+                            selected_field.properties['appearance'] = {}
+                        selected_field.properties['appearance'].update(appearance_props)
+
+                        # Trigger field re-rendering
+                        self.update_field_display()
+
+                        print(f"✅ Updated appearance for field {selected_field.id}")
+                        print(f"   Font: {appearance_props.get('font', 'unchanged')}")
+                        print(f"   Colors: {appearance_props.get('text_color', 'unchanged')}")
+                    else:
+                        print("⚠️ No field selected for appearance update")
+                else:
+                    print("⚠️ Field manager not available")
+            else:
+                print("⚠️ PDF canvas or field manager not available")
+        except Exception as e:
+            print(f"❌ Error updating field appearance: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_field_property_changed(self, property_name: str, value):
+        """Handle general field property changes"""
+        try:
+            # Get the currently selected field from PDF canvas
+            if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+                if field_manager and hasattr(field_manager, 'get_selected_field'):
+                    selected_field = field_manager.get_selected_field()
+                    if selected_field:
+                        if property_name == "geometry":
+                            # Update position and size
+                            selected_field.x = value['x']
+                            selected_field.y = value['y']
+                            selected_field.width = value['width']
+                            selected_field.height = value['height']
+                        elif property_name == "appearance":
+                            # Update appearance properties
+                            selected_field.properties['appearance'] = value
+                        elif property_name in ['name', 'required']:
+                            # Update basic field properties
+                            setattr(selected_field, property_name, value)
+                        else:
+                            # Update other properties
+                            selected_field.properties[property_name] = value
+
+                        # Trigger field re-rendering
+                        self.update_field_display()
+
+                        print(f"✅ Updated {property_name} for field {selected_field.id}")
+                    else:
+                        print("⚠️ No field selected for property update")
+                else:
+                    print("⚠️ Field manager not available")
+            else:
+                print("⚠️ PDF canvas or field manager not available")
+        except Exception as e:
+            print(f"❌ Error updating field property: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def update_field_display(self):
+        """Trigger field re-rendering with new appearance properties"""
+        try:
+            # This should call your existing field rendering method
+            # The enhanced renderer will automatically use the appearance properties
+            if hasattr(self, 'pdf_canvas'):
+                if hasattr(self.pdf_canvas, 'draw_overlay'):
+                    self.pdf_canvas.draw_overlay()
+                elif hasattr(self.pdf_canvas, 'update'):
+                    self.pdf_canvas.update()
+                elif hasattr(self.pdf_canvas, 'repaint'):
+                    self.pdf_canvas.repaint()
+                else:
+                    print("⚠️ Could not find method to refresh PDF canvas")
+            else:
+                print("⚠️ PDF canvas not available")
+        except Exception as e:
+            print(f"❌ Error updating field display: {e}")
+            import traceback
+            traceback.print_exc()
+
 def main():
     """Main entry point for the application"""
     app = QApplication(sys.argv)

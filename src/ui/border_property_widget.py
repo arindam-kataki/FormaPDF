@@ -1,3 +1,10 @@
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtGui import QColor
+from PyQt6.QtWidgets import QVBoxLayout, QWidget, QHBoxLayout, QLabel, QComboBox
+
+from ui.color_property_widget import ColorPropertyWidget
+
+
 class BorderPropertyWidget(QWidget):
     """Widget for border styling"""
 

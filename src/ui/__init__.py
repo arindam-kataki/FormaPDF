@@ -14,9 +14,11 @@ __all__ = [
     'PDFCanvas',
     'EnhancedFieldPalette',
     'PropertiesPanel',
+    'EnhancedPropertiesPanel',
     'PDFViewerMainWindow',
     'GridControlPopup'
     'FieldRenderer',
+    'EnhancedFieldRenderer',      # ← ADD this
     'DragHandler',
     'SelectionHandler'
 ]

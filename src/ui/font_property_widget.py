@@ -1,3 +1,7 @@
+from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QCheckBox
+
+
 class FontPropertyWidget(QWidget):
     """Widget for font selection and styling"""
 
