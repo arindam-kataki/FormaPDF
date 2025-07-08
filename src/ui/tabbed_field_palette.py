@@ -319,35 +319,139 @@ class PropertiesTab(QWidget):
         parent_layout.addWidget(selection_group)
 
     def _create_properties_section(self, parent_layout):
-        """Create the properties editing section"""
-        # Use existing PropertiesPanel or create a placeholder
+        """Create the properties editing section with enhanced appearance support"""
+
+        # Try enhanced properties panel first
         try:
-            self.properties_panel = PropertiesPanel()
-            self.properties_panel.propertyChanged.connect(self.propertyChanged)
+            from ui.enhanced_properties_panel import EnhancedPropertiesPanel
+            self.properties_panel = EnhancedPropertiesPanel()
+
+            # Connect property change signals with signal conversion
+            if hasattr(self.properties_panel, 'propertyChanged'):
+                self.properties_panel.propertyChanged.connect(self._on_property_changed_internal)
+                print("✅ Connected propertyChanged signal (with conversion)")
+
+            # Connect appearance change signals if available
+            if hasattr(self.properties_panel, 'appearanceChanged'):
+                self.properties_panel.appearanceChanged.connect(self._on_appearance_changed)
+                print("✅ Connected appearanceChanged signal")
+
             parent_layout.addWidget(self.properties_panel)
-        except:
-            # Fallback if PropertiesPanel not available
-            properties_group = QGroupBox("Properties_2")
-            properties_layout = QVBoxLayout()
+            print("✅ TabbedFieldPalette using EnhancedPropertiesPanel with appearance controls")
 
-            self.properties_placeholder = QLabel("Properties panel will appear here when a control is selected")
-            self.properties_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.properties_placeholder.setStyleSheet("""
-                QLabel {
-                    border: 2px dashed #ccc;
-                    border-radius: 4px;
-                    background-color: #f9f9f9;
-                    color: #666;
-                    font-size: 12px;
-                    padding: 20px;
-                }
-            """)
+        except ImportError as e:
+            print(f"⚠️ EnhancedPropertiesPanel not available: {e}")
+            print("   Falling back to original PropertiesPanel...")
 
-            properties_layout.addWidget(self.properties_placeholder)
-            properties_group.setLayout(properties_layout)
-            parent_layout.addWidget(properties_group)
+            # Fallback to original PropertiesPanel
+            try:
+                from ui.properties_panel import PropertiesPanel
+                self.properties_panel = PropertiesPanel()
 
-            self.properties_panel = None
+                # Connect property change signals with signal conversion
+                if hasattr(self.properties_panel, 'propertyChanged'):
+                    self.properties_panel.propertyChanged.connect(self._on_property_changed_internal)
+                    print("✅ Connected propertyChanged signal (fallback with conversion)")
+
+                parent_layout.addWidget(self.properties_panel)
+                print("⚠️ TabbedFieldPalette using fallback PropertiesPanel (no appearance controls)")
+
+            except ImportError as e2:
+                print(f"❌ Both PropertiesPanel versions failed: {e2}")
+                print("   Creating placeholder...")
+
+                # Final fallback - create placeholder
+                properties_group = QGroupBox("Properties")
+                properties_layout = QVBoxLayout()
+
+                self.properties_placeholder = QLabel(
+                    "Properties panel not available\n\n"
+                    "Missing dependencies:\n"
+                    "• Enhanced Properties Panel\n"
+                    "• Original Properties Panel"
+                )
+                self.properties_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.properties_placeholder.setStyleSheet("""
+                    QLabel {
+                        border: 2px dashed #ccc;
+                        border-radius: 4px;
+                        background-color: #f9f9f9;
+                        color: #666;
+                        font-size: 12px;
+                        padding: 20px;
+                        margin: 10px;
+                    }
+                """)
+
+                properties_layout.addWidget(self.properties_placeholder)
+                properties_group.setLayout(properties_layout)
+                parent_layout.addWidget(properties_group)
+
+                self.properties_panel = None
+                print("❌ Created placeholder - no properties functionality available")
+
+    def _on_property_changed_internal(self, property_name: str, value):
+        """Handle property changes from enhanced properties panel and convert signal format"""
+        try:
+            if hasattr(self, 'current_field') and self.current_field:
+                field_id = self.current_field.id
+
+                # Convert to the expected signal format for TabbedFieldPalette
+                # Original signal: propertyChanged(str, str, object) - field_id, property_name, value
+                self.propertyChanged.emit(field_id, property_name, value)
+
+                print(f"✅ Property changed: {field_id}.{property_name} = {value}")
+            else:
+                print("⚠️ Property changed but no current field selected")
+
+        except Exception as e:
+            print(f"❌ Error handling property change: {e}")
+
+    def _on_appearance_changed(self, appearance_props: dict):
+        """Handle appearance property changes from enhanced properties panel"""
+        try:
+            print(f"🎨 Appearance changed in TabbedFieldPalette: {list(appearance_props.keys())}")
+
+            # Get currently selected field
+            if hasattr(self, 'current_field') and self.current_field:
+                # Update the field's appearance properties
+                if 'appearance' not in self.current_field.properties:
+                    self.current_field.properties['appearance'] = {}
+                self.current_field.properties['appearance'].update(appearance_props)
+
+                print(f"✅ Updated appearance for field {self.current_field.id}")
+
+                # Notify parent components about the change
+                self._notify_appearance_change(appearance_props)
+
+            else:
+                print("⚠️ No field selected for appearance update")
+
+        except Exception as e:
+            print(f"❌ Error handling appearance change: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _notify_appearance_change(self, appearance_props: dict):
+        """Notify parent components about appearance changes"""
+        try:
+            # Find the main window and trigger field re-rendering
+            main_window = self._find_main_window()
+            if main_window:
+                # Try to trigger field display update
+                if hasattr(main_window, 'update_field_display'):
+                    main_window.update_field_display()
+                    print("✅ Triggered field display update via main window")
+                elif hasattr(main_window, 'pdf_canvas') and hasattr(main_window.pdf_canvas, 'draw_overlay'):
+                    main_window.pdf_canvas.draw_overlay()
+                    print("✅ Triggered field display update via PDF canvas")
+                else:
+                    print("⚠️ Could not find method to update field display")
+            else:
+                print("⚠️ Could not find main window to notify")
+
+        except Exception as e:
+            print(f"❌ Error notifying appearance change: {e}")
 
     def _on_control_selected(self):
         """Handle control selection from dropdown - update FieldManager as source of truth AND navigate to page"""

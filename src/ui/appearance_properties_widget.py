@@ -13,18 +13,19 @@ class AppearancePropertiesWidget(QWidget):
 
     appearanceChanged = pyqtSignal(dict)
 
-    def __init__(self, field_type: str = None):
+    def __init__(self, field_type: str = None, standalone=True):
         super().__init__()
         self.field_type = field_type
         self.appearance_props = {}
+        self.standalone = standalone  # Track if this widget will be used standalone
         self.init_ui()
 
     def init_ui(self):
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
-
+        """
+        Initialize UI - create groups that can be extracted if needed
+        """
         # Font properties group
-        font_group = QGroupBox("Font & Text")
+        self.font_group = QGroupBox("Font & Text")
         font_layout = QVBoxLayout()
 
         self.font_widget = FontPropertyWidget()
@@ -45,22 +46,20 @@ class AppearancePropertiesWidget(QWidget):
             self.alignment_widget.alignmentChanged.connect(self.on_appearance_changed)
             font_layout.addWidget(self.alignment_widget)
 
-        font_group.setLayout(font_layout)
-        layout.addWidget(font_group)
+        self.font_group.setLayout(font_layout)
 
         # Border properties group
-        border_group = QGroupBox("Border")
+        self.border_group = QGroupBox("Border")
         border_layout = QVBoxLayout()
 
         self.border_widget = BorderPropertyWidget()
         self.border_widget.borderChanged.connect(self.on_appearance_changed)
         border_layout.addWidget(self.border_widget)
 
-        border_group.setLayout(border_layout)
-        layout.addWidget(border_group)
+        self.border_group.setLayout(border_layout)
 
         # Background properties group
-        bg_group = QGroupBox("Background")
+        self.bg_group = QGroupBox("Background")
         bg_layout = QHBoxLayout()
 
         bg_layout.addWidget(QLabel("Fill Color:"))
@@ -68,10 +67,20 @@ class AppearancePropertiesWidget(QWidget):
         self.bg_color_widget.colorChanged.connect(self.on_appearance_changed)
         bg_layout.addWidget(self.bg_color_widget)
 
-        bg_group.setLayout(bg_layout)
-        layout.addWidget(bg_group)
+        self.bg_group.setLayout(bg_layout)
 
-        self.setLayout(layout)
+        # Only create and set layout if this widget will be used standalone
+        if self.standalone:
+            layout = QVBoxLayout()
+            layout.setSpacing(10)
+            layout.addWidget(self.font_group)
+            layout.addWidget(self.border_group)
+            layout.addWidget(self.bg_group)
+            self.setLayout(layout)
+
+    def get_groups(self):
+        """Return the individual group widgets for extraction"""
+        return [self.font_group, self.border_group, self.bg_group]
 
     def on_appearance_changed(self):
         """Handle any appearance property change"""

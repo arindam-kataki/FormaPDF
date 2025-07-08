@@ -337,6 +337,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             left_layout.addWidget(self.field_palette)
 
         # Properties panel (with enhanced fallback)
+        """
         if ENHANCED_PROPERTIES_AVAILABLE and EnhancedPropertiesPanel:
             self.properties_panel = EnhancedPropertiesPanel()
             print("✅ Using EnhancedPropertiesPanel")
@@ -361,6 +362,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             self.properties_panel.setStyleSheet("border: 1px solid #ccc; padding: 20px;")
             left_layout.addWidget(self.properties_panel)
             print("❌ No PropertiesPanel available")
+        
+        """
 
         left_widget.setLayout(left_layout)
         left_widget.setMaximumWidth(350)

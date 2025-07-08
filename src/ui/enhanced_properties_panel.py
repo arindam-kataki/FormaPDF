@@ -110,21 +110,41 @@ class EnhancedPropertiesPanel(QWidget):
         self.init_ui()
 
     def init_ui(self):
-        """Initialize the properties panel UI"""
+        """Initialize the properties panel UI - maximize height"""
         layout = QVBoxLayout()
-        layout.setSpacing(5)
+        layout.setSpacing(0)  # Reduce spacing to maximize content area
+        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins to use full space
 
         # Create scrollable area for properties
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+
+        # Set size policy to expand and use all available space
+        from PyQt6.QtWidgets import QSizePolicy
+        scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+
+        # Set minimum size to ensure it's usable
+        scroll_area.setMinimumHeight(200)
+
+        # Remove frame to maximize content area
+        scroll_area.setFrameStyle(0)
 
         self.properties_widget = QWidget()
         self.properties_layout = QVBoxLayout()
+        self.properties_layout.setSpacing(5)
+        self.properties_layout.setContentsMargins(5, 5, 5, 5)
         self.properties_widget.setLayout(self.properties_layout)
+
+        # Set size policy for the properties widget
+        self.properties_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         scroll_area.setWidget(self.properties_widget)
         layout.addWidget(scroll_area)
+
+        # Set size policy for the main panel to expand vertically
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
 
         self.setLayout(layout)
         self.show_no_selection()
@@ -169,7 +189,7 @@ class EnhancedPropertiesPanel(QWidget):
         self.clear_properties()
 
         # Field header with type and ID
-        self._create_field_header(field)
+        #self._create_field_header(field)
 
         # Basic properties (always shown)
         self._create_basic_properties(field)
@@ -264,12 +284,9 @@ class EnhancedPropertiesPanel(QWidget):
         self.properties_layout.addWidget(pos_group)
 
     def _create_appearance_properties(self, field: FormField):
-        """Create appearance properties section (NEW)"""
-        appearance_group = QGroupBox("Appearance")
-        appearance_layout = QVBoxLayout()
-
-        # Create appearance widget based on field type
-        self.appearance_widget = AppearancePropertiesWidget(field.type.value)
+        """Create appearance properties by using individual groups"""
+        # Create appearance widget without standalone layout
+        self.appearance_widget = AppearancePropertiesWidget(field.type.value, standalone=False)
         self.appearance_widget.appearanceChanged.connect(self._on_appearance_changed)
 
         # Load existing appearance properties from field
@@ -277,9 +294,9 @@ class EnhancedPropertiesPanel(QWidget):
         if existing_appearance:
             self.appearance_widget.set_appearance_properties(existing_appearance)
 
-        appearance_layout.addWidget(self.appearance_widget)
-        appearance_group.setLayout(appearance_layout)
-        self.properties_layout.addWidget(appearance_group)
+        # Add the individual groups directly to main properties layout
+        for group in self.appearance_widget.get_groups():
+            self.properties_layout.addWidget(group)
 
     def _create_field_specific_properties(self, field: FormField):
         """Create field type-specific properties"""
@@ -440,3 +457,90 @@ class EnhancedPropertiesPanel(QWidget):
         """Update a field property and refresh UI if needed"""
         if self.current_field and property_name in self.property_widgets:
             self.property_widgets[property_name].set_value(value)
+
+    # Add this method to the EnhancedPropertiesPanel class in src/ui/enhanced_properties_panel.py
+
+    def update_field_position_size(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Update field position and size from external changes (move/resize operations)"""
+        if not self.current_field or self.current_field.id != field_id:
+            return
+
+        try:
+            # Block signals to prevent feedback loop during updates
+            self._block_property_signals(True)
+
+            # Update the actual field object
+            self.current_field.x = x
+            self.current_field.y = y
+            self.current_field.width = width
+            self.current_field.height = height
+
+            # Update the UI widgets to reflect the changes
+            if "x" in self.property_widgets:
+                self.property_widgets["x"].set_value(x)
+            if "y" in self.property_widgets:
+                self.property_widgets["y"].set_value(y)
+            if "width" in self.property_widgets:
+                self.property_widgets["width"].set_value(width)
+            if "height" in self.property_widgets:
+                self.property_widgets["height"].set_value(height)
+
+            print(f"✅ Enhanced Properties panel updated for {field_id}: ({x}, {y}) {width}×{height}")
+
+        except Exception as e:
+            print(f"⚠️ Error updating enhanced properties panel: {e}")
+        finally:
+            # Ensure signals are re-enabled even if there's an error
+            self._block_property_signals(False)
+
+    def _block_property_signals(self, block: bool):
+        """Block or unblock property widget signals to prevent feedback loops"""
+        try:
+            for widget in self.property_widgets.values():
+                if hasattr(widget, 'widget') and hasattr(widget.widget, 'blockSignals'):
+                    widget.widget.blockSignals(block)
+        except Exception as e:
+            print(f"⚠️ Error blocking/unblocking signals: {e}")
+
+    def update_live_values(self, x: int, y: int, width: int, height: int):
+        """Update position and size values during live drag operations"""
+        if not self.current_field:
+            return
+
+        try:
+            # Block signals to prevent triggering property changes during live updates
+            self._block_property_signals(True)
+
+            # Update position and size widgets without triggering signals
+            if "x" in self.property_widgets:
+                self.property_widgets["x"].set_value(x)
+            if "y" in self.property_widgets:
+                self.property_widgets["y"].set_value(y)
+            if "width" in self.property_widgets:
+                self.property_widgets["width"].set_value(width)
+            if "height" in self.property_widgets:
+                self.property_widgets["height"].set_value(height)
+
+        except Exception as e:
+            print(f"⚠️ Error in enhanced live update: {e}")
+        finally:
+            # Always re-enable signals
+            self._block_property_signals(False)
+
+    def update_field_values(self, field_id: str, x: int, y: int, width: int, height: int):
+        """Update field values after operation completion"""
+        if not self.current_field or self.current_field.id != field_id:
+            return
+
+        try:
+            # Update the actual field object
+            self.current_field.x = x
+            self.current_field.y = y
+            self.current_field.width = width
+            self.current_field.height = height
+
+            # Update the UI widgets
+            self.update_live_values(x, y, width, height)
+            print(f"✅ Updated enhanced properties panel for {field_id}")
+        except Exception as e:
+            print(f"⚠️ Error updating enhanced field values: {e}")
