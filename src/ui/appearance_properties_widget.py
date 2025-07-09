@@ -2,6 +2,7 @@ from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QVBoxLayout, QGroupBox, QHBoxLayout, QLabel, QWidget
 
+from ui.background_property_widget import BackgroundPropertyWidget
 from ui.border_property_widget import BorderPropertyWidget
 from ui.color_property_widget import ColorPropertyWidget
 from ui.font_property_widget import FontPropertyWidget
@@ -46,12 +47,11 @@ class AppearancePropertiesWidget(QWidget):
 
         # Background properties group
         self.bg_group = QGroupBox("Background")
-        bg_layout = QHBoxLayout()
+        bg_layout = QVBoxLayout()
 
-        bg_layout.addWidget(QLabel("Fill Color:"))
-        self.bg_color_widget = ColorPropertyWidget("Background Color", QColor(255, 255, 255, 0), allow_transparent=True)
-        self.bg_color_widget.colorChanged.connect(self.on_appearance_changed)
-        bg_layout.addWidget(self.bg_color_widget)
+        self.bg_widget = BackgroundPropertyWidget()
+        self.bg_widget.backgroundChanged.connect(self.on_appearance_changed)
+        bg_layout.addWidget(self.bg_widget)
 
         self.bg_group.setLayout(bg_layout)
 
@@ -72,9 +72,9 @@ class AppearancePropertiesWidget(QWidget):
         """Handle any appearance property change"""
         self.appearance_props = {
             'font': self.font_widget.get_font_properties(),
-            'text_color': self.text_color_widget.get_color(),
+            'text_color': self.font_widget.text_color_widget.get_color(),
             'border': self.border_widget.get_border_properties(),
-            'background_color': self.bg_color_widget.get_color()
+            'background_color': self.bg_widget.bg_color_widget.get_color()
         }
 
         # Add alignment if available
@@ -107,7 +107,7 @@ class AppearancePropertiesWidget(QWidget):
 
         # Update text color
         if 'text_color' in appearance_props:
-            self.text_color_widget.set_color(appearance_props['text_color'])
+            self.font_widget.text_color_widget.set_color(appearance_props['text_color'])
 
         # Update border properties
         if 'border' in appearance_props:
@@ -115,7 +115,7 @@ class AppearancePropertiesWidget(QWidget):
 
         # Update background color
         if 'background_color' in appearance_props:
-            self.bg_color_widget.set_color(appearance_props['background_color'])
+            self.bg_widget.set_color(appearance_props['background_color'])
 
         # Update alignment if available
         if hasattr(self, 'alignment_widget') and 'text_alignment' in appearance_props:

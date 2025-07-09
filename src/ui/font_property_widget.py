@@ -57,6 +57,11 @@ class FontPropertyWidget(QWidget):
         self.size_spinner.setMinimumWidth(50)
         font_layout.addWidget(self.size_spinner, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
+        self.auto_size_check = QCheckBox("Auto")
+        self.auto_size_check.setToolTip("Automatically size font to fit field height")
+        self.auto_size_check.toggled.connect(self.on_auto_size_toggled)
+        font_layout.addWidget(self.auto_size_check, 1, 2, Qt.AlignmentFlag.AlignLeft)
+
         # Font style checkboxes - stacked vertically
         style_label = QLabel("Style:")
         style_label.setFixedWidth(50)
@@ -107,14 +112,14 @@ class FontPropertyWidget(QWidget):
 
     def on_auto_size_toggled(self, checked: bool):
         """Handle auto-size toggle"""
-        self.size_spin.setEnabled(not checked)
+        self.size_spinner.setEnabled(not checked)
         self.on_font_changed()
 
     def on_font_changed(self):
         """Handle font property changes"""
         self.font_props = {
-            'family': self.family_combo.currentText(),
-            'size': self.size_spin.value() if not self.auto_size_check.isChecked() else 'auto',
+            'family': self.font_combo.currentText(),
+            'size': self.size_spinner.value() if not self.auto_size_check.isChecked() else 'auto',
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked()
         }
@@ -129,14 +134,14 @@ class FontPropertyWidget(QWidget):
         self.font_props = font_props
 
         # Update UI
-        self.family_combo.setCurrentText(font_props.get('family', 'Arial'))
+        self.font_combo.setCurrentText(font_props.get('family', 'Arial'))
 
         if font_props.get('size') == 'auto':
             self.auto_size_check.setChecked(True)
-            self.size_spin.setEnabled(False)
+            self.size_spinner.setEnabled(False)
         else:
-            self.size_spin.setValue(int(font_props.get('size', 12)))
-            self.auto_size_check.setChecked(False)
+            self.size_spinner.setValue(int(font_props.get('size', 12)))
+            self.size_spinner.setChecked(False)
 
         self.bold_check.setChecked(font_props.get('bold', False))
         self.italic_check.setChecked(font_props.get('italic', False))
