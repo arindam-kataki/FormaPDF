@@ -121,7 +121,8 @@ class FontPropertyWidget(QWidget):
             'family': self.font_combo.currentText(),
             'size': self.size_spinner.value() if not self.auto_size_check.isChecked() else 'auto',
             'bold': self.bold_check.isChecked(),
-            'italic': self.italic_check.isChecked()
+            'italic': self.italic_check.isChecked(),
+            'underline': self.underline_check.isChecked()
         }
         self.fontChanged.emit(self.font_props)
 
@@ -141,7 +142,8 @@ class FontPropertyWidget(QWidget):
             self.size_spinner.setEnabled(False)
         else:
             self.size_spinner.setValue(int(font_props.get('size', 12)))
-            self.size_spinner.setChecked(False)
+            self.auto_size_check.setChecked(False)
+            self.size_spinner.setEnabled(True)
 
         self.bold_check.setChecked(font_props.get('bold', False))
         self.italic_check.setChecked(font_props.get('italic', False))
