@@ -34,8 +34,8 @@ class AppearancePropertiesWidget(QWidget):
 
         # Text color
         text_color_layout = QHBoxLayout()
-        text_color_layout.addWidget(QLabel("Text Color:"))
-        self.text_color_widget = ColorPropertyWidget("Text Color", QColor(0, 0, 0), allow_transparent=False)
+        text_color_layout.addWidget(QLabel("Color:"))
+        self.text_color_widget = ColorPropertyWidget("Color", QColor(0, 0, 0), allow_transparent=False)
         self.text_color_widget.colorChanged.connect(self.on_appearance_changed)
         text_color_layout.addWidget(self.text_color_widget)
         font_layout.addLayout(text_color_layout)

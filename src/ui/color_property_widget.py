@@ -83,11 +83,11 @@ class ColorPropertyWidget(QWidget):
 
     def update_color_label(self):
         """Update the color description label"""
-        if self.current_color.alpha() == 0:
-            self.color_label.setText("Transparent")
-        else:
-            rgb_text = f"RGB({self.current_color.red()}, {self.current_color.green()}, {self.current_color.blue()})"
-            self.color_label.setText(rgb_text)
+        #if self.current_color.alpha() == 0:
+        #    self.color_label.setText("Transparent")
+        #else:
+        #    rgb_text = f"RGB({self.current_color.red()}, {self.current_color.green()}, {self.current_color.blue()})"
+        self.color_label.setText("")
 
     def select_color(self):
         """Open color picker dialog"""

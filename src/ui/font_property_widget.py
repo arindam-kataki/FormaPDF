@@ -1,5 +1,5 @@
-from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QCheckBox
+from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QCheckBox, QGridLayout
 
 
 class FontPropertyWidget(QWidget):
@@ -18,60 +18,67 @@ class FontPropertyWidget(QWidget):
         self.init_ui()
 
     def init_ui(self):
+        """Initialize font property UI with consistent styling"""
         layout = QVBoxLayout()
-        layout.setSpacing(8)
+        layout.setSpacing(5)
+        layout.setContentsMargins(5, 5, 5, 5)
 
         # Font family row
-        family_layout = QHBoxLayout()
-        family_layout.addWidget(QLabel("Font:"))
+        font_layout = QGridLayout()
+        font_layout.setHorizontalSpacing(8)  # Same as position controls
+        font_layout.setVerticalSpacing(5)
 
-        self.family_combo = QComboBox()
-        self.family_combo.addItems([
-            "Arial", "Helvetica", "Times-Roman", "Courier",
-            "Symbol", "ZapfDingbats", "Times-Bold", "Times-Italic",
-            "Courier-Bold", "Courier-Oblique"
-        ])
-        self.family_combo.setCurrentText(self.font_props['family'])
-        self.family_combo.currentTextChanged.connect(self.on_font_changed)
+        # Font family
+        font_label = QLabel("Font:")
+        font_label.setFixedWidth(50)  # Same width as position labels
+        font_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(font_label, 0, 0)
 
-        family_layout.addWidget(self.family_combo)
-        layout.addLayout(family_layout)
+        self.font_combo = QComboBox()
+        self.font_combo.setMaximumWidth(120)  # Reasonable width for font names
+        self.font_combo.setMinimumWidth(120)
+        self.font_combo.addItems(['Arial', 'Times New Roman', 'Courier New', 'Helvetica', 'Georgia'])
+        font_layout.addWidget(self.font_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
-        # Font size row
-        size_layout = QHBoxLayout()
-        size_layout.addWidget(QLabel("Size:"))
+        # Font size
+        size_label = QLabel("Size:")
+        size_label.setFixedWidth(50)  # Same width as position labels
+        size_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(size_label, 1, 0)
 
-        self.size_spin = QSpinBox()
-        self.size_spin.setRange(6, 72)
-        self.size_spin.setValue(self.font_props['size'])
-        self.size_spin.valueChanged.connect(self.on_font_changed)
+        self.size_spinner = QSpinBox()
+        self.size_spinner.setRange(8, 72)
+        self.size_spinner.setValue(12)
+        self.size_spinner.setMaximumWidth(50)  # Same as position spinners
+        self.size_spinner.setMinimumWidth(50)
+        font_layout.addWidget(self.size_spinner, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
-        self.auto_size_check = QCheckBox("Auto")
-        self.auto_size_check.toggled.connect(self.on_auto_size_toggled)
+        # Font style checkboxes - stacked vertically
+        style_label = QLabel("Style:")
+        style_label.setFixedWidth(50)
+        style_label.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Remove AlignVCenter from here
+        font_layout.addWidget(style_label, 3, 0,
+                              Qt.AlignmentFlag.AlignVCenter)  # Put it in the middle row (3) with VCenter alignment
 
-        size_layout.addWidget(self.size_spin)
-        size_layout.addWidget(self.auto_size_check)
-        size_layout.addStretch()
-        layout.addLayout(size_layout)
-
-        # Font style row
-        style_layout = QHBoxLayout()
-        style_layout.addWidget(QLabel("Style:"))
-
+        # Stack checkboxes vertically
         self.bold_check = QCheckBox("Bold")
-        self.bold_check.setChecked(self.font_props['bold'])
-        self.bold_check.toggled.connect(self.on_font_changed)
+        font_layout.addWidget(self.bold_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         self.italic_check = QCheckBox("Italic")
-        self.italic_check.setChecked(self.font_props['italic'])
-        self.italic_check.toggled.connect(self.on_font_changed)
+        font_layout.addWidget(self.italic_check, 3, 1, Qt.AlignmentFlag.AlignLeft)
 
-        style_layout.addWidget(self.bold_check)
-        style_layout.addWidget(self.italic_check)
-        style_layout.addStretch()
-        layout.addLayout(style_layout)
+        self.underline_check = QCheckBox("Underline")
+        font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
 
+        layout.addLayout(font_layout)
         self.setLayout(layout)
+
+        # Connect signals
+        self.font_combo.currentTextChanged.connect(self.on_font_changed)
+        self.size_spinner.valueChanged.connect(self.on_font_changed)
+        self.bold_check.toggled.connect(self.on_font_changed)
+        self.italic_check.toggled.connect(self.on_font_changed)
+        self.underline_check.toggled.connect(self.on_font_changed)
 
     def on_auto_size_toggled(self, checked: bool):
         """Handle auto-size toggle"""
