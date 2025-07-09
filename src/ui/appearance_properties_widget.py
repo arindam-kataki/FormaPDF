@@ -25,27 +25,12 @@ class AppearancePropertiesWidget(QWidget):
         Initialize UI - create groups that can be extracted if needed
         """
         # Font properties group
-        self.font_group = QGroupBox("Font & Text")
+        self.font_group = QGroupBox("Text")
         font_layout = QVBoxLayout()
 
         self.font_widget = FontPropertyWidget()
         self.font_widget.fontChanged.connect(self.on_appearance_changed)
         font_layout.addWidget(self.font_widget)
-
-        # Text color
-        text_color_layout = QHBoxLayout()
-        text_color_layout.addWidget(QLabel("Color:"))
-        self.text_color_widget = ColorPropertyWidget("Color", QColor(0, 0, 0), allow_transparent=False)
-        self.text_color_widget.colorChanged.connect(self.on_appearance_changed)
-        text_color_layout.addWidget(self.text_color_widget)
-        font_layout.addLayout(text_color_layout)
-
-        # Text alignment (only for text-based fields)
-        # 3x3 Alignment Grid (replaces old text alignment)
-        if self.field_type in ['text', 'textarea', None]:
-            self.alignment_widget = AlignmentGridWidget()
-            self.alignment_widget.alignmentChanged.connect(self.on_appearance_changed)
-            font_layout.addWidget(self.alignment_widget)
 
         self.font_group.setLayout(font_layout)
 

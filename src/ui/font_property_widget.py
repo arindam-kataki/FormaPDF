@@ -1,5 +1,9 @@
 from PyQt6.QtCore import pyqtSignal, Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QCheckBox, QGridLayout
+
+from ui.alignment_grid_widget import AlignmentGridWidget
+from ui.color_property_widget import ColorPropertyWidget
 
 
 class FontPropertyWidget(QWidget):
@@ -71,6 +75,27 @@ class FontPropertyWidget(QWidget):
         font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addLayout(font_layout)
+
+        # Text color - aligned with other font controls (after style)
+        color_label = QLabel("Color:")
+        color_label.setFixedWidth(50)  # Same width as Font/Size labels
+        color_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(color_label, 5, 0)
+
+        self.text_color_widget = ColorPropertyWidget("Color", QColor(0, 0, 0), allow_transparent=False)
+        self.text_color_widget.colorChanged.connect(self.on_font_changed)  # Connect to font change handler
+        font_layout.addWidget(self.text_color_widget, 5, 1, Qt.AlignmentFlag.AlignLeft)
+
+        # Text alignment with label
+        alignment_label = QLabel("Align:")
+        alignment_label.setFixedWidth(50)  # Same width as other labels
+        alignment_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.alignment_widget = AlignmentGridWidget()  # Now has no internal label
+        self.alignment_widget.alignmentChanged.connect(self.on_font_changed)
+        font_layout.addWidget(self.alignment_widget, 6, 1, Qt.AlignmentFlag.AlignLeft)
+
         self.setLayout(layout)
 
         # Connect signals
