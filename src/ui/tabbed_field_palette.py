@@ -336,7 +336,7 @@ class PropertiesTab(QWidget):
                 self.properties_panel.appearanceChanged.connect(self._on_appearance_changed)
                 print("✅ Connected appearanceChanged signal")
 
-            parent_layout.addWidget(self.properties_panel)
+            parent_layout.addWidget(self.properties_panel, 1)
             print("✅ TabbedFieldPalette using EnhancedPropertiesPanel with appearance controls")
 
         except ImportError as e:
@@ -353,7 +353,7 @@ class PropertiesTab(QWidget):
                     self.properties_panel.propertyChanged.connect(self._on_property_changed_internal)
                     print("✅ Connected propertyChanged signal (fallback with conversion)")
 
-                parent_layout.addWidget(self.properties_panel)
+                parent_layout.addWidget(self.properties_panel, 1)
                 print("⚠️ TabbedFieldPalette using fallback PropertiesPanel (no appearance controls)")
 
             except ImportError as e2:

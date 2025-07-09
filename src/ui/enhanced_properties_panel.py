@@ -251,33 +251,59 @@ class EnhancedPropertiesPanel(QWidget):
         """Create position and size properties"""
         pos_group = QGroupBox("Position & Size")
         pos_layout = QGridLayout()
+        pos_layout.setHorizontalSpacing(8)  # Reduced gap between label and spinner
+        pos_layout.setVerticalSpacing(5)
+        pos_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Set fixed width for labels to align spinners
+        label_width = 50
 
         # X position
-        pos_layout.addWidget(QLabel("X:"), 0, 0)
-        x_widget = NumberPropertyWidget("x", field.x, 0, 2000)
+        x_label = QLabel("X:")
+        x_label.setFixedWidth(label_width)
+        x_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        pos_layout.addWidget(x_label, 0, 0)
+        x_widget = NumberPropertyWidget("x", field.x, 0, 999)
+        x_widget.widget.setMaximumWidth(50)
+        x_widget.widget.setMinimumWidth(50)
         x_widget.connect_signal(lambda value: self._emit_geometry_change())
-        pos_layout.addWidget(x_widget.widget, 0, 1)
+        pos_layout.addWidget(x_widget.widget, 0, 1, Qt.AlignmentFlag.AlignLeft)
         self.property_widgets["x"] = x_widget
 
         # Y position
-        pos_layout.addWidget(QLabel("Y:"), 1, 0)
-        y_widget = NumberPropertyWidget("y", field.y, 0, 2000)
+        y_label = QLabel("Y:")
+        y_label.setFixedWidth(label_width)
+        y_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        pos_layout.addWidget(y_label, 1, 0)
+        y_widget = NumberPropertyWidget("y", field.y, 0, 999)
+        y_widget.widget.setMaximumWidth(50)
+        y_widget.widget.setMinimumWidth(50)
         y_widget.connect_signal(lambda value: self._emit_geometry_change())
-        pos_layout.addWidget(y_widget.widget, 1, 1)
+        pos_layout.addWidget(y_widget.widget, 1, 1, Qt.AlignmentFlag.AlignLeft)
         self.property_widgets["y"] = y_widget
 
         # Width
-        pos_layout.addWidget(QLabel("Width:"), 0, 2)
-        width_widget = NumberPropertyWidget("width", field.width, 10, 500)
+        width_label = QLabel("Width:")
+        width_label.setFixedWidth(label_width)
+        width_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        pos_layout.addWidget(width_label, 2, 0)
+        width_widget = NumberPropertyWidget("width", field.width, 10, 999)
+        width_widget.widget.setMaximumWidth(50)
+        width_widget.widget.setMinimumWidth(50)
         width_widget.connect_signal(lambda value: self._emit_geometry_change())
-        pos_layout.addWidget(width_widget.widget, 0, 3)
+        pos_layout.addWidget(width_widget.widget, 2, 1, Qt.AlignmentFlag.AlignLeft)
         self.property_widgets["width"] = width_widget
 
         # Height
-        pos_layout.addWidget(QLabel("Height:"), 1, 2)
+        height_label = QLabel("Height:")
+        height_label.setFixedWidth(label_width)
+        height_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        pos_layout.addWidget(height_label, 3, 0)
         height_widget = NumberPropertyWidget("height", field.height, 10, 200)
+        height_widget.widget.setMaximumWidth(50)
+        height_widget.widget.setMinimumWidth(50)
         height_widget.connect_signal(lambda value: self._emit_geometry_change())
-        pos_layout.addWidget(height_widget.widget, 1, 3)
+        pos_layout.addWidget(height_widget.widget, 3, 1, Qt.AlignmentFlag.AlignLeft)
         self.property_widgets["height"] = height_widget
 
         pos_group.setLayout(pos_layout)

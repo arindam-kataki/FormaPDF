@@ -6,7 +6,7 @@ from ui.border_property_widget import BorderPropertyWidget
 from ui.color_property_widget import ColorPropertyWidget
 from ui.font_property_widget import FontPropertyWidget
 from ui.text_alignment_widget import TextAlignmentWidget
-
+from ui.alignment_grid_widget import AlignmentGridWidget
 
 class AppearancePropertiesWidget(QWidget):
     """Complete appearance properties widget combining all appearance settings"""
@@ -41,8 +41,9 @@ class AppearancePropertiesWidget(QWidget):
         font_layout.addLayout(text_color_layout)
 
         # Text alignment (only for text-based fields)
+        # 3x3 Alignment Grid (replaces old text alignment)
         if self.field_type in ['text', 'textarea', None]:
-            self.alignment_widget = TextAlignmentWidget()
+            self.alignment_widget = AlignmentGridWidget()
             self.alignment_widget.alignmentChanged.connect(self.on_appearance_changed)
             font_layout.addWidget(self.alignment_widget)
 
@@ -95,6 +96,16 @@ class AppearancePropertiesWidget(QWidget):
         if hasattr(self, 'alignment_widget'):
             self.appearance_props['text_alignment'] = self.alignment_widget.get_alignment()
 
+        # Add alignment if available (3x3 grid)
+        if hasattr(self, 'alignment_widget'):
+            alignment_data = {
+                'combined': self.alignment_widget.get_alignment(),  # e.g., "top-left"
+                'horizontal': self.alignment_widget.get_horizontal_alignment(),  # "left"
+                'vertical': self.alignment_widget.get_vertical_alignment(),  # "top"
+                'css': self.alignment_widget.get_css_alignment()  # CSS properties
+            }
+            self.appearance_props['alignment'] = alignment_data
+
         self.appearanceChanged.emit(self.appearance_props)
 
     def get_appearance_properties(self) -> dict:
@@ -124,3 +135,5 @@ class AppearancePropertiesWidget(QWidget):
         # Update alignment if available
         if hasattr(self, 'alignment_widget') and 'text_alignment' in appearance_props:
             self.alignment_widget.set_alignment(appearance_props['text_alignment'])
+
+
