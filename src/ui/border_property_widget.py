@@ -48,12 +48,12 @@ class BorderPropertyWidget(QWidget):
         width_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
         border_layout.addWidget(width_label, 1, 0)
 
-        self.width_spinner = QSpinBox()
-        self.width_spinner.setRange(0, 10)
-        self.width_spinner.setValue(1)
-        self.width_spinner.setMaximumWidth(50)  # Same as font size spinner
-        self.width_spinner.setMinimumWidth(50)
-        border_layout.addWidget(self.width_spinner, 1, 1, Qt.AlignmentFlag.AlignLeft)
+        self.width_combo = QComboBox()
+        self.width_combo.setMaximumWidth(80)  # Slightly wider for text
+        self.width_combo.setMinimumWidth(80)
+        self.width_combo.addItems(['hairline', 'thin', 'medium', 'thick'])
+        self.width_combo.setCurrentText('thin')  # Default value
+        border_layout.addWidget(self.width_combo, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
         # Border color
         color_label = QLabel("Color:")
@@ -69,14 +69,14 @@ class BorderPropertyWidget(QWidget):
 
         # Connect signals
         self.style_combo.currentTextChanged.connect(self.on_border_changed)
-        self.width_spinner.valueChanged.connect(self.on_border_changed)
+        self.width_combo.currentTextChanged.connect(self.on_border_changed)
         self.border_color_widget.colorChanged.connect(self.on_border_changed)
 
     def on_border_changed(self):
         """Handle border property changes"""
         self.border_props = {
             'color': self.border_color_widget.get_color(),
-            'width': self.width_spinner.value(),  # Fixed: Added .value() and missing comma
+            'width': self.width_combo.currentText(),  # Fixed: Added .value() and missing comma
             'style': self.style_combo.currentText()
         }
         self.borderChanged.emit(self.border_props)
@@ -91,5 +91,5 @@ class BorderPropertyWidget(QWidget):
 
         # Update UI
         self.border_color_widget.set_color(border_props.get('color', QColor(100, 100, 100)))
-        self.width_spinner.setVisible(border_props.get('width', 'thin'))
+        self.width_combo.setVisible(border_props.get('width', 'thin'))
         self.style_combo.setCurrentText(border_props.get('style', 'solid'))
