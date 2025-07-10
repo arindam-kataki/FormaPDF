@@ -49,14 +49,27 @@ class ControlsTab(QWidget):
         field_group = QGroupBox("Form Controls")
         field_layout = QVBoxLayout()
 
-        # Create scrollable area for field buttons
+        # ✅ FIX: Remove spacing and margins to eliminate gap
+        field_layout.setSpacing(0)  # Remove spacing between widgets
+        field_layout.setContentsMargins(5, 5, 5, 5)  # Minimal margins
+
+        # Create scrollable area for field buttons - EXPAND TO FILL AVAILABLE HEIGHT
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
-        scroll_area.setFixedHeight(200)
+
+        # ✅ KEY FIX: Remove fixed height and set size policy to expand
+        from PyQt6.QtWidgets import QSizePolicy
+        scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        #scroll_area.setMinimumHeight(200)  # Minimum usable height
+        scroll_area.setFrameStyle(0)  # Remove frame to maximize content area
 
         scroll_widget = QWidget()
         scroll_layout = QVBoxLayout()
         scroll_layout.setSpacing(5)
+
+        scroll_widget.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
 
         # Define field types with icons and descriptions
         field_types = [
@@ -86,6 +99,7 @@ class ControlsTab(QWidget):
         scroll_area.setWidget(scroll_widget)
         field_layout.addWidget(scroll_area)
 
+        field_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         field_group.setLayout(field_layout)
         parent_layout.addWidget(field_group)
 
