@@ -30,7 +30,8 @@ class ControlsTab(QWidget):
     def init_ui(self):
         """Initialize the controls tab UI"""
         layout = QVBoxLayout()
-        layout.setSpacing(10)
+        layout.setSpacing(5)  # Reduce spacing to maximize content area
+        layout.setContentsMargins(5, 5, 5, 5)  # Remove margins to use full space
 
         # Field Types Section
         self._create_field_types_section(layout)
@@ -42,6 +43,8 @@ class ControlsTab(QWidget):
         #self._create_quick_actions_section(layout)
 
         layout.addStretch()
+        from PyQt6.QtWidgets import QSizePolicy
+        self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         self.setLayout(layout)
 
     def _create_field_types_section(self, parent_layout):
@@ -59,7 +62,7 @@ class ControlsTab(QWidget):
 
         # ✅ KEY FIX: Remove fixed height and set size policy to expand
         from PyQt6.QtWidgets import QSizePolicy
-        scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        scroll_area.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.MinimumExpanding)
         scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         #scroll_area.setMinimumHeight(200)  # Minimum usable height
@@ -75,14 +78,19 @@ class ControlsTab(QWidget):
         field_types = [
             ("text", "📝", "Text Field", "Single line text input"),
             ("textarea", "📄", "Text Area", "Multi-line text input"),
+            ("password", "🔒", "Password", "Password input field"),
             ("checkbox", "☑️", "Checkbox", "Checkable box"),
             ("radio", "🔘", "Radio Button", "Single selection option"),
             ("dropdown", "📋", "Dropdown", "Selection list"),
             ("date", "📅", "Date Field", "Date picker"),
             ("number", "🔢", "Number Field", "Numeric input"),
             ("email", "📧", "Email Field", "Email address input"),
+            ("phone", "📞", "Phone", "Phone number input"),
+            ("url", "🔗", "URL", "Website URL input"),
+            ("file_upload", "📎", "File Upload", "File selection input"),
+            ("button", "🔘", "Button", "Clickable button"),
+            ("label", "🏷️", "Label", "Text label"),
             ("signature", "✍️", "Signature", "Digital signature area"),
-            ("image", "🖼️", "Image", "Image placeholder"),
         ]
 
         for field_type, icon, name, description in field_types:
@@ -99,7 +107,7 @@ class ControlsTab(QWidget):
         scroll_area.setWidget(scroll_widget)
         field_layout.addWidget(scroll_area)
 
-        field_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        field_group.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
         field_group.setLayout(field_layout)
         parent_layout.addWidget(field_group)
 
