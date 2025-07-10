@@ -17,16 +17,17 @@ class FieldType(Enum):
     CHECKBOX = "checkbox"
     RADIO = "radio"
     DROPDOWN = "dropdown"
+    LIST_BOX = "list_box"           # NEW: List box control
     SIGNATURE = "signature"
     DATE = "date"
     BUTTON = "button"
-    NUMBER = "number",
-    EMAIL = "email",
-    LABEL = "label",
-    FILE_UPLOAD = "file upload",
-    PHONE= "phone",
-    URL = "url",
-    TEXTAREA = "textarea",
+    NUMBER = "number"               # FIXED: removed comma
+    EMAIL = "email"                 # FIXED: removed comma
+    LABEL = "label"                 # FIXED: removed comma
+    FILE_UPLOAD = "file_upload"     # FIXED: changed to underscore, removed comma
+    PHONE = "phone"                 # FIXED: removed comma
+    URL = "url"                     # FIXED: removed comma
+    TEXTAREA = "textarea"           # FIXED: removed comma
     PASSWORD = "password"
 
 @dataclass
@@ -54,14 +55,20 @@ class FormField:
         default_sizes = {
             FieldType.TEXT: (150, 25),
             FieldType.CHECKBOX: (20, 20),
+            FieldType.RADIO: (20, 20),
             FieldType.DROPDOWN: (120, 25),
+            FieldType.LIST_BOX: (120, 80),  # NEW: Wider and taller to show multiple options
             FieldType.SIGNATURE: (200, 50),
             FieldType.DATE: (100, 25),
-            FieldType.RADIO: (20, 20),
             FieldType.BUTTON: (80, 30),
             FieldType.NUMBER: (100, 25),
             FieldType.EMAIL: (200, 25),
-            FieldType.LABEL: (100, 25)
+            FieldType.LABEL: (100, 25),
+            FieldType.FILE_UPLOAD: (150, 30),  # NEW: Slightly taller for browse button
+            FieldType.PHONE: (120, 25),  # NEW: Medium width for phone numbers
+            FieldType.URL: (200, 25),  # NEW: Wide for URLs
+            FieldType.TEXTAREA: (200, 60),  # NEW: Wide and tall for multi-line text
+            FieldType.PASSWORD: (150, 25)  # NEW: Same as text field
         }
 
         field_type_enum = FieldType(field_type)

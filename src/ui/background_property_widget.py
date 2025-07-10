@@ -60,16 +60,7 @@ class BackgroundPropertyWidget(QWidget):
         self.opacity_spinner.setMinimumWidth(50)
         bg_layout.addWidget(self.opacity_spinner, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
-        # None checkbox - similar to auto-size in font widget
-        none_label = QLabel("None:")
-        none_label.setFixedWidth(50)  # Same width as other labels
-        none_label.setAlignment(Qt.AlignmentFlag.AlignLeft)
-        bg_layout.addWidget(none_label, 2, 0)
 
-        self.none_check = QCheckBox("No background")
-        self.none_check.setToolTip("No background color (transparent)")
-        self.none_check.toggled.connect(self.on_none_toggled)
-        bg_layout.addWidget(self.none_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addLayout(bg_layout)
         self.setLayout(layout)

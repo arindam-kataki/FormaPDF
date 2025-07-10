@@ -91,5 +91,5 @@ class BorderPropertyWidget(QWidget):
 
         # Update UI
         self.border_color_widget.set_color(border_props.get('color', QColor(100, 100, 100)))
-        self.width_combo.setVisible(border_props.get('width', 'thin'))
+        self.width_combo.setCurrentText(border_props.get('width', 'thin'))  # CORRECT
         self.style_combo.setCurrentText(border_props.get('style', 'solid'))
