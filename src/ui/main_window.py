@@ -116,6 +116,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         self.setup_scroll_tracking()
         self.setup_scroll_timer()
         self.connect_grid_popup_to_manager()
+        self.setup_alignment_system()
+
 
     def setup_scroll_timer(self):
         """Setup timer-based scroll rendering"""
@@ -232,6 +234,99 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         except Exception as e:
             print(f"❌ Error connecting grid popup: {e}")
             return False
+
+    def setup_alignment_system(self):
+        """Setup alignment system using existing field manager - no separate manager needed"""
+
+        # Simply connect field palette alignment requests to our handler
+        if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'alignRequested'):
+            self.field_palette.alignRequested.connect(self._on_alignment_requested)
+            print("✅ Connected field palette alignment requests")
+
+        # Setup keyboard shortcuts (optional)
+        self._setup_alignment_shortcuts()
+
+        print("✅ Alignment system setup complete using existing FieldManager")
+
+    def _on_alignment_requested(self, alignment_type: str):
+        """Handle alignment request using field manager directly"""
+
+        # Get selected fields from existing field manager
+        if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'field_manager'):
+            field_manager = self.pdf_canvas.field_manager
+            selected_fields = field_manager.get_selected_fields()
+
+            if len(selected_fields) < 2:
+                print("⚠️ Need at least 2 fields selected for alignment")
+                return
+
+            # Use first selected field as reference
+            reference_field = selected_fields[0]
+
+            print(
+                f"🎯 Aligning {len(selected_fields)} fields using '{alignment_type}' with reference: {reference_field.id}")
+
+            # Import and use alignment utilities directly
+            from utils.geometry_utils import AlignmentUtils
+
+            try:
+                # Perform alignment based on type
+                if alignment_type == "left":
+                    AlignmentUtils.align_left(selected_fields, reference_field)
+                elif alignment_type == "right":
+                    AlignmentUtils.align_right(selected_fields, reference_field)
+                elif alignment_type == "top":
+                    AlignmentUtils.align_top(selected_fields, reference_field)
+                elif alignment_type == "bottom":
+                    AlignmentUtils.align_bottom(selected_fields, reference_field)
+                elif alignment_type == "center_horizontal":
+                    AlignmentUtils.align_center_horizontal(selected_fields, reference_field)
+                elif alignment_type == "center_vertical":
+                    AlignmentUtils.align_center_vertical(selected_fields, reference_field)
+                elif alignment_type == "distribute_horizontal":
+                    AlignmentUtils.distribute_horizontal(selected_fields)
+                elif alignment_type == "distribute_vertical":
+                    AlignmentUtils.distribute_vertical(selected_fields)
+                else:
+                    print(f"⚠️ Unknown alignment type: {alignment_type}")
+                    return
+
+                # Update canvas display
+                if hasattr(self, 'pdf_canvas'):
+                    self.pdf_canvas.update()
+
+                # Mark document as modified
+                self.document_modified = True
+
+                # Update status bar
+                if hasattr(self, 'statusBar'):
+                    self.statusBar().showMessage(f"Aligned {len(selected_fields)} fields ({alignment_type})", 3000)
+
+                print(f"✅ Successfully aligned {len(selected_fields)} fields")
+
+            except Exception as e:
+                print(f"❌ Error during alignment: {e}")
+
+    def _setup_alignment_shortcuts(self):
+        """Setup keyboard shortcuts for alignment"""
+        from PyQt6.QtGui import QShortcut, QKeySequence
+
+        shortcuts_config = [
+            ("Ctrl+Shift+L", "left", "Align Left"),
+            ("Ctrl+Shift+R", "right", "Align Right"),
+            ("Ctrl+Shift+T", "top", "Align Top"),
+            ("Ctrl+Shift+B", "bottom", "Align Bottom"),
+            ("Ctrl+Shift+H", "center_horizontal", "Align Center Horizontally"),
+            ("Ctrl+Shift+V", "center_vertical", "Align Center Vertically"),
+            ("Ctrl+Shift+D", "distribute_horizontal", "Distribute Horizontally"),
+        ]
+
+        self.alignment_shortcuts = []
+        for key_sequence, alignment_type, description in shortcuts_config:
+            shortcut = QShortcut(QKeySequence(key_sequence), self)
+            shortcut.activated.connect(lambda at=alignment_type: self._on_alignment_requested(at))
+            self.alignment_shortcuts.append(shortcut)
+            print(f"✅ Registered shortcut: {key_sequence} -> {description}")
 
     def update_canvas_grid_visibility(self, visible):
         """Update canvas grid visibility"""

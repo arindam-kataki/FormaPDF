@@ -203,6 +203,58 @@ class AlignmentUtils:
             if field != reference_field:
                 field.y = ref_center_y - field.height // 2
 
+    # Add these methods to the existing AlignmentUtils class
+
+    @staticmethod
+    def distribute_horizontal(fields: list) -> None:
+        """Distribute fields evenly horizontally"""
+        if len(fields) < 3:
+            return
+
+        # Sort fields by x position
+        sorted_fields = sorted(fields, key=lambda f: f.x)
+
+        # Calculate total width and spacing
+        leftmost = sorted_fields[0]
+        rightmost = sorted_fields[-1]
+        total_width = (rightmost.x + rightmost.width) - leftmost.x
+
+        # Calculate width of all fields
+        total_field_width = sum(field.width for field in sorted_fields)
+        available_space = total_width - total_field_width
+        spacing = available_space / (len(sorted_fields) - 1)
+
+        # Position fields with equal spacing
+        current_x = leftmost.x
+        for field in sorted_fields[:-1]:  # Exclude last field
+            field.x = current_x
+            current_x += field.width + spacing
+
+    @staticmethod
+    def distribute_vertical(fields: list) -> None:
+        """Distribute fields evenly vertically"""
+        if len(fields) < 3:
+            return
+
+        # Sort fields by y position
+        sorted_fields = sorted(fields, key=lambda f: f.y)
+
+        # Calculate total height and spacing
+        topmost = sorted_fields[0]
+        bottommost = sorted_fields[-1]
+        total_height = (bottommost.y + bottommost.height) - topmost.y
+
+        # Calculate height of all fields
+        total_field_height = sum(field.height for field in sorted_fields)
+        available_space = total_height - total_field_height
+        spacing = available_space / (len(sorted_fields) - 1)
+
+        # Position fields with equal spacing
+        current_y = topmost.y
+        for field in sorted_fields[:-1]:  # Exclude last field
+            field.y = current_y
+            current_y += field.height + spacing
+
 
 class DistributionUtils:
     """Utilities for distributing fields evenly"""
