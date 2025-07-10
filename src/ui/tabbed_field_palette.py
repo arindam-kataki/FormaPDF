@@ -5,7 +5,7 @@ Reorganizes the field palette into a tabbed interface with Controls and Properti
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QTabWidget, QGroupBox,
-    QLabel, QComboBox, QScrollArea, QPushButton, QFrame
+    QLabel, QComboBox, QScrollArea, QPushButton, QFrame, QGridLayout
 )
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont
@@ -40,7 +40,7 @@ class ControlsTab(QWidget):
         #self._create_preview_section(layout)
 
         # Quick Actions Section
-        #self._create_quick_actions_section(layout)
+        self._create_quick_actions_section(layout)
 
         layout.addStretch()
         from PyQt6.QtWidgets import QSizePolicy
@@ -82,6 +82,7 @@ class ControlsTab(QWidget):
             ("checkbox", "☑️", "Checkbox", "Checkable box"),
             ("radio", "🔘", "Radio Button", "Single selection option"),
             ("dropdown", "📋", "Dropdown", "Selection list"),
+            ("list_box", "📋", "List Box", "Multi-selection list"),
             ("date", "📅", "Date Field", "Date picker"),
             ("number", "🔢", "Number Field", "Numeric input"),
             ("email", "📧", "Email Field", "Email address input"),
@@ -137,7 +138,7 @@ class ControlsTab(QWidget):
         parent_layout.addWidget(preview_group)
 
     def _create_quick_actions_section(self, parent_layout):
-        """Create the quick actions section"""
+        """Create the quick actions section with field alignment widget"""
         actions_group = QGroupBox("Quick Actions")
         actions_layout = QVBoxLayout()
 
@@ -157,32 +158,57 @@ class ControlsTab(QWidget):
             # Store reference for enabling/disabling
             setattr(self, f"_{signal_name}_btn", btn)
 
-        # Alignment buttons
-        align_frame = QFrame()
-        align_layout = QHBoxLayout()
-        align_layout.setContentsMargins(0, 0, 0, 0)
+        # Add field alignment widget
+        from ui.field_alignment_widget import FieldAlignmentWidget
 
-        align_label = QLabel("Align:")
-        align_layout.addWidget(align_label)
+        self.field_alignment_widget = FieldAlignmentWidget()
 
-        align_buttons = [
-            ("⬅️", "left"), ("➡️", "right"), ("⬆️", "top"), ("⬇️", "bottom")
-        ]
+        # Connect alignment signals to main signals
+        self.field_alignment_widget.alignmentRequested.connect(self.alignRequested.emit)
+        self.field_alignment_widget.distributionRequested.connect(self.alignRequested.emit)
 
-        for icon, alignment in align_buttons:
-            btn = QPushButton(icon)
-            btn.setFixedSize(30, 25)
-            btn.setToolTip(f"Align {alignment}")
-            btn.setEnabled(False)
-            btn.clicked.connect(lambda checked, a=alignment: self.alignRequested.emit(a))
-            align_layout.addWidget(btn)
-            setattr(self, f"_align_{alignment}_btn", btn)
-
-        align_frame.setLayout(align_layout)
-        actions_layout.addWidget(align_frame)
+        actions_layout.addWidget(self.field_alignment_widget)
 
         actions_group.setLayout(actions_layout)
         parent_layout.addWidget(actions_group)
+
+        # Connect to field manager selection changes
+        self._connect_selection_updates()
+
+    def _should_include_distribution_buttons(self):
+        """Determine if distribution buttons should be included"""
+        # You can make this configurable or always return True
+        return True
+
+    def _connect_selection_updates(self):
+        """Connect to field manager to update button states"""
+        # Get field manager reference (adjust path based on your structure)
+        if hasattr(self, 'field_manager') and self.field_manager:
+            if hasattr(self.field_manager, 'selection_changed'):
+                self.field_manager.selection_changed.connect(self._update_action_buttons)
+        elif hasattr(self, 'parent') and hasattr(self.parent(), 'field_manager'):
+            field_manager = self.parent().field_manager
+            if hasattr(field_manager, 'selection_changed'):
+                field_manager.selection_changed.connect(self._update_action_buttons)
+        else:
+            print("⚠️ Could not connect to field manager selection changes")
+
+    def _update_action_buttons(self, selected_fields):
+        """Update action button states based on selection"""
+        selection_count = len(selected_fields) if selected_fields else 0
+
+        # Update duplicate/delete buttons (need 1+ fields)
+        enable_single = selection_count >= 1
+        if hasattr(self, '_duplicateRequested_btn'):
+            self._duplicateRequested_btn.setEnabled(enable_single)
+        if hasattr(self, '_deleteRequested_btn'):
+            self._deleteRequested_btn.setEnabled(enable_single)
+
+        # Update field alignment widget
+        if hasattr(self, 'field_alignment_widget'):
+            self.field_alignment_widget.update_selection_count(selection_count)
+
+        print(f"🔄 Updated action buttons: {selection_count} fields selected")
 
     def _apply_field_button_styles(self):
         """Apply consistent styling to field buttons"""
