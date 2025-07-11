@@ -810,9 +810,10 @@ class FieldManager(QObject):
 
         # Select the duplicated fields (replace selection)
         if duplicated_fields:
-            self.selected_fields = duplicated_fields.copy()
-            self.selection_changed.emit(self.selected_fields.copy())
+            #self.selected_fields = duplicated_fields.copy()
+            #self.selection_changed.emit(self.selected_fields.copy())
             print(f"🎯 Selected {len(duplicated_fields)} duplicated fields")
+            pass
 
         print(f"📄 Successfully duplicated {len(duplicated_fields)} field(s)")
         return duplicated_fields
