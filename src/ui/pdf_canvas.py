@@ -1670,7 +1670,11 @@ class PDFCanvas(QLabel):
             self.enhanced_drag_handler.handle_keyboard_move(0, move_distance)
             self.draw_overlay()
             event.accept()
-
+        # Duplicate shortcut (Ctrl+D) - ADD THIS TO keyPressEvent
+        elif key == Qt.Key.Key_D and modifiers & Qt.KeyboardModifier.ControlModifier:
+            self.duplicate_selected_fields()
+            event.accept()
+            return
         # Delete selected fields
         elif key == Qt.Key.Key_Delete or key == Qt.Key.Key_Backspace:
             for field in selected_fields:

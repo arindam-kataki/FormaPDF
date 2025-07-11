@@ -399,6 +399,12 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             self.alignment_shortcuts.append(shortcut)
             print(f"✅ Registered shortcut: {key_sequence} -> {description}")
 
+        # NEW: Add duplicate shortcut
+        duplicate_shortcut = QShortcut(QKeySequence("Ctrl+D"), self)
+        duplicate_shortcut.activated.connect(self._on_duplicate_requested)
+        self.alignment_shortcuts.append(duplicate_shortcut)
+        print(f"✅ Registered shortcut: Ctrl+D -> Duplicate Selected Fields")
+
     def _on_duplicate_requested(self):
         """Handle duplicate shortcut from main window"""
         try:

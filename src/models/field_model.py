@@ -196,12 +196,7 @@ class FieldManager(QObject):
 
         # Field counter for generating unique IDs
         self._field_counter = 0
-
         self.duplicate_offset_count = 0  # Tracks how many times duplicate was called
-        self.last_selected_field_ids = set()  # Cache of last selection for comparison
-
-        # Connect to selection changes to reset duplicate offset
-        self.selection_changed.connect(self._on_selection_changed)
 
         print("✅ FieldManager initialized with list-based field management")
 
@@ -708,19 +703,6 @@ class FieldManager(QObject):
     # #####################################################
     # FIELD DUPLICATION
     # #####################################################
-
-    def _on_selection_changed(self, selected_fields: List[FormField]):
-        """Reset duplicate offset when selection changes"""
-        # Get current selection IDs from the actual selected fields
-        current_selection_ids = {field.id for field in selected_fields}
-
-        # Reset offset if selection changed or no selection
-        if current_selection_ids != self.last_selected_field_ids or not current_selection_ids:
-            self.duplicate_offset_count = 0
-            print(f"🔄 Reset duplicate offset (selection changed)")
-
-        # Update cache for next comparison
-        self.last_selected_field_ids = current_selection_ids
 
     def _create_duplicate_field(self, original_field: FormField, new_x: int, new_y: int) -> Optional[FormField]:
         """Create a duplicate of a field at specified position"""
