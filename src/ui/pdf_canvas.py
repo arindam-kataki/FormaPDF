@@ -2890,10 +2890,6 @@ class PDFCanvas(QLabel):
             duplicated_fields = self.field_manager.duplicate_selected_fields()
 
             if duplicated_fields:
-                # Update drag handler selection to new duplicates
-                self.enhanced_drag_handler.clear_selection()
-                for field in duplicated_fields:
-                    self.enhanced_drag_handler.select_field(field, add_to_selection=True)
 
                 # Trigger visual update
                 self.update()

@@ -197,6 +197,13 @@ class FieldManager(QObject):
         # Field counter for generating unique IDs
         self._field_counter = 0
         self.duplicate_offset_count = 0  # Tracks how many times duplicate was called
+        # ADD THIS LINE:
+        self.selection_changed.connect(
+            lambda selected_fields: (
+                setattr(self, 'duplicate_offset_count', 0),
+                print(f"🔄 Reset duplicate offset to 0 (selection changed: {len(selected_fields)} fields)")
+            )
+        )
 
         print("✅ FieldManager initialized with list-based field management")
 
@@ -763,12 +770,13 @@ class FieldManager(QObject):
 
         print(f"📄 Duplicating {len(self.selected_fields)} selected field(s)")
 
+        """
         current_selection_ids = {f.id for f in self.selected_fields}
         if not hasattr(self, '_last_duplicate_selection') or self._last_duplicate_selection != current_selection_ids:
             self.duplicate_offset_count = 0
             self._last_duplicate_selection = current_selection_ids
             print(f"🔄 Reset duplicate offset (new selection)")
-
+        """
         # Increment offset count for staggering
         self.duplicate_offset_count += 1
         base_offset = 10 * self.duplicate_offset_count
