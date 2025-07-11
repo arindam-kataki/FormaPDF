@@ -415,6 +415,25 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
         except Exception as e:
             print(f"❌ Error handling duplicate request: {e}")
 
+    def _on_delete_requested(self):
+        """Handle delete request from field palette"""
+        try:
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                # Get selected fields and delete them
+                selected_fields = self.pdf_canvas.enhanced_drag_handler.get_selected_fields()
+                if selected_fields:
+                    for field in selected_fields:
+                        self.field_manager.remove_field(field)
+                    # Clear selection and update display
+                    self.pdf_canvas.enhanced_drag_handler.clear_selection()
+                    self.pdf_canvas.draw_overlay()
+                else:
+                    print("⚠️ No fields selected for deletion")
+            else:
+                print("❌ PDF canvas not available for deletion")
+        except Exception as e:
+            print(f"❌ Error handling delete request: {e}")
+
     def update_canvas_grid_visibility(self, visible):
         """Update canvas grid visibility"""
         if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
@@ -901,7 +920,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                 self.field_palette is not None and 
                 hasattr(self.field_palette, 'duplicateRequested')):
                 try:
-                    self.field_palette.duplicateRequested.connect(lambda: print("Duplicate requested"))
+                    #self.field_palette.duplicateRequested.connect(lambda: print("Duplicate requested"))
+                    self.field_palette.duplicateRequested.connect(self._on_duplicate_requested)
                     print("  ✅ Connected field_palette.duplicateRequested")
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect duplicateRequested: {e}")
@@ -910,7 +930,8 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                 self.field_palette is not None and 
                 hasattr(self.field_palette, 'deleteRequested')):
                 try:
-                    self.field_palette.deleteRequested.connect(lambda: print("Delete requested"))
+                    #self.field_palette.deleteRequested.connect(lambda: print("Delete requested"))
+                    self.field_palette.deleteRequested.connect(self._on_delete_requested)
                     print("  ✅ Connected field_palette.deleteRequested")
                 except Exception as e:
                     print(f"  ⚠️ Failed to connect deleteRequested: {e}")
