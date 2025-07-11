@@ -738,6 +738,7 @@ class FieldManager(QObject):
             print(f"❌ Error creating duplicate field: {e}")
             return None
 
+
     def find_top_left_reference_field(self, fields: List[FormField]) -> FormField:
         """Find the field closest to top-left corner for positioning reference"""
         if not fields:
@@ -761,6 +762,12 @@ class FieldManager(QObject):
             return []
 
         print(f"📄 Duplicating {len(self.selected_fields)} selected field(s)")
+
+        current_selection_ids = {f.id for f in self.selected_fields}
+        if not hasattr(self, '_last_duplicate_selection') or self._last_duplicate_selection != current_selection_ids:
+            self.duplicate_offset_count = 0
+            self._last_duplicate_selection = current_selection_ids
+            print(f"🔄 Reset duplicate offset (new selection)")
 
         # Increment offset count for staggering
         self.duplicate_offset_count += 1

@@ -142,31 +142,25 @@ class ControlsTab(QWidget):
         actions_group = QGroupBox("Quick Actions")
         actions_layout = QVBoxLayout()
 
-        # Create action buttons
-        action_buttons = [
-            ("📋 Duplicate", "duplicateRequested", "Create a copy of selected field"),
-            ("🗑️ Delete", "deleteRequested", "Delete selected field"),
-        ]
+        # Create duplicate button
+        self.duplicate_btn = QPushButton("📋 Duplicate (Ctrl+D)")
+        self.duplicate_btn.setToolTip("Create a copy of selected field")
+        self.duplicate_btn.setEnabled(False)  # Disabled by default
+        self.duplicate_btn.clicked.connect(self.duplicateRequested.emit)
+        actions_layout.addWidget(self.duplicate_btn)
 
-        for text, signal_name, tooltip in action_buttons:
-            btn = QPushButton(text)
-            btn.setToolTip(tooltip)
-            btn.setEnabled(False)  # Disabled by default
-            btn.clicked.connect(lambda checked, sig=signal_name: getattr(self, sig).emit())
-            actions_layout.addWidget(btn)
-
-            # Store reference for enabling/disabling
-            setattr(self, f"_{signal_name}_btn", btn)
+        # Create delete button
+        self.delete_btn = QPushButton("🗑️ Delete")
+        self.delete_btn.setToolTip("Delete selected field")
+        self.delete_btn.setEnabled(False)  # Disabled by default
+        self.delete_btn.clicked.connect(self.deleteRequested.emit)
+        actions_layout.addWidget(self.delete_btn)
 
         # Add field alignment widget
         from ui.field_alignment_widget import FieldAlignmentWidget
-
         self.field_alignment_widget = FieldAlignmentWidget()
-
-        # Connect alignment signals to main signals
         self.field_alignment_widget.alignmentRequested.connect(self.alignRequested.emit)
         self.field_alignment_widget.distributionRequested.connect(self.alignRequested.emit)
-
         actions_layout.addWidget(self.field_alignment_widget)
 
         actions_group.setLayout(actions_layout)
@@ -196,19 +190,23 @@ class ControlsTab(QWidget):
     def _update_action_buttons(self, selected_fields):
         """Update action button states based on selection"""
         selection_count = len(selected_fields) if selected_fields else 0
+        enable_buttons = selection_count >= 1
 
-        # Update duplicate/delete buttons (need 1+ fields)
-        enable_single = selection_count >= 1
-        if hasattr(self, '_duplicateRequested_btn'):
-            self._duplicateRequested_btn.setEnabled(enable_single)
-        if hasattr(self, '_deleteRequested_btn'):
-            self._deleteRequested_btn.setEnabled(enable_single)
+        # Update duplicate/delete buttons
+        self.duplicate_btn.setEnabled(enable_buttons)
+        self.delete_btn.setEnabled(enable_buttons)
+
+        # Update button text to show count
+        if selection_count > 1:
+            self.duplicate_btn.setText(f"📋 Duplicate {selection_count} fields (Ctrl+D)")
+        else:
+            self.duplicate_btn.setText("📋 Duplicate (Ctrl+D)")
 
         # Update field alignment widget
         if hasattr(self, 'field_alignment_widget'):
             self.field_alignment_widget.update_selection_count(selection_count)
 
-        print(f"🔄 Updated action buttons: {selection_count} fields selected")
+        print(f"🔄 Updated action buttons: {selection_count} fields selected, buttons enabled: {enable_buttons}")
 
     def _apply_field_button_styles(self):
         """Apply consistent styling to field buttons"""
@@ -315,6 +313,15 @@ class ControlsTab(QWidget):
     def get_selected_field_type(self):
         """Get the currently selected field type"""
         return self.selected_field_type
+
+    def set_field_manager(self, field_manager):
+        """Set the field manager and connect to selection changes"""
+        self.field_manager = field_manager
+
+        # Connect to selection changes to update button states
+        if hasattr(field_manager, 'selection_changed'):
+            field_manager.selection_changed.connect(self._update_action_buttons)
+            print("✅ ControlsTab connected to field manager selection changes")
 
 class PropertiesTab(QWidget):
     """Tab containing properties for the selected form control"""
@@ -1315,6 +1322,7 @@ class TabbedFieldPalette(QWidget):
         """Set the field manager for both tabs"""
         self.field_manager = field_manager
         self.properties_tab.set_field_manager(field_manager)
+        self.controls_tab.set_field_manager(field_manager)  # Add this line
 
     def set_field_selected(self, has_selection: bool, field=None):
         """Update both tabs based on field selection"""
