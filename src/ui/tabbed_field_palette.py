@@ -1251,6 +1251,10 @@ class TabbedFieldPalette(QWidget):
         self.field_manager = None
         self.init_ui()
 
+        # Connect duplicate signal from quick actions
+        if hasattr(self.controls_tab, 'quick_actions'):
+            self.controls_tab.quick_actions.duplicateRequested.connect(self._on_duplicate_requested)
+
     def init_ui(self):
         """Initialize the tabbed interface"""
         layout = QVBoxLayout()
@@ -1350,3 +1354,27 @@ class TabbedFieldPalette(QWidget):
     def get_selected_field_type(self):
         """Get selected field type from controls tab"""
         return self.controls_tab.get_selected_field_type()
+
+    def _get_main_window(self):
+        """Get the main window safely"""
+        try:
+            widget = self
+            while widget.parent():
+                widget = widget.parent()
+                if hasattr(widget, 'pdf_canvas') and hasattr(widget, 'field_manager'):
+                    return widget
+            return None
+        except:
+            return None
+
+    def _on_duplicate_requested(self):
+        """Handle duplicate request from field palette"""
+        try:
+            # Find main window and canvas
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'pdf_canvas'):
+                main_window.pdf_canvas.duplicate_selected_fields()
+            else:
+                print("❌ Cannot find PDF canvas for duplication")
+        except Exception as e:
+            print(f"❌ Error handling duplicate request: {e}")

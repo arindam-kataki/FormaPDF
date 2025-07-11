@@ -235,9 +235,42 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             print(f"❌ Error connecting grid popup: {e}")
             return False
 
+    def _update_alignment_buttons(self, selected_fields):
+        """Update alignment button states when field selection changes"""
+        selection_count = len(selected_fields) if selected_fields else 0
+
+        print(f"🔄 Updating alignment buttons: {selection_count} fields selected")
+
+        # Update alignment buttons in field palette
+        if hasattr(self, 'field_palette'):
+            # Try tabbed field palette first
+            if hasattr(self.field_palette, 'controls_tab'):
+                controls_tab = self.field_palette.controls_tab
+                if hasattr(controls_tab, 'field_alignment_widget'):
+                    controls_tab.field_alignment_widget.update_selection_count(selection_count)
+                    print("   ✅ Updated tabbed field palette alignment buttons")
+                    return
+
+            # Try regular field palette
+            if hasattr(self.field_palette, 'field_alignment_widget'):
+                self.field_palette.field_alignment_widget.update_selection_count(selection_count)
+                print("   ✅ Updated field palette alignment buttons")
+                return
+
+            # Try quick actions widget
+            if hasattr(self.field_palette, 'quick_actions'):
+                quick_actions = self.field_palette.quick_actions
+                if hasattr(quick_actions, 'field_alignment_widget'):
+                    quick_actions.field_alignment_widget.update_selection_count(selection_count)
+                    print("   ✅ Updated quick actions alignment buttons")
+                    return
+
+        print("   ⚠️ Could not find alignment widget to update")
+
     def setup_alignment_system(self):
         """Setup alignment system using existing field manager - no separate manager needed"""
-
+        field_manager = self.pdf_canvas.field_manager
+        field_manager.selection_changed.connect(self._update_alignment_buttons)
         # Simply connect field palette alignment requests to our handler
         if hasattr(self, 'field_palette') and hasattr(self.field_palette, 'alignRequested'):
             self.field_palette.alignRequested.connect(self._on_alignment_requested)
@@ -292,8 +325,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
                     return
 
                 # Update canvas display
-                if hasattr(self, 'pdf_canvas'):
-                    self.pdf_canvas.update()
+                self._update_canvas_after_alignment()
 
                 # Mark document as modified
                 self.document_modified = True
@@ -306,6 +338,45 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
 
             except Exception as e:
                 print(f"❌ Error during alignment: {e}")
+
+    def _update_canvas_after_alignment(self):
+        """Comprehensive canvas update after alignment operations"""
+        print("🎨 Updating canvas after alignment...")
+
+        try:
+            if hasattr(self, 'pdf_canvas'):
+                canvas = self.pdf_canvas
+
+                # Method 1: Standard update
+                if hasattr(canvas, 'update'):
+                    canvas.update()
+                    print("   ✅ Called canvas.update()")
+
+                # Method 2: Draw overlay (for field highlighting/selection)
+                if hasattr(canvas, 'draw_overlay'):
+                    canvas.draw_overlay()
+                    print("   ✅ Called canvas.draw_overlay()")
+
+                # Method 3: Repaint (force immediate redraw)
+                if hasattr(canvas, 'repaint'):
+                    canvas.repaint()
+                    print("   ✅ Called canvas.repaint()")
+
+                # Method 4: Update viewport if it's a scroll area
+                if hasattr(canvas, 'viewport'):
+                    canvas.viewport().update()
+                    print("   ✅ Called canvas.viewport().update()")
+
+                # Method 5: Refresh field rendering
+                if hasattr(canvas, 'field_renderer') and hasattr(canvas.field_renderer, 'refresh'):
+                    canvas.field_renderer.refresh()
+                    print("   ✅ Called field_renderer.refresh()")
+
+            else:
+                print("   ❌ No pdf_canvas found")
+
+        except Exception as e:
+            print(f"   ❌ Error updating canvas: {e}")
 
     def _setup_alignment_shortcuts(self):
         """Setup keyboard shortcuts for alignment"""
@@ -327,6 +398,16 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
             shortcut.activated.connect(lambda at=alignment_type: self._on_alignment_requested(at))
             self.alignment_shortcuts.append(shortcut)
             print(f"✅ Registered shortcut: {key_sequence} -> {description}")
+
+    def _on_duplicate_requested(self):
+        """Handle duplicate shortcut from main window"""
+        try:
+            if hasattr(self, 'pdf_canvas') and self.pdf_canvas:
+                self.pdf_canvas.duplicate_selected_fields()
+            else:
+                print("❌ PDF canvas not available for duplication")
+        except Exception as e:
+            print(f"❌ Error handling duplicate request: {e}")
 
     def update_canvas_grid_visibility(self, visible):
         """Update canvas grid visibility"""

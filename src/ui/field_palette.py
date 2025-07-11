@@ -651,16 +651,18 @@ class QuickActionsWidget(QWidget):
         actions_layout.setSpacing(3)
 
         # Duplicate button
-        duplicate_btn = QPushButton("📄 Duplicate")
-        duplicate_btn.setToolTip("Duplicate selected field (Ctrl+D)")
-        duplicate_btn.clicked.connect(self.duplicateRequested.emit)
-        actions_layout.addWidget(duplicate_btn)
+        self.duplicate_btn = QPushButton("📄 Duplicate (Ctrl+D)")
+        self.duplicate_btn.setToolTip("Duplicate selected fields with 10px offset")
+        self.duplicate_btn.clicked.connect(self.duplicateRequested.emit)
+        self.duplicate_btn.setEnabled(False)  # Disabled by default
+        actions_layout.addWidget(self.duplicate_btn)
 
         # Delete button
-        delete_btn = QPushButton("🗑️ Delete")
-        delete_btn.setToolTip("Delete selected field (Delete key)")
-        delete_btn.clicked.connect(self.deleteRequested.emit)
-        actions_layout.addWidget(delete_btn)
+        self.delete_btn = QPushButton("🗑️ Delete")
+        self.delete_btn.setToolTip("Delete selected fields (Delete key)")
+        self.delete_btn.clicked.connect(self.deleteRequested.emit)
+        self.delete_btn.setEnabled(False)  # Disabled by default
+        actions_layout.addWidget(self.delete_btn)
 
         # Alignment buttons
         align_group = QGroupBox("Align")
@@ -717,6 +719,15 @@ class QuickActionsWidget(QWidget):
         for button in self.findChildren(QPushButton):
             button.setEnabled(enabled)
 
+    def set_selection_state(self, has_selection: bool, field_count: int = 0):
+        """Update button states based on selection"""
+        self.duplicate_btn.setEnabled(has_selection)
+        self.delete_btn.setEnabled(has_selection)
+
+        if has_selection and field_count > 0:
+            self.duplicate_btn.setText(f"📄 Duplicate {field_count} field{'s' if field_count > 1 else ''} (Ctrl+D)")
+        else:
+            self.duplicate_btn.setText("📄 Duplicate (Ctrl+D)")
 
 class EnhancedFieldPalette(QWidget):
     """Enhanced field palette with preview and quick actions"""

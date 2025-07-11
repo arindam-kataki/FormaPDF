@@ -197,6 +197,12 @@ class FieldManager(QObject):
         # Field counter for generating unique IDs
         self._field_counter = 0
 
+        self.duplicate_offset_count = 0  # Tracks how many times duplicate was called
+        self.last_selected_field_ids = set()  # Cache of last selection for comparison
+
+        # Connect to selection changes to reset duplicate offset
+        self.selection_changed.connect(self._on_selection_changed)
+
         print("✅ FieldManager initialized with list-based field management")
 
     # ==========================================
@@ -698,6 +704,129 @@ class FieldManager(QObject):
         return (f"FieldManager(all_fields={len(self.all_fields)}, "
                 f"selected_fields={len(self.selected_fields)}, "
                 f"field_counter={self._field_counter})")
+
+    # #####################################################
+    # FIELD DUPLICATION
+    # #####################################################
+
+    def _on_selection_changed(self, selected_fields: List[FormField]):
+        """Reset duplicate offset when selection changes"""
+        # Get current selection IDs from the actual selected fields
+        current_selection_ids = {field.id for field in selected_fields}
+
+        # Reset offset if selection changed or no selection
+        if current_selection_ids != self.last_selected_field_ids or not current_selection_ids:
+            self.duplicate_offset_count = 0
+            print(f"🔄 Reset duplicate offset (selection changed)")
+
+        # Update cache for next comparison
+        self.last_selected_field_ids = current_selection_ids
+
+    def _create_duplicate_field(self, original_field: FormField, new_x: int, new_y: int) -> Optional[FormField]:
+        """Create a duplicate of a field at specified position"""
+        try:
+            # Generate unique field ID
+            self._field_counter += 1
+            field_type = original_field.type.value if hasattr(original_field.type, 'value') else str(
+                original_field.type)
+            new_field_id = f"{field_type}_{self._field_counter}"
+
+            # Create duplicate with all properties
+            duplicate = FormField(
+                id=new_field_id,
+                type=original_field.type,
+                name=f"{original_field.name}_copy",
+                x=new_x,
+                y=new_y,
+                width=original_field.width,
+                height=original_field.height,
+                page_number=original_field.page_number,
+                required=original_field.required,
+                value=original_field.value,
+                properties=original_field.properties.copy()
+            )
+
+            # Add to manager
+            self.all_fields.append(duplicate)
+            self.field_added.emit(duplicate)
+
+            return duplicate
+
+        except Exception as e:
+            print(f"❌ Error creating duplicate field: {e}")
+            return None
+
+    def find_top_left_reference_field(self, fields: List[FormField]) -> FormField:
+        """Find the field closest to top-left corner for positioning reference"""
+        if not fields:
+            return None
+
+        # Find field with minimum (x + y) distance from origin
+        reference_field = min(fields, key=lambda f: f.x + f.y)
+        print(f"📍 Reference field for duplication: {reference_field.id} at ({reference_field.x}, {reference_field.y})")
+        return reference_field
+
+    def duplicate_selected_fields(self) -> List[FormField]:
+        """
+        Duplicate all selected fields with 10px staggered offset
+
+        Returns:
+            List of newly created duplicate fields
+        """
+        # Use existing selected_fields list
+        if not self.selected_fields:
+            print("⚠️ No fields selected for duplication")
+            return []
+
+        print(f"📄 Duplicating {len(self.selected_fields)} selected field(s)")
+
+        # Increment offset count for staggering
+        self.duplicate_offset_count += 1
+        base_offset = 10 * self.duplicate_offset_count
+
+        print(f"🎯 Using offset: {base_offset}px (iteration #{self.duplicate_offset_count})")
+
+        # Find the top-left reference field
+        reference_field = self.find_top_left_reference_field(self.selected_fields)
+        if not reference_field:
+            print("❌ No reference field found")
+            return []
+
+        # Calculate offset based on reference field position
+        offset_x = base_offset
+        offset_y = base_offset
+
+        duplicated_fields = []
+
+        # Duplicate each selected field
+        for field in self.selected_fields:
+            try:
+                # Calculate relative position from reference field
+                relative_x = field.x - reference_field.x
+                relative_y = field.y - reference_field.y
+
+                # New position: reference position + offset + relative position
+                new_x = reference_field.x + offset_x + relative_x
+                new_y = reference_field.y + offset_y + relative_y
+
+                # Create duplicate
+                duplicate = self._create_duplicate_field(field, new_x, new_y)
+                if duplicate:
+                    duplicated_fields.append(duplicate)
+                    print(f"✅ Duplicated {field.id} → {duplicate.id} at ({new_x}, {new_y})")
+
+            except Exception as e:
+                print(f"❌ Error duplicating field {field.id}: {e}")
+                continue
+
+        # Select the duplicated fields (replace selection)
+        if duplicated_fields:
+            self.selected_fields = duplicated_fields.copy()
+            self.selection_changed.emit(self.selected_fields.copy())
+            print(f"🎯 Selected {len(duplicated_fields)} duplicated fields")
+
+        print(f"📄 Successfully duplicated {len(duplicated_fields)} field(s)")
+        return duplicated_fields
 
 
 # Legacy compatibility properties (deprecated - use lists instead)

@@ -5,7 +5,7 @@ Provides alignment and distribution controls for multiple selected fields
 Uses clickable buttons like AlignmentGridWidget
 """
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
                              QLabel, QPushButton, QFrame)
 
@@ -41,15 +41,18 @@ class FieldAlignmentWidget(QWidget):
         self.setLayout(layout)
 
     def _create_alignment_section(self, parent_layout):
-        """Create the alignment section with 2x3 grid layout"""
+        """Create the alignment section matching font property widget style exactly"""
         align_frame = QFrame()
-        align_layout = QHBoxLayout()
+        align_layout = QGridLayout()  # Use QGridLayout like font properties
         align_layout.setContentsMargins(0, 0, 0, 0)
-        align_layout.setSpacing(5)
+        align_layout.setHorizontalSpacing(8)  # Same spacing as font layout
+        align_layout.setVerticalSpacing(5)
 
-        # Label matching text alignment widget style
+        # Label matching font property widget style exactly
         align_label = QLabel("Align:")
-        align_layout.addWidget(align_label)
+        align_label.setFixedWidth(50)  # Same width as other labels
+        align_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        align_layout.addWidget(align_label, 0, 0, Qt.AlignmentFlag.AlignVCenter)
 
         # Create 2x3 grid for alignment buttons
         grid_widget = QWidget()
@@ -83,22 +86,30 @@ class FieldAlignmentWidget(QWidget):
             self.alignment_buttons[alignment_type] = button
 
         grid_widget.setLayout(grid_layout)
-        align_layout.addWidget(grid_widget)
-        align_layout.addStretch()
+        align_layout.addWidget(grid_widget, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
         align_frame.setLayout(align_layout)
         parent_layout.addWidget(align_frame)
 
     def _create_distribution_section(self, parent_layout):
-        """Create the distribution section matching alignment style"""
+        """Create the distribution section matching font property widget style exactly"""
         dist_frame = QFrame()
-        dist_layout = QHBoxLayout()
+        dist_layout = QGridLayout()  # Use QGridLayout like font properties
         dist_layout.setContentsMargins(0, 0, 0, 0)
-        dist_layout.setSpacing(5)
+        dist_layout.setHorizontalSpacing(8)  # Same spacing as font layout
+        dist_layout.setVerticalSpacing(5)
 
-        # Label matching text alignment widget style
+        # Label matching font property widget style exactly
         dist_label = QLabel("Distribute:")
-        dist_layout.addWidget(dist_label)
+        dist_label.setFixedWidth(50)  # Same width as other labels
+        dist_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        dist_layout.addWidget(dist_label, 0, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        # Create container for distribution buttons
+        buttons_widget = QWidget()
+        buttons_layout = QHBoxLayout()
+        buttons_layout.setContentsMargins(0, 0, 0, 0)
+        buttons_layout.setSpacing(2)  # Same tight spacing as alignment buttons
 
         # Distribution button definitions (text, distribution_type, tooltip)
         dist_button_definitions = [
@@ -116,10 +127,11 @@ class FieldAlignmentWidget(QWidget):
             # Connect with proper lambda closure
             button.clicked.connect(lambda checked, d=dist_type: self._on_distribution_clicked(d))
 
-            dist_layout.addWidget(button)
+            buttons_layout.addWidget(button)
             self.distribution_buttons[dist_type] = button
 
-        dist_layout.addStretch()
+        buttons_widget.setLayout(buttons_layout)
+        dist_layout.addWidget(buttons_widget, 0, 1, Qt.AlignmentFlag.AlignLeft)
 
         dist_frame.setLayout(dist_layout)
         parent_layout.addWidget(dist_frame)

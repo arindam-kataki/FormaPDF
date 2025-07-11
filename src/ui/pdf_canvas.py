@@ -2869,6 +2869,59 @@ class PDFCanvas(QLabel):
         except Exception as e:
             print(f"⚠️ Error drawing field selection: {e}")
 
+    def duplicate_selected_fields(self):
+        """Duplicate all currently selected fields"""
+        try:
+            if not self.field_manager:
+                print("❌ No field manager available")
+                return
+
+            # Check if any fields are selected using field manager's list
+            if not self.field_manager.selected_fields:
+                print("⚠️ No fields selected for duplication")
+                self.show_status_message("No fields selected for duplication", 2000)
+                return
+
+            # Perform duplication
+            duplicated_fields = self.field_manager.duplicate_selected_fields()
+
+            if duplicated_fields:
+                # Update drag handler selection to new duplicates
+                self.enhanced_drag_handler.clear_selection()
+                for field in duplicated_fields:
+                    self.enhanced_drag_handler.select_field(field, add_to_selection=True)
+
+                # Trigger visual update
+                self.update()
+                self.draw_overlay()
+
+                # Show success message
+                count = len(duplicated_fields)
+                self.show_status_message(f"Duplicated {count} field{'s' if count > 1 else ''}", 2000)
+
+                # Mark document as modified
+                if hasattr(self, 'parent') and hasattr(self.parent(), 'document_modified'):
+                    self.parent().document_modified = True
+
+            else:
+                self.show_status_message("Failed to duplicate fields", 2000)
+
+        except Exception as e:
+            print(f"❌ Error during duplication: {e}")
+            self.show_status_message("Error during duplication", 2000)
+
+    def show_status_message(self, message: str, timeout: int = 2000):
+        """Show message in status bar if available"""
+        try:
+            # Try to find main window and show status
+            main_window = self._get_main_window()
+            if main_window and hasattr(main_window, 'statusBar'):
+                main_window.statusBar().showMessage(message, timeout)
+            else:
+                print(f"📢 Status: {message}")
+        except Exception as e:
+            print(f"📢 Status: {message}")
+
 class SafeSelectionHandler:
     """Emergency fallback SelectionHandler that never crashes"""
 
