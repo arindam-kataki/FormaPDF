@@ -1321,6 +1321,15 @@ class TabbedFieldPalette(QWidget):
     def set_field_manager(self, field_manager):
         """Set the field manager for both tabs"""
         self.field_manager = field_manager
+
+        # Connect to the unified field list change signal
+        if field_manager and hasattr(field_manager, 'field_list_changed'):
+            try:
+                field_manager.field_list_changed.connect(self.properties_tab.refresh_control_list)
+                print("✅ Connected field_list_changed signal to refresh dropdown")
+            except Exception as e:
+                print(f"⚠️ Failed to connect field_list_changed signal: {e}")
+
         self.properties_tab.set_field_manager(field_manager)
         self.controls_tab.set_field_manager(field_manager)  # Add this line
 

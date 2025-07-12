@@ -185,6 +185,7 @@ class FieldManager(QObject):
     field_removed = pyqtSignal(str)  # field_id
     fields_cleared = pyqtSignal()
     selection_changed = pyqtSignal(list)  # list of selected fields
+    field_list_changed = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -241,6 +242,8 @@ class FieldManager(QObject):
             # Emit signal
             self.field_added.emit(field)
 
+            self.field_list_changed.emit()
+
             print(f"✅ Created field: {field_id} at ({x}, {y}) on page {page_num}")
             return field
 
@@ -262,6 +265,7 @@ class FieldManager(QObject):
             if field not in self.all_fields:
                 self.all_fields.append(field)
                 self.field_added.emit(field)
+                self.field_list_changed.emit()
                 print(f"✅ Added existing field: {field.id}")
                 return True
             else:
@@ -311,6 +315,8 @@ class FieldManager(QObject):
             # Emit removal signal
             self.field_removed.emit(field_id)
 
+            self.field_list_changed.emit()
+
             return True
 
         except Exception as e:
@@ -326,6 +332,8 @@ class FieldManager(QObject):
 
             self.fields_cleared.emit()
             self.selection_changed.emit([])
+
+            self.field_list_changed.emit()
 
             print("✅ Cleared all fields")
 
@@ -738,6 +746,7 @@ class FieldManager(QObject):
             # Add to manager
             self.all_fields.append(duplicate)
             self.field_added.emit(duplicate)
+            self.field_list_changed.emit()
 
             return duplicate
 
