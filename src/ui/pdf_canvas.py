@@ -2891,6 +2891,11 @@ class PDFCanvas(QLabel):
 
             if duplicated_fields:
 
+                # NEW: Add each duplicated field to dropdown using existing method
+                for duplicate in duplicated_fields:
+                    self._add_field_to_dropdown(duplicate)
+                    print(f"✅ Added duplicate {duplicate.id} to dropdown")
+
                 # Trigger visual update
                 self.update()
                 self.draw_overlay()
@@ -2902,6 +2907,8 @@ class PDFCanvas(QLabel):
                 # Mark document as modified
                 if hasattr(self, 'parent') and hasattr(self.parent(), 'document_modified'):
                     self.parent().document_modified = True
+
+
 
             else:
                 self.show_status_message("Failed to duplicate fields", 2000)

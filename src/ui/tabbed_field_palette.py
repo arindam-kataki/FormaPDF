@@ -1352,7 +1352,7 @@ class TabbedFieldPalette(QWidget):
         """Remove a field from the properties tab"""
         self.properties_tab.remove_field_from_list(field_id)
 
-    def refresh_control_list(self):
+    def deprecated_refresh_control_list(self):
         """Refresh the control list in properties tab"""
         self.properties_tab.refresh_control_list()
 
