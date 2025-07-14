@@ -2211,7 +2211,8 @@ class PDFCanvas(QLabel):
 
                 return field
             else:
-                print(f"⚠️ Failed to create field via field manager")
+                # ADD THIS: Handle field creation failure
+                print(f"❌ Field creation failed - outside page bounds or validation error")
                 return None
 
         except Exception as e:
