@@ -314,7 +314,16 @@ class PDFCanvas(QLabel):
             self.setStyleSheet("border: none; background-color: transparent;")
 
             self.debug_widget_setup()
-            #self.update_drag_handler_for_document()
+
+            # Load page information into PageManager
+            if self.pdf_document and hasattr(self, 'field_manager'):
+                success = self.field_manager.page_manager.load_pages_from_pdf(self.pdf_document)
+                if success:
+                    # Update zoom level in PageManager
+                    self.field_manager.page_manager.set_zoom_level(self.zoom_level)
+
+                    # Debug output
+                    self.field_manager.page_manager.debug_print_all_pages()
 
             return True
 
@@ -699,6 +708,10 @@ class PDFCanvas(QLabel):
             return
 
         self.zoom_level = zoom_level
+
+        # Update PageManager zoom level
+        if hasattr(self, 'field_manager'):
+            self.field_manager.page_manager.set_zoom_level(zoom_level)
 
         # ✅ ADD THIS LINE - Update enhanced drag handler zoom level
         if hasattr(self, 'enhanced_drag_handler'):

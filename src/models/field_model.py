@@ -176,6 +176,7 @@ Handles all field creation, deletion, and selection operations
 
 from typing import List, Optional, Dict, Any
 from PyQt6.QtCore import QObject, pyqtSignal
+from page_manager import PageManager
 
 class FieldManager(QObject):
     """Central authority for all field management operations"""
@@ -205,6 +206,8 @@ class FieldManager(QObject):
                 print(f"🔄 Reset duplicate offset to 0 (selection changed: {len(selected_fields)} fields)")
             )
         )
+
+        self.page_manager = PageManager()
 
         print("✅ FieldManager initialized with list-based field management")
 
@@ -732,7 +735,7 @@ class FieldManager(QObject):
             duplicate = FormField(
                 id=new_field_id,
                 type=original_field.type,
-                name=f"{original_field.name}_copy",
+                name=self.generate_unique_copy_name(original_field.name),
                 x=new_x,
                 y=new_y,
                 width=original_field.width,
@@ -764,6 +767,53 @@ class FieldManager(QObject):
         reference_field = min(fields, key=lambda f: f.x + f.y)
         print(f"📍 Reference field for duplication: {reference_field.id} at ({reference_field.x}, {reference_field.y})")
         return reference_field
+
+    def generate_unique_copy_name(self, original_name: str) -> str:
+        """Generate unique copy name by skipping existing names"""
+        import re
+
+        # Pattern to detect existing copy naming pattern
+        copy_pattern = r'^(.+?)(?:_copy(?:_(\d+))?)?$'
+        match = re.match(copy_pattern, original_name)
+
+        if match:
+            base_name = match.group(1)
+            existing_number = match.group(2)
+        else:
+            base_name = original_name
+            existing_number = None
+
+        # Try the original name first (in case it's a copy being copied)
+        if not self.is_name_duplicate(original_name):
+            return original_name
+
+        # Try simple "_copy" suffix
+        candidate = f"{base_name}_copy"
+        if not self.is_name_duplicate(candidate):
+            return candidate
+
+        # Skip through numbered versions until finding available name
+        start_counter = int(existing_number) + 1 if existing_number else 2
+        counter = start_counter
+
+        while counter <= 1000:  # Safety limit
+            candidate = f"{base_name}_copy_{counter}"
+            if not self.is_name_duplicate(candidate):
+                return candidate
+            counter += 1
+
+        # Fallback if too many copies exist
+        import time
+        return f"{base_name}_{int(time.time() * 1000) % 100000}"
+
+    def is_name_duplicate(self, name: str, exclude_field_id: str = None) -> bool:
+        """Check if name already exists (case-insensitive)"""
+        for field in self.all_fields:
+            if exclude_field_id and field.id == exclude_field_id:
+                continue
+            if field.name.lower() == name.lower():
+                return True
+        return False
 
     def duplicate_selected_fields(self) -> List[FormField]:
         """
