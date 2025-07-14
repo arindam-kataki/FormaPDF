@@ -10,6 +10,8 @@ from enum import Enum
 from PyQt6.QtCore import QRect
 from click import clear
 
+from models.page_manager import PageManager
+
 
 class FieldType(Enum):
     """Enumeration of supported field types"""
@@ -176,7 +178,7 @@ Handles all field creation, deletion, and selection operations
 
 from typing import List, Optional, Dict, Any
 from PyQt6.QtCore import QObject, pyqtSignal
-from page_manager import PageManager
+
 
 class FieldManager(QObject):
     """Central authority for all field management operations"""
@@ -215,7 +217,7 @@ class FieldManager(QObject):
     # FIELD CREATION AND DELETION
     # ==========================================
 
-    def create_field(self, field_type: str, x: int, y: int, page_num: int = 0, **kwargs) -> FormField:
+    def create_field(self, field_type: str, x: int, y: int, page_num: int = 0, **kwargs) -> Optional[FormField]:
         """
         Create a new field and add it to the master list
 
@@ -238,6 +240,15 @@ class FieldManager(QObject):
 
             # Create the field
             field = FormField.create(field_type_enum, x, y, field_id, page_num, **kwargs)
+
+            # NOW VALIDATE THE ACTUAL FIELD
+            is_valid, error_message = self._validate_created_field(field)
+
+            if not is_valid:
+                # Field is invalid - show message and return None
+                print(f"❌ Field creation blocked: {error_message}")
+                self._show_bounds_error(error_message, field.x, field.y, field.width, field.height, field.page_number)
+                return None
 
             # Add to master list
             self.all_fields.append(field)
@@ -342,6 +353,63 @@ class FieldManager(QObject):
 
         except Exception as e:
             print(f"❌ Error clearing fields: {e}")
+
+    def _validate_created_field(self, field: FormField) -> tuple[bool, str]:
+        """
+        Validate a created field against page boundaries
+
+        Args:
+            field: The FormField to validate
+
+        Returns:
+            tuple: (is_valid, error_message)
+        """
+        try:
+            # Basic checks
+            if not field:
+                return False, "No field to validate"
+
+            # Check if PageManager is available for bounds checking
+            if not hasattr(self, 'page_manager'):
+                return True, "No page bounds checking available"
+
+            # Use PageManager to validate bounds
+            return self.page_manager.validate_position_within_page(
+                field.page_number,
+                field.x,
+                field.y,
+                field.width,
+                field.height
+            )
+
+        except Exception as e:
+            return False, f"Validation error: {e}"
+
+    def _show_bounds_error(self, error_message: str, x: int, y: int, width: int, height: int, page_num: int):
+        """Show bounds validation error in a simple message box"""
+        try:
+            from PyQt6.QtWidgets import QMessageBox
+
+            # Get page dimensions for context
+            page_width, page_height = self.page_manager.get_page_dimensions(page_num)
+
+            # Create simple message box
+            msg = QMessageBox()
+            msg.setIcon(QMessageBox.Icon.Information)
+            msg.setWindowTitle("Position Outside Page")
+            msg.setText(f"Cannot create control at position ({x}, {y})")
+            msg.setInformativeText(f"Position is outside page {page_num + 1} boundaries ({page_width} × {page_height})")
+            msg.setStandardButtons(QMessageBox.StandardButton.Ok)
+
+            # Show and done
+            msg.exec()
+
+            print(f"📢 Showed bounds error for position ({x}, {y}) on page {page_num + 1}")
+
+        except Exception as e:
+            # Fallback to console if message box fails
+            print(f"📢 BOUNDS ERROR: Cannot create control at ({x}, {y}) - {error_message}")
+
 
     # ==========================================
     # FIELD SELECTION MANAGEMENT
