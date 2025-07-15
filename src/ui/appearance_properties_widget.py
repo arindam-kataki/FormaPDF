@@ -14,14 +14,15 @@ class AppearancePropertiesWidget(QWidget):
 
     appearanceChanged = pyqtSignal(dict)
 
-    def __init__(self, field_type: str = None, standalone=True):
+    def __init__(self, field_type: str = None, show_properties=None, standalone=True):
         super().__init__()
         self.field_type = field_type
+        self.show_properties = show_properties or ['font', 'border', 'background', 'alignment']
         self.appearance_props = {}
-        self.standalone = standalone  # Track if this widget will be used standalone
+        self.standalone = standalone
         self.init_ui()
 
-    def init_ui(self):
+    def working_init_ui(self):
         """
         Initialize UI - create groups that can be extracted if needed
         """
@@ -63,6 +64,55 @@ class AppearancePropertiesWidget(QWidget):
             layout.addWidget(self.border_group)
             layout.addWidget(self.bg_group)
             self.setLayout(layout)
+
+    def init_ui(self):
+        """Initialize UI - only create requested property groups"""
+
+        # Font properties group (only if requested)
+        if 'font' in self.show_properties:
+            self.font_group = QGroupBox("Text")
+            font_layout = QVBoxLayout()
+            self.font_widget = FontPropertyWidget()
+            self.font_widget.fontChanged.connect(self.on_appearance_changed)
+            font_layout.addWidget(self.font_widget)
+            self.font_group.setLayout(font_layout)
+
+        # Border properties group (only if requested)
+        if 'border' in self.show_properties:
+            self.border_group = QGroupBox("Border")
+            border_layout = QVBoxLayout()
+            self.border_widget = BorderPropertyWidget()
+            self.border_widget.borderChanged.connect(self.on_appearance_changed)
+            border_layout.addWidget(self.border_widget)
+            self.border_group.setLayout(border_layout)
+
+        # Background properties group (only if requested)
+        if 'background' in self.show_properties:
+            self.bg_group = QGroupBox("Background")
+            bg_layout = QVBoxLayout()
+            self.bg_widget = BackgroundPropertyWidget()
+            self.bg_widget.backgroundChanged.connect(self.on_appearance_changed)
+            bg_layout.addWidget(self.bg_widget)
+            self.bg_group.setLayout(bg_layout)
+
+        # Alignment properties group (only if requested)
+        if 'alignment' in self.show_properties:
+            self.alignment_group = QGroupBox("Text Alignment")
+            alignment_layout = QVBoxLayout()
+            self.alignment_widget = AlignmentGridWidget()
+            self.alignment_widget.alignmentChanged.connect(self.on_appearance_changed)
+            alignment_layout.addWidget(self.alignment_widget)
+            self.alignment_group.setLayout(alignment_layout)
+
+        # Set up layout only if standalone
+        if self.standalone:
+            main_layout = QVBoxLayout()
+            self.setLayout(main_layout)
+
+            # Add only the created groups
+            for group_name in self.show_properties:
+                if hasattr(self, f'{group_name}_group'):
+                    main_layout.addWidget(getattr(self, f'{group_name}_group'))
 
     def get_groups(self):
         """Return the individual group widgets for extraction"""

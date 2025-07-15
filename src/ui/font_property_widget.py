@@ -1,5 +1,5 @@
 from PyQt6.QtCore import pyqtSignal, Qt
-from PyQt6.QtGui import QColor
+from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QComboBox, QSpinBox, QCheckBox, QGridLayout
 
 from ui.alignment_grid_widget import AlignmentGridWidget
@@ -11,8 +11,9 @@ class FontPropertyWidget(QWidget):
 
     fontChanged = pyqtSignal(dict)  # Emits font properties dict
 
-    def __init__(self, initial_font_props: dict = None):
+    def __init__(self, initial_font_props: dict = None, show_alignment=True):
         super().__init__()
+        self.show_alignment = show_alignment  # ← Add this line
         self.font_props = initial_font_props or {
             'family': 'Arial',
             'size': 12,
@@ -91,15 +92,19 @@ class FontPropertyWidget(QWidget):
         self.text_color_widget.colorChanged.connect(self.on_font_changed)  # Connect to font change handler
         font_layout.addWidget(self.text_color_widget, 5, 1, Qt.AlignmentFlag.AlignLeft)
 
-        # Text alignment with label
-        alignment_label = QLabel("Align:")
-        alignment_label.setFixedWidth(50)  # Same width as other labels
-        alignment_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-        font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
+        # Text alignment (CONDITIONAL) ← Add this section
+        if self.show_alignment:
+            # Text alignment with label
+            alignment_label = QLabel("Align:")
+            alignment_label.setFixedWidth(50)  # Same width as other labels
+            alignment_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
 
-        self.alignment_widget = AlignmentGridWidget()  # Now has no internal label
-        self.alignment_widget.alignmentChanged.connect(self.on_font_changed)
-        font_layout.addWidget(self.alignment_widget, 6, 1, Qt.AlignmentFlag.AlignLeft)
+            self.alignment_widget = AlignmentGridWidget()  # Now has no internal label
+            self.alignment_widget.alignmentChanged.connect(self.on_font_changed)
+            font_layout.addWidget(self.alignment_widget, 6, 1, Qt.AlignmentFlag.AlignLeft)
+        else:
+            self.alignment_widget = None  # ← Important: Set to None when not created
 
         self.setLayout(layout)
 
@@ -127,23 +132,192 @@ class FontPropertyWidget(QWidget):
         self.fontChanged.emit(self.font_props)
 
     def get_font_properties(self) -> dict:
-        """Get current font properties"""
-        return self.font_props.copy()
+        """Get current font properties including optional alignment"""
+        props = {
+            'family': self.font_combo.currentText(),
+            'size': self.size_spinner.value(),
+            'bold': self.bold_check.isChecked(),
+            'italic': self.italic_check.isChecked(),
+            'underline': self.underline_check.isChecked(),
+            'color': self.text_color_widget.get_color()
+        }
 
-    def set_font_properties(self, font_props: dict):
-        """Set font properties"""
-        self.font_props = font_props
+        # Only include alignment if widget exists - return simple string
+        if self.alignment_widget:
+            props['alignment'] = self.alignment_widget.get_alignment()  # Just "top-left"
 
-        # Update UI
-        self.font_combo.setCurrentText(font_props.get('family', 'Arial'))
+        return props
 
-        if font_props.get('size') == 'auto':
-            self.auto_size_check.setChecked(True)
-            self.size_spinner.setEnabled(False)
-        else:
-            self.size_spinner.setValue(int(font_props.get('size', 12)))
-            self.auto_size_check.setChecked(False)
-            self.size_spinner.setEnabled(True)
+    def _block_signals(self, block: bool):
+        """Block or unblock signals for all font widgets to prevent feedback loops"""
+        try:
+            widgets_to_block = [
+                self.font_combo,
+                self.size_spinner,
+                self.bold_check,
+                self.italic_check,
+                self.underline_check,
+                self.text_color_widget
+            ]
 
-        self.bold_check.setChecked(font_props.get('bold', False))
-        self.italic_check.setChecked(font_props.get('italic', False))
+            for widget in widgets_to_block:
+                if widget and hasattr(widget, 'blockSignals'):
+                    widget.blockSignals(block)
+
+            # Block alignment widget signals if it exists
+            if self.alignment_widget and hasattr(self.alignment_widget, 'blockSignals'):
+                self.alignment_widget.blockSignals(block)
+
+        except Exception as e:
+            print(f"⚠️ Error blocking/unblocking signals: {e}")
+
+    def set_font_properties(self, props: dict):
+        """Set font properties from dictionary with signal blocking to prevent loops"""
+        if not props:
+            return
+
+        # Block signals during bulk updates to prevent multiple change events
+        self._block_signals(True)
+
+        try:
+            # Font family
+            if 'family' in props:
+                family = props['family']
+                if family:  # Only set if not empty
+                    index = self.font_combo.findText(family)
+                    if index >= 0:
+                        self.font_combo.setCurrentIndex(index)
+                    else:
+                        # Add custom font if not in list
+                        self.font_combo.addItem(family)
+                        self.font_combo.setCurrentText(family)
+
+            # Font size
+            if 'size' in props:
+                size = props['size']
+                if isinstance(size, (int, float)) and 6 <= size <= 72:
+                    self.size_spinner.setValue(int(size))
+
+            # Font style properties
+            if 'bold' in props:
+                self.bold_check.setChecked(bool(props['bold']))
+
+            if 'italic' in props:
+                self.italic_check.setChecked(bool(props['italic']))
+
+            if 'underline' in props:
+                self.underline_check.setChecked(bool(props['underline']))
+
+            # Text color
+            if 'color' in props:
+                color = props['color']
+                if color:
+                    # Handle different color formats
+                    if isinstance(color, QColor):
+                        self.text_color_widget.set_color(color)
+                    elif isinstance(color, str):
+                        # Handle hex colors like "#FF0000"
+                        if color.startswith('#') and len(color) == 7:
+                            qcolor = QColor(color)
+                            if qcolor.isValid():
+                                self.text_color_widget.set_color(qcolor)
+                    elif isinstance(color, (list, tuple)) and len(color) >= 3:
+                        # Handle RGB tuples like (255, 0, 0)
+                        r, g, b = color[0], color[1], color[2]
+                        a = color[3] if len(color) > 3 else 255
+                        qcolor = QColor(r, g, b, a)
+                        self.text_color_widget.set_color(qcolor)
+
+            # Text alignment (only if widget exists) - simplified!
+            if self.alignment_widget and 'alignment' in props:
+                alignment = props['alignment']
+                if isinstance(alignment, str):
+                    self.alignment_widget.set_alignment(alignment)  # Just pass the string
+
+            # Update internal font_props dictionary
+            self.font_props.update(props)
+
+        except Exception as e:
+            print(f"⚠️ Error setting font properties: {e}")
+
+        finally:
+            # Always re-enable signals
+            self._block_signals(False)
+
+            # Emit change signal after all updates are complete
+            self.on_font_changed()
+
+    def reset_to_defaults(self):
+        """Reset font properties to default values"""
+        default_props = {
+            'family': 'Arial',
+            'size': 12,
+            'bold': False,
+            'italic': False,
+            'underline': False,
+            'color': QColor(0, 0, 0),  # Black
+        }
+
+        # Add default alignment if widget exists
+        if self.alignment_widget:
+            default_props['alignment'] = 'top-left'
+
+        self.set_font_properties(default_props)
+
+    def validate_font_properties(self, props: dict) -> tuple[bool, str]:
+        """Validate font properties before setting them"""
+        if not isinstance(props, dict):
+            return False, "Properties must be a dictionary"
+
+        # Validate font size
+        if 'size' in props:
+            size = props['size']
+            if not isinstance(size, (int, float)) or not (6 <= size <= 72):
+                return False, "Font size must be between 6 and 72"
+
+        # Validate color format
+        if 'color' in props:
+            color = props['color']
+            if isinstance(color, str):
+                if not (color.startswith('#') and len(color) == 7):
+                    return False, "Color string must be in #RRGGBB format"
+            elif isinstance(color, (list, tuple)):
+                if len(color) < 3 or not all(0 <= c <= 255 for c in color[:3]):
+                    return False, "RGB color values must be between 0 and 255"
+
+        # Validate alignment - simplified!
+        if 'alignment' in props and self.alignment_widget:
+            alignment = props['alignment']
+            if not isinstance(alignment, str):
+                return False, "Alignment must be a string"
+
+            valid_alignments = [
+                'top-left', 'top-center', 'top-right',
+                'middle-left', 'middle-center', 'middle-right',
+                'bottom-left', 'bottom-center', 'bottom-right'
+            ]
+            if alignment not in valid_alignments:
+                return False, f"Invalid alignment: {alignment}. Must be one of: {valid_alignments}"
+
+        return True, "Valid"
+
+    def get_font_qfont(self) -> QFont:
+        """Get a QFont object from current font properties"""
+        qfont = QFont()
+        qfont.setFamily(self.font_combo.currentText())
+        qfont.setPointSize(self.size_spinner.value())
+        qfont.setBold(self.bold_check.isChecked())
+        qfont.setItalic(self.italic_check.isChecked())
+        qfont.setUnderline(self.underline_check.isChecked())
+        return qfont
+
+    def set_from_qfont(self, qfont: QFont):
+        """Set font properties from a QFont object"""
+        props = {
+            'family': qfont.family(),
+            'size': qfont.pointSize(),
+            'bold': qfont.bold(),
+            'italic': qfont.italic(),
+            'underline': qfont.underline()
+        }
+        self.set_font_properties(props)

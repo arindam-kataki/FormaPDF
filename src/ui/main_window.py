@@ -2511,13 +2511,6 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
 
         return state
 
-
-    @pyqtSlot(str)
-    def deprecated_create_field_at_center(self, field_type: str):
-        """Create a new field at the center of the visible area"""
-        print(f"Creating field of type: {field_type}")
-        # Implementation would go herecls
-
     @pyqtSlot(str)
     def on_field_clicked(self, field_id: str):
         """Handle field click - SIMPLIFIED"""

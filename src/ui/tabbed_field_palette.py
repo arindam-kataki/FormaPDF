@@ -852,12 +852,12 @@ class PropertiesTab(QWidget):
                     field_type = field_type.value
 
                 # Get field ID safely
-                field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
+                field_id = getattr(field, 'name', getattr(field, 'id', 'unknown'))
 
-                display_text = f"{str(field_type).title()} - {field_id}"
+                display_text = f"{field_id}"
 
-                if hasattr(field, 'properties') and isinstance(field.properties, dict) and 'name' in field.properties:
-                    display_text = f"{str(field_type).title()} - {field.properties['name']}"
+                #if hasattr(field, 'properties') and isinstance(field.properties, dict) and 'name' in field.properties:
+                #    display_text = f"{str(field_type).title()} - {field.properties['name']}"
 
                 self.control_dropdown.addItem(display_text, field_id)
                 print(f"    Added: {display_text}")
@@ -1038,7 +1038,7 @@ class PropertiesTab(QWidget):
 
         display_text = f"{field.field_type.title()} - {field.id}"
         if hasattr(field, 'properties') and 'name' in field.properties:
-            display_text = f"{field.field_type.title()} - {field.properties['name']}"
+            display_text = f"{field.properties['name']}"
 
         self.control_dropdown.addItem(display_text, field.id)
 

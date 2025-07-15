@@ -14,6 +14,14 @@ from PyQt6.QtGui import QFont, QColor
 
 from models.field_model import FormField, FieldType
 
+# Add these imports at the top
+from models.field_property_schema import (
+    FIELD_PROPERTY_SCHEMA,
+    get_property_groups,
+    get_default_properties,
+    PropertyWidgetType,
+    PropertyDefinition
+)
 
 class PropertyWidget:
     """Base class for property editing widgets"""

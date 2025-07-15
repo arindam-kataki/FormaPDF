@@ -2255,10 +2255,10 @@ class PDFCanvas(QLabel):
                 else:
                     field_type = str(field_type).lower()
 
-                field_id = getattr(field, 'id', 'unknown')
+                field_id = getattr(field, 'name', 'unknown')
 
                 # Create display text with proper field type
-                display_text = f"{str(field_type).title()} - {field_id}"
+                display_text = f"{field_id}"
                 properties_tab.control_dropdown.addItem(display_text, field_id)
                 print(f"  ➕ Added to dropdown: {display_text}")
 
