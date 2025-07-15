@@ -936,6 +936,23 @@ class FieldManager(QObject):
                 # Create duplicate
                 duplicate = self._create_duplicate_field(field, new_x, new_y)
                 if duplicate:
+
+                    # USE SAME VALIDATION AS create_field
+                    is_valid, error_message = self._validate_created_field(duplicate)
+
+                    if not is_valid:
+                        print(f"❌ Duplication stopped: {duplicate.id} failed validation - {error_message}")
+                        self._show_bounds_error(error_message, duplicate.x, duplicate.y, duplicate.width,
+                                                duplicate.height, duplicate.page_number)
+
+                        # Remove the invalid duplicate from all_fields (it was already added by _create_duplicate_field)
+                        if duplicate in self.all_fields:
+                            self.all_fields.remove(duplicate)
+                            self.field_removed.emit(duplicate.id)
+
+                        # Return empty list - duplication failed
+                        return []
+
                     duplicated_fields.append(duplicate)
                     print(f"✅ Duplicated {field.id} → {duplicate.id} at ({new_x}, {new_y})")
 
