@@ -2255,7 +2255,7 @@ class PDFCanvas(QLabel):
                 else:
                     field_type = str(field_type).lower()
 
-                field_id = getattr(field, 'name', 'unknown')
+                field_id = getattr(field, 'id', 'unknown')
 
                 # Create display text with proper field type
                 display_text = f"{field_id}"

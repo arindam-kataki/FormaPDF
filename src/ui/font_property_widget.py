@@ -135,7 +135,7 @@ class FontPropertyWidget(QWidget):
         """Get current font properties including optional alignment"""
         props = {
             'family': self.font_combo.currentText(),
-            'size': self.size_spinner.value(),
+            'size': self.size_spinner.value() if not self.auto_size_check.isChecked() else 'auto',
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked(),
             'underline': self.underline_check.isChecked(),
@@ -195,8 +195,17 @@ class FontPropertyWidget(QWidget):
             # Font size
             if 'size' in props:
                 size = props['size']
-                if isinstance(size, (int, float)) and 6 <= size <= 72:
-                    self.size_spinner.setValue(int(size))
+                if size == 'auto':
+                    # Set auto-size checkbox and disable spinner
+                    self.auto_size_check.setChecked(True)
+                    self.size_spinner.setEnabled(False)
+                    # Keep current spinner value for display
+                else:
+                    # Set specific size value
+                    self.auto_size_check.setChecked(False)
+                    self.size_spinner.setEnabled(True)
+                    if isinstance(size, (int, float)) and 6 <= size <= 72:
+                        self.size_spinner.setValue(int(size))
 
             # Font style properties
             if 'bold' in props:

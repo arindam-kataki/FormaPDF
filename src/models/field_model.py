@@ -816,6 +816,8 @@ class FieldManager(QObject):
                 properties=original_field.properties.copy()
             )
 
+            duplicate.id = duplicate.name
+
             # Add to manager
             self.all_fields.append(duplicate)
             self.field_added.emit(duplicate)
