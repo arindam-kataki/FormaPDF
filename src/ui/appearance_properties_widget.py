@@ -111,7 +111,14 @@ class AppearancePropertiesWidget(QWidget):
 
     def get_groups(self):
         """Return the individual group widgets for extraction"""
-        return [self.font_group, self.border_group, self.bg_group]
+        groups = []
+        if hasattr(self, 'font_group'):
+            groups.append(self.font_group)
+        if hasattr(self, 'border_group'):
+            groups.append(self.border_group)
+        if hasattr(self, 'bg_group'):
+            groups.append(self.bg_group)
+        return groups
 
     def on_appearance_changed(self):
         """Handle any appearance property change"""
