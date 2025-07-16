@@ -72,7 +72,11 @@ class AppearancePropertiesWidget(QWidget):
         if 'font' in self.show_properties:
             self.font_group = QGroupBox("Text")
             font_layout = QVBoxLayout()
-            self.font_widget = FontPropertyWidget()
+            show_text_alignment = 'alignment' in self.show_properties
+            self.font_widget = FontPropertyWidget(
+                initial_font_props=None,
+                show_alignment=show_text_alignment
+            )
             self.font_widget.fontChanged.connect(self.on_appearance_changed)
             font_layout.addWidget(self.font_widget)
             self.font_group.setLayout(font_layout)
@@ -94,15 +98,6 @@ class AppearancePropertiesWidget(QWidget):
             self.bg_widget.backgroundChanged.connect(self.on_appearance_changed)
             bg_layout.addWidget(self.bg_widget)
             self.bg_group.setLayout(bg_layout)
-
-        # Alignment properties group (only if requested)
-        if 'alignment' in self.show_properties:
-            self.alignment_group = QGroupBox("Text Alignment")
-            alignment_layout = QVBoxLayout()
-            self.alignment_widget = AlignmentGridWidget()
-            self.alignment_widget.alignmentChanged.connect(self.on_appearance_changed)
-            alignment_layout.addWidget(self.alignment_widget)
-            self.alignment_group.setLayout(alignment_layout)
 
         # Set up layout only if standalone
         if self.standalone:
@@ -166,9 +161,5 @@ class AppearancePropertiesWidget(QWidget):
         # Update background color
         if 'background_color' in appearance_props:
             self.bg_widget.set_color(appearance_props['background_color'])
-
-        # Update alignment if available
-        if hasattr(self, 'alignment_widget') and 'text_alignment' in appearance_props:
-            self.alignment_widget.set_alignment(appearance_props['text_alignment'])
 
 
