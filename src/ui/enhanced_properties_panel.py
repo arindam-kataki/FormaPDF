@@ -311,6 +311,81 @@ class EnhancedPropertiesPanel(QWidget):
         self.properties_layout.addWidget(pos_group)
 
     def _create_appearance_properties(self, field: FormField):
+        """Create appearance properties with field-specific selection"""
+
+        # Determine which appearance properties to show for this field type
+        appearance_props = self._get_appearance_properties_for_field_type(field.type)
+
+        # Create appearance widget with selective properties
+        self.appearance_widget = AppearancePropertiesWidget(
+            field_type=field.type.value,
+            show_properties=appearance_props,  # ← Key change: pass specific properties
+            standalone=False
+        )
+        self.appearance_widget.appearanceChanged.connect(self._on_appearance_changed)
+
+        # Load existing appearance properties from field
+        existing_appearance = field.properties.get('appearance', {})
+        if existing_appearance:
+            self.appearance_widget.set_appearance_properties(existing_appearance)
+
+        # Add the individual groups directly to main properties layout
+        for group in self.appearance_widget.get_groups():
+            self.properties_layout.addWidget(group)
+
+
+    def _get_appearance_properties_for_field_type(self, field_type: FieldType) -> list:
+        """Return list of appearance properties to show for each field type"""
+
+        if field_type == FieldType.TEXT:
+            return ['font', 'border', 'background', 'alignment']
+
+        elif field_type == FieldType.BUTTON:
+            return ['font', 'border', 'background']  # No alignment for buttons
+
+        elif field_type == FieldType.SIGNATURE:
+            return ['border']  # Only border for signatures
+
+        elif field_type == FieldType.LABEL:
+            return ['font', 'background', 'alignment']  # No border for labels
+
+        elif field_type == FieldType.CHECKBOX:
+            return ['border']  # Minimal appearance for checkboxes
+
+        elif field_type == FieldType.DROPDOWN:
+            return ['font', 'border', 'background']
+
+        elif field_type == FieldType.LIST_BOX:
+            return ['font', 'border', 'background']
+
+        elif field_type == FieldType.DATE:
+            return ['font', 'border', 'background']
+
+        elif field_type == FieldType.NUMBER:
+            return ['font', 'border', 'background', 'alignment']
+
+        elif field_type == FieldType.EMAIL:
+            return ['font', 'border', 'background', 'alignment']
+
+        elif field_type == FieldType.PHONE:
+            return ['font', 'border', 'background', 'alignment']
+
+        elif field_type == FieldType.URL:
+            return ['font', 'border', 'background', 'alignment']
+
+        elif field_type == FieldType.RADIO:
+            return ['border']  # Minimal for radio buttons
+
+        elif field_type == FieldType.FILE_UPLOAD:
+            return ['font', 'border', 'background']
+
+        elif field_type == FieldType.PASSWORD:
+            return ['font', 'border', 'background']
+
+        else:
+            return ['font', 'border', 'background']  # Default fallback
+
+    def working_create_appearance_properties(self, field: FormField):
         """Create appearance properties by using individual groups"""
         # Create appearance widget without standalone layout
         self.appearance_widget = AppearancePropertiesWidget(field.type.value, standalone=False)
