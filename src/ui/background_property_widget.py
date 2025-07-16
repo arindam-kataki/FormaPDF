@@ -110,33 +110,71 @@ class BackgroundPropertyWidget(QWidget):
         }
         self.backgroundChanged.emit(self.background_props)
 
+    def _block_signals(self, block: bool):
+        """Block or unblock signals for all background widgets to prevent feedback loops"""
+        try:
+            widgets_to_block = [
+                self.bg_color_widget,
+                self.opacity_spinner,
+                self.none_check
+            ]
+
+            for widget in widgets_to_block:
+                if widget and hasattr(widget, 'blockSignals'):
+                    widget.blockSignals(block)
+
+        except Exception as e:
+            print(f"⚠️ Error blocking/unblocking background widget signals: {e}")
+
     def get_background_properties(self) -> dict:
+        props = {
+            'color': self.bg_color_widget.get_color(),
+            'opacity': self.opacity_spinner.value()
+        }
+        print(f"🎨 BackgroundPropertyWidget.get_background_properties(): {props}")
         """Get current background properties"""
         return self.background_props.copy()
 
     def set_background_properties(self, bg_props: dict):
-        """Set background properties"""
-        self.background_props = bg_props
+        """Set background properties with signal blocking to prevent loops"""
+        if not bg_props:
+            return
 
-        # Update color
-        if 'color' in bg_props:
-            self.bg_color_widget.set_color(bg_props['color'])
+        # Block signals during bulk updates to prevent multiple change events
+        self._block_signals(True)
 
-        # Update opacity
-        if 'opacity' in bg_props:
-            self.opacity_spinner.setValue(bg_props['opacity'])
+        try:
+            self.background_props = bg_props
 
-        # Update None checkbox state
-        if hasattr(self, 'none_check'):
-            color = bg_props.get('color', QColor(255, 255, 255))
-            opacity = bg_props.get('opacity', 100)
-            is_transparent = color.alpha() == 0 or opacity == 0
+            # Update color
+            if 'color' in bg_props:
+                color = bg_props['color']
+                self.bg_color_widget.set_color(color)
 
-            self.none_check.blockSignals(True)
-            self.none_check.setChecked(is_transparent)
-            self.bg_color_widget.setEnabled(not is_transparent)
-            self.opacity_spinner.setEnabled(not is_transparent)
-            self.none_check.blockSignals(False)
+            # Update opacity
+            if 'opacity' in bg_props:
+                opacity = bg_props['opacity']
+                self.opacity_spinner.setValue(opacity)
+
+            # Update None checkbox state
+            if hasattr(self, 'none_check'):
+                color = bg_props.get('color', QColor(255, 255, 255))
+                opacity = bg_props.get('opacity', 100)
+                is_transparent = color.alpha() == 0 or opacity == 0
+
+                self.none_check.setChecked(is_transparent)
+                self.bg_color_widget.setEnabled(not is_transparent)
+                self.opacity_spinner.setEnabled(not is_transparent)
+
+        except Exception as e:
+            print(f"⚠️ Error setting background properties: {e}")
+
+        finally:
+            # Always re-enable signals
+            self._block_signals(False)
+
+            # Emit change signal after all updates are complete
+            self.on_background_changed()
 
     def get_color(self):
         """Get current background color"""
