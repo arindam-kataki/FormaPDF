@@ -115,6 +115,24 @@ class AppearancePropertiesWidget(QWidget):
 
     def on_appearance_changed(self):
         """Handle any appearance property change"""
+        self.appearance_props = {}
+
+        # Get font properties (includes alignment if enabled)
+        if hasattr(self, 'font_widget'):
+            self.appearance_props['font'] = self.font_widget.get_font_properties()
+
+        # Get border properties
+        if hasattr(self, 'border_widget'):
+            self.appearance_props['border'] = self.border_widget.get_border_properties()
+
+        # Get background properties
+        if hasattr(self, 'bg_widget'):
+            self.appearance_props['background'] = self.bg_widget.get_background_properties()
+
+        self.appearanceChanged.emit(self.appearance_props)
+
+    def deprecated_on_appearance_changed(self):
+        """Handle any appearance property change"""
         self.appearance_props = {
             'font': self.font_widget.get_font_properties(),
             'text_color': self.font_widget.text_color_widget.get_color(),
@@ -143,6 +161,22 @@ class AppearancePropertiesWidget(QWidget):
         return self.appearance_props.copy()
 
     def set_appearance_properties(self, appearance_props: dict):
+        """Set all appearance properties"""
+        self.appearance_props = appearance_props
+
+        # Update font properties (includes alignment)
+        if hasattr(self, 'font_widget') and 'font' in appearance_props:
+            self.font_widget.set_font_properties(appearance_props['font'])
+
+        # Update border properties
+        if hasattr(self, 'border_widget') and 'border' in appearance_props:
+            self.border_widget.set_border_properties(appearance_props['border'])
+
+        # Update background properties
+        if hasattr(self, 'bg_widget') and 'background' in appearance_props:
+            self.bg_widget.set_background_properties(appearance_props['background'])
+
+    def deprecated_set_appearance_properties(self, appearance_props: dict):
         """Set all appearance properties"""
         self.appearance_props = appearance_props
 
