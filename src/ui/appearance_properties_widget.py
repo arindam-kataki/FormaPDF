@@ -22,49 +22,6 @@ class AppearancePropertiesWidget(QWidget):
         self.standalone = standalone
         self.init_ui()
 
-    def working_init_ui(self):
-        """
-        Initialize UI - create groups that can be extracted if needed
-        """
-        # Font properties group
-        self.font_group = QGroupBox("Text")
-        font_layout = QVBoxLayout()
-
-        self.font_widget = FontPropertyWidget()
-        self.font_widget.fontChanged.connect(self.on_appearance_changed)
-        font_layout.addWidget(self.font_widget)
-
-        self.font_group.setLayout(font_layout)
-
-        # Border properties group
-        self.border_group = QGroupBox("Border")
-        border_layout = QVBoxLayout()
-
-        self.border_widget = BorderPropertyWidget()
-        self.border_widget.borderChanged.connect(self.on_appearance_changed)
-        border_layout.addWidget(self.border_widget)
-
-        self.border_group.setLayout(border_layout)
-
-        # Background properties group
-        self.bg_group = QGroupBox("Background")
-        bg_layout = QVBoxLayout()
-
-        self.bg_widget = BackgroundPropertyWidget()
-        self.bg_widget.backgroundChanged.connect(self.on_appearance_changed)
-        bg_layout.addWidget(self.bg_widget)
-
-        self.bg_group.setLayout(bg_layout)
-
-        # Only create and set layout if this widget will be used standalone
-        if self.standalone:
-            layout = QVBoxLayout()
-            layout.setSpacing(10)
-            layout.addWidget(self.font_group)
-            layout.addWidget(self.border_group)
-            layout.addWidget(self.bg_group)
-            self.setLayout(layout)
-
     def init_ui(self):
         """Initialize UI - only create requested property groups"""
 
@@ -138,30 +95,7 @@ class AppearancePropertiesWidget(QWidget):
 
         self.appearanceChanged.emit(self.appearance_props)
 
-    def deprecated_on_appearance_changed(self):
-        """Handle any appearance property change"""
-        self.appearance_props = {
-            'font': self.font_widget.get_font_properties(),
-            'text_color': self.font_widget.text_color_widget.get_color(),
-            'border': self.border_widget.get_border_properties(),
-            'background_color': self.bg_widget.bg_color_widget.get_color()
-        }
 
-        # Add alignment if available
-        if hasattr(self, 'alignment_widget'):
-            self.appearance_props['text_alignment'] = self.alignment_widget.get_alignment()
-
-        # Add alignment if available (3x3 grid)
-        if hasattr(self, 'alignment_widget'):
-            alignment_data = {
-                'combined': self.alignment_widget.get_alignment(),  # e.g., "top-left"
-                'horizontal': self.alignment_widget.get_horizontal_alignment(),  # "left"
-                'vertical': self.alignment_widget.get_vertical_alignment(),  # "top"
-                'css': self.alignment_widget.get_css_alignment()  # CSS properties
-            }
-            self.appearance_props['alignment'] = alignment_data
-
-        self.appearanceChanged.emit(self.appearance_props)
 
     def get_appearance_properties(self) -> dict:
         """Get all appearance properties"""

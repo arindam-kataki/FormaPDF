@@ -466,13 +466,14 @@ class PropertiesTab(QWidget):
         """Handle appearance property changes from enhanced properties panel"""
         try:
             print(f"🎨 Appearance changed in TabbedFieldPalette: {list(appearance_props.keys())}")
-
+            print(f"🎨 Appearance changed in TabbedFieldPalette: {list(appearance_props.values())}")
             # Get currently selected field
             if hasattr(self, 'current_field') and self.current_field:
                 # Update the field's appearance properties
                 if 'appearance' not in self.current_field.properties:
                     self.current_field.properties['appearance'] = {}
-                self.current_field.properties['appearance'].update(appearance_props)
+                else:
+                    self.current_field.properties['appearance'].update(appearance_props)
 
                 print(f"✅ Updated appearance for field {self.current_field.id}")
 

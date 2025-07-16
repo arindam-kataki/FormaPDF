@@ -60,8 +60,6 @@ class BackgroundPropertyWidget(QWidget):
         self.opacity_spinner.setMinimumWidth(50)
         bg_layout.addWidget(self.opacity_spinner, 1, 1, Qt.AlignmentFlag.AlignLeft)
 
-
-
         layout.addLayout(bg_layout)
         self.setLayout(layout)
 
@@ -71,39 +69,54 @@ class BackgroundPropertyWidget(QWidget):
 
     def on_none_toggled(self, checked: bool):
         """Handle none checkbox toggle"""
-        if checked:
-            # Set transparent background and disable controls
-            transparent_color = QColor(0, 0, 0, 0)
-            self.bg_color_widget.set_color(transparent_color)
-            self.opacity_spinner.setValue(0)
-            self.bg_color_widget.setEnabled(False)
-            self.opacity_spinner.setEnabled(False)
-        else:
-            # Enable controls and set default values if currently transparent
-            self.bg_color_widget.setEnabled(True)
-            self.opacity_spinner.setEnabled(True)
-            if self.bg_color_widget.get_color().alpha() == 0:
-                # Set default white background
-                self.bg_color_widget.set_color(QColor(255, 255, 255))
-            if self.opacity_spinner.value() == 0:
-                self.opacity_spinner.setValue(100)
+        # Block all signals to prevent circular updates
+        self._block_signals(True)
 
-        self.on_background_changed()
+        try:
+            if checked:
+                # Set transparent background and disable controls
+                transparent_color = QColor(0, 0, 0, 0)
+                self.bg_color_widget.set_color(transparent_color)
+                self.opacity_spinner.setValue(0)
+                self.bg_color_widget.setEnabled(False)
+                self.opacity_spinner.setEnabled(False)
+            else:
+                # Enable controls and set default values if currently transparent
+                self.bg_color_widget.setEnabled(True)
+                self.opacity_spinner.setEnabled(True)
+                if self.bg_color_widget.get_color().alpha() == 0:
+                    # Set default white background
+                    self.bg_color_widget.set_color(QColor(255, 255, 255))
+                if self.opacity_spinner.value() == 0:
+                    self.opacity_spinner.setValue(100)
+
+        finally:
+            # Always re-enable signals
+            self._block_signals(False)
+
+        # Manually trigger change event ONCE after all updates
+        self._emit_background_change()
 
     def on_background_changed(self):
-        """Handle background property changes"""
-        # Update None checkbox state based on current values
-        if hasattr(self, 'none_check'):
+        """Handle background property changes from color/opacity widgets"""
+        # Only update checkbox state if the change came from color/opacity widgets
+        # (not from the checkbox itself)
+        if hasattr(self, 'none_check') and not self.none_check.signalsBlocked():
             current_color = self.bg_color_widget.get_color()
             current_opacity = self.opacity_spinner.value()
             is_transparent = current_color.alpha() == 0 or current_opacity == 0
 
-            self.none_check.blockSignals(True)  # Prevent recursive calls
+            # Block only the checkbox to prevent recursion
+            self.none_check.blockSignals(True)
             self.none_check.setChecked(is_transparent)
             self.bg_color_widget.setEnabled(not is_transparent)
             self.opacity_spinner.setEnabled(not is_transparent)
             self.none_check.blockSignals(False)
 
+        self._emit_background_change()
+
+    def _emit_background_change(self):
+        """Emit background change with current properties"""
         self.background_props = {
             'color': self.bg_color_widget.get_color(),
             'opacity': self.opacity_spinner.value()
@@ -127,13 +140,32 @@ class BackgroundPropertyWidget(QWidget):
             print(f"⚠️ Error blocking/unblocking background widget signals: {e}")
 
     def get_background_properties(self) -> dict:
-        props = {
-            'color': self.bg_color_widget.get_color(),
-            'opacity': self.opacity_spinner.value()
-        }
-        print(f"🎨 BackgroundPropertyWidget.get_background_properties(): {props}")
-        """Get current background properties"""
-        return self.background_props.copy()
+        """Get current background properties from UI state, including None/transparent state"""
+
+        # Get base properties from UI
+        color = self.bg_color_widget.get_color()
+        opacity = self.opacity_spinner.value()
+
+        # Check if None checkbox is checked OR if color/opacity indicates transparency
+        is_transparent = False
+        if hasattr(self, 'none_check') and self.none_check.isChecked():
+            is_transparent = True
+        elif color.alpha() == 0 or opacity == 0:
+            is_transparent = True
+
+        if is_transparent:
+            props = {
+                'color': QColor(0, 0, 0, 0),  # Fully transparent
+                'opacity': 0  # Zero opacity
+            }
+        else:
+            props = {
+                'color': color,
+                'opacity': opacity
+            }
+
+        print(f"🎨 BackgroundPropertyWidget.get_background_properties(): {props} (transparent: {is_transparent})")
+        return props
 
     def set_background_properties(self, bg_props: dict):
         """Set background properties with signal blocking to prevent loops"""
@@ -176,30 +208,3 @@ class BackgroundPropertyWidget(QWidget):
             # Emit change signal after all updates are complete
             self.on_background_changed()
 
-    def get_color(self):
-        """Get current background color"""
-        return self.bg_color_widget.get_color()
-
-    def set_color(self, color):
-        """Set background color"""
-        self.bg_color_widget.set_color(color)
-
-    def get_opacity(self) -> int:
-        """Get current opacity percentage"""
-        return self.opacity_spinner.value()
-
-    def set_opacity(self, opacity: int):
-        """Set opacity percentage (0-100)"""
-        self.opacity_spinner.setValue(opacity)
-
-    def is_transparent(self) -> bool:
-        """Check if background is fully transparent"""
-        return self.opacity_spinner.value() == 0
-
-    def make_transparent(self):
-        """Set background to fully transparent"""
-        self.opacity_spinner.setValue(0)
-
-    def make_opaque(self):
-        """Set background to fully opaque"""
-        self.opacity_spinner.setValue(100)

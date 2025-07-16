@@ -328,6 +328,12 @@ class EnhancedPropertiesPanel(QWidget):
         existing_appearance = field.properties.get('appearance', {})
         if existing_appearance:
             self.appearance_widget.set_appearance_properties(existing_appearance)
+            print(f"   Dumping field appearance properties")
+            for key, value in existing_appearance.items():
+                print(f"   {key}: {type(value).__name__} = {value}")
+                if isinstance(value, dict):
+                    for sub_key, sub_value in value.items():
+                        print(f"     {sub_key}: {type(sub_value).__name__} = {sub_value}")
 
         # Add the individual groups directly to main properties layout
         for group in self.appearance_widget.get_groups():
@@ -384,21 +390,6 @@ class EnhancedPropertiesPanel(QWidget):
 
         else:
             return ['font', 'border', 'background']  # Default fallback
-
-    def working_create_appearance_properties(self, field: FormField):
-        """Create appearance properties by using individual groups"""
-        # Create appearance widget without standalone layout
-        self.appearance_widget = AppearancePropertiesWidget(field.type.value, standalone=False)
-        self.appearance_widget.appearanceChanged.connect(self._on_appearance_changed)
-
-        # Load existing appearance properties from field
-        existing_appearance = field.properties.get('appearance', {})
-        if existing_appearance:
-            self.appearance_widget.set_appearance_properties(existing_appearance)
-
-        # Add the individual groups directly to main properties layout
-        for group in self.appearance_widget.get_groups():
-            self.properties_layout.addWidget(group)
 
     def _create_field_specific_properties(self, field: FormField):
         """Create field type-specific properties"""
