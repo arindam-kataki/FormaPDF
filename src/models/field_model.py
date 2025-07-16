@@ -528,7 +528,9 @@ class FieldManager(QObject):
     def get_field_by_id(self, field_id: str) -> Optional[FormField]:
         """Find field by ID"""
         try:
+            print(f"📋 Looking for: {field_id}")
             for field in self.all_fields:
+                print(f"📋 Field: {field.id}")
                 if getattr(field, 'id', None) == field_id:
                     return field
             return None

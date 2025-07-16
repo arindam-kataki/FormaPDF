@@ -516,7 +516,17 @@ class PropertiesTab(QWidget):
 
             print(f"🔽 DROPDOWN: User selected control: {field_id}")
 
+            # Add dropdown data and text dump
+            print("📋 DROPDOWN CONTENTS:")
+            for i in range(self.control_dropdown.count()):
+                item_text = self.control_dropdown.itemText(i)
+                item_data = self.control_dropdown.itemData(i)
+                current_marker = " ← CURRENT" if i == current_index else ""
+                print(f"  [{i}] Text: '{item_text}' | Data: {item_data}{current_marker}")
+            print(f"📋 Total items: {self.control_dropdown.count()}")
+
             if field_id and self.field_manager:
+                print(f"📋 Looking for field .... ")
                 field = self.field_manager.get_field_by_id(field_id)
                 if field:
                     # UPDATE FIELDMANAGER as source of truth
@@ -539,7 +549,8 @@ class PropertiesTab(QWidget):
                     if main_window and hasattr(main_window, 'pdf_canvas'):
                         main_window.pdf_canvas.draw_overlay()
                         print("  🎨 Canvas overlay repainted")
-
+                else:
+                    print("  🧹 No field found.")
             else:
                 # Clear selection in FieldManager
                 if self.field_manager:
@@ -852,7 +863,7 @@ class PropertiesTab(QWidget):
                     field_type = field_type.value
 
                 # Get field ID safely
-                field_id = getattr(field, 'name', getattr(field, 'id', 'unknown'))
+                field_id = getattr(field, 'id', getattr(field, 'name', 'unknown'))
 
                 display_text = f"{field_id}"
 
@@ -1042,7 +1053,38 @@ class PropertiesTab(QWidget):
 
         self.control_dropdown.addItem(display_text, field.id)
 
-    def remove_field_from_list(self, field_id):
+    def remove_field_from_list(self, field_identifier):
+        """Remove a field from the control list - handles both field ID and field name"""
+        print(f"🗑️ Removing field from dropdown: {field_identifier}")
+
+        for i in range(self.control_dropdown.count()):
+            dropdown_data = self.control_dropdown.itemData(i)
+            if dropdown_data == field_identifier:
+                item_text = self.control_dropdown.itemText(i)
+                self.control_dropdown.removeItem(i)
+                print(f"  ✅ Removed from dropdown: {item_text}")
+
+                # Clear current selection if removed field was selected
+                if (hasattr(self, 'current_field') and
+                        self.current_field and
+                        (getattr(self.current_field, 'id', None) == field_identifier or
+                         getattr(self.current_field, 'name', None) == field_identifier)):
+                    self.current_field = None
+                    self._update_properties_display(None)
+                    print(f"  ✅ Cleared selection for deleted field: {field_identifier}")
+                break
+
+        if self.control_dropdown.count() == 0:
+            self.control_dropdown.addItem("No controls available", None)
+            print("  ➕ Added 'No controls available' placeholder")
+        elif self.control_dropdown.count() == 1:
+            # Only "No controls selected" left, select it
+            self.control_dropdown.setCurrentIndex(0)
+            self.current_field = None
+            self._update_properties_display(None)
+            print("  ✅ Reset to 'No controls selected'")
+
+    def working_remove_field_from_list(self, field_id):
         """Remove a field from the control list"""
         for i in range(self.control_dropdown.count()):
             if self.control_dropdown.itemData(i) == field_id:
