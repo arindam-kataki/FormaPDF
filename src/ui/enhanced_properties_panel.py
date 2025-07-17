@@ -942,13 +942,20 @@ class EnhancedPropertiesPanel(QWidget):
         label_group = QGroupBox("Label Properties")
         label_layout = QVBoxLayout()
 
-        # Label text
+        # Label text - this is the only label-specific property needed
         text_label = QLabel("Label Text:")
         label_layout.addWidget(text_label)
         text_widget = TextPropertyWidget("label_text", field.properties.get("label_text", "Label"))
         text_widget.connect_signal(lambda value: self._emit_property_change("label_text", value))
         label_layout.addWidget(text_widget.widget)
         self.property_widgets["label_text"] = text_widget
+
+        # Word wrap
+        wrap_widget = BoolPropertyWidget("word_wrap", field.properties.get("word_wrap", True))
+        wrap_widget.connect_signal(lambda value: self._emit_property_change("word_wrap", value))
+        wrap_widget.widget.setText("Enable word wrap")
+        label_layout.addWidget(wrap_widget.widget)
+        self.property_widgets["word_wrap"] = wrap_widget
 
         label_group.setLayout(label_layout)
         self.properties_layout.addWidget(label_group)

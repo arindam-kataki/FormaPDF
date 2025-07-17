@@ -5,7 +5,7 @@ Updated field renderer that applies font, border, and background appearance prop
 
 from typing import List, Optional, Dict, Any
 from PyQt6.QtGui import QPainter, QPen, QBrush, QColor, QFont
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QRect
 
 from models.field_model import FormField, FieldType
 
@@ -201,6 +201,8 @@ class EnhancedFieldRenderer:
             self._render_button_content(painter, field, x, y, width, height, text_alignment)
         elif field.type == FieldType.RADIO:
             self._render_radio_content(painter, field, x, y, width, height)
+        elif field.type == FieldType.LABEL:
+            self._render_label_content(painter, field, x, y, width, height, text_alignment)
 
     def _create_font_from_properties(self, font_props: Dict[str, Any], field_height: float, zoom_level: float) -> QFont:
         """Create QFont from font properties"""
@@ -302,6 +304,53 @@ class EnhancedFieldRenderer:
                                          button_text)
         painter.drawText(text_rect, self._get_text_alignment_flag(alignment) | Qt.AlignmentFlag.AlignVCenter,
                          button_text)
+
+    def _render_label_content(self, painter: QPainter, field: FormField,
+                              x: int, y: int, width: int, height: int, alignment: str):
+        """Render label content with alignment"""
+        # Get label text from properties or use default
+        label_text = field.properties.get("label_text", field.value if field.value else "Label")
+
+        # Get word wrap setting
+        word_wrap = field.properties.get("word_wrap", True)
+
+        # Get alignment flags (use the universal alignment from appearance)
+        align_flag = self._get_text_alignment_flag(alignment) | Qt.AlignmentFlag.AlignVCenter
+
+        # Add word wrap if enabled
+        if word_wrap:
+            align_flag |= Qt.TextFlag.TextWordWrap
+
+        # Draw the label text
+        text_rect = QRect(x + 2, y + 2, width - 4, height - 4)
+        painter.drawText(text_rect, align_flag, str(label_text))
+
+    # Convert alignment to Qt flags
+    def _get_alignment_flags(self, alignment: str) -> Qt.AlignmentFlag:
+        """Convert alignment string to Qt alignment flags"""
+        alignment_map = {
+            # Top row
+            "Top Left": Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft,
+            "Top Center": Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter,
+            "Top Right": Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignRight,
+
+            # Middle row (vertical center)
+            "Middle Left": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            "Middle Center": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter,
+            "Middle Right": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+
+            # Bottom row
+            "Bottom Left": Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignLeft,
+            "Bottom Center": Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
+            "Bottom Right": Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignRight,
+
+            # Legacy compatibility
+            "Left": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft,
+            "Center": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignHCenter,
+            "Right": Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignRight,
+        }
+
+        return alignment_map.get(alignment, Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
 
     def _render_radio_content(self, painter: QPainter, field: FormField,
                               x: int, y: int, width: int, height: int):
