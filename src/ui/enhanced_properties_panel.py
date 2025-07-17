@@ -105,6 +105,7 @@ class EnhancedPropertiesPanel(QWidget):
 
     def __init__(self):
         super().__init__()
+        self.control_dropdown = None
         self.current_field = None
         self.property_widgets = {}
         self.appearance_widget = None
@@ -149,6 +150,10 @@ class EnhancedPropertiesPanel(QWidget):
 
         self.setLayout(layout)
         self.show_no_selection()
+
+    def set_control_dropdown(self, dropdown):
+        """Set reference to the control dropdown"""
+        self.control_dropdown = dropdown
 
     def show_no_selection(self):
         """Show message when no field is selected"""
@@ -233,7 +238,8 @@ class EnhancedPropertiesPanel(QWidget):
         name_layout = QHBoxLayout()
         name_layout.addWidget(QLabel("Name:"))
         name_widget = TextPropertyWidget("name", field.name)
-        name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        #name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        name_widget.connect_signal(self.handle_name_change)
         name_layout.addWidget(name_widget.widget)
         basic_layout.addLayout(name_layout)
         self.property_widgets["name"] = name_widget
@@ -1040,3 +1046,199 @@ class EnhancedPropertiesPanel(QWidget):
 
         number_group.setLayout(number_layout)
         self.properties_layout.addWidget(number_group)
+
+    def handle_name_change(self, value):
+        """Handle name field changes with validation"""
+        if not self.current_field:
+            return
+
+        # Get the current name
+        current_name = self.current_field.name
+
+        # IMPORTANT: Skip validation if name hasn't actually changed
+        if value == current_name:
+            print(f"✅ Name unchanged: '{value}' - skipping validation")
+            return
+
+        # Validate the new name
+        is_valid, error_message = self.validate_control_name(value, self.current_field)
+
+        if not is_valid:
+            # Show error message
+            self.show_error_message_box(error_message)
+
+            # Revert to original name and select text
+            if "name" in self.property_widgets:
+                name_widget = self.property_widgets["name"]
+                name_widget.widget.setText(current_name)
+                name_widget.widget.selectAll()
+                name_widget.widget.setFocus()
+        else:
+            # Valid name - update field and emit signal
+            old_name = self.current_field.name
+            self.current_field.name = value
+
+            # Update dropdown display
+            self.refresh_control_dropdown_item(self.current_field.id, value)
+
+            self._emit_property_change("name", value)
+            print(f"✅ Renamed control {self.current_field.id}: '{old_name}' -> '{value}'")
+
+    def validate_control_name(self, new_name, current_control_id=None):
+        """Validate control name according to requirements"""
+        import re
+
+        # Check for empty/null
+        if not new_name or not new_name.strip():
+            return False, "Name cannot be empty"
+
+        name = new_name.strip()
+
+        # Check minimum length
+        if len(name) < 1:
+            return False, "Name cannot be empty"
+
+        # Check maximum length
+        if len(name) > 50:
+            return False, "Name too long (maximum 50 characters)"
+
+        # Check starts with letter
+        if not name[0].isalpha():
+            return False, "Name must start with a letter (A-Z, a-z)"
+
+        # Check alphanumeric + underscore + dash only
+        if not re.match(r'^[A-Za-z][A-Za-z0-9_-]*$', name):
+            return False, "Name can only contain letters, numbers, underscores (_), and dashes (-)"
+
+        # Check for consecutive dashes
+        if '--' in name:
+            return False, "Consecutive dashes (--) are not allowed"
+
+        # Check for periods (PDF SFN issue)
+        if '.' in name:
+            return False, "Periods (.) are not allowed in field names"
+
+        # Check uniqueness (case-insensitive)
+        if self.is_name_duplicate(name, current_control_id):
+            return False, f"Name '{name}' is already in use"
+
+        return True, "Valid name"
+
+    def show_error_message_box(self, error_message):
+        """Show error message with appropriate formatting"""
+        from PyQt6.QtWidgets import QMessageBox
+
+        msg_box = QMessageBox(self)
+        msg_box.setIcon(QMessageBox.Icon.Warning)
+        msg_box.setWindowTitle("Invalid Field Name")
+
+        # Customize message based on error type
+        if "cannot be empty" in error_message:
+            msg_box.setText("Field Name Required")
+            msg_box.setInformativeText("Please enter a name for this field.")
+        elif "too long" in error_message:
+            msg_box.setText("Name Too Long")
+            msg_box.setInformativeText(f"{error_message}\n\nPlease use a shorter name.")
+        elif "must start with" in error_message:
+            msg_box.setText("Invalid Name Format")
+            msg_box.setInformativeText(f"{error_message}\n\nExample: Field1, MyControl, Button_A")
+        elif "can only contain" in error_message:
+            msg_box.setText("Invalid Characters")
+            msg_box.setInformativeText(f"{error_message}\n\nAllowed: letters, numbers, underscores (_), dashes (-)")
+        else:
+            msg_box.setText(error_message)
+
+        msg_box.setStandardButtons(QMessageBox.StandardButton.Ok)
+        msg_box.exec()
+
+    def is_name_duplicate(self, name, exclude_control_id=None):
+        """Check if name already exists (case-insensitive)"""
+        if not hasattr(self, 'field_manager') or not self.field_manager:
+            self.field_manager = self._get_field_manager()
+
+        if not self.field_manager:
+            return False  # Can't check if no field manager
+
+        existing_names = []
+        for field in self.field_manager.get_all_fields():
+            if exclude_control_id is None or field.id != exclude_control_id:
+                existing_names.append(field.name.lower())
+
+        return name.lower() in existing_names
+
+    def _get_field_manager(self):
+        """Get field manager from parent hierarchy"""
+        parent = self.parent()
+        while parent:
+            if hasattr(parent, 'field_manager'):
+                return parent.field_manager
+            parent = parent.parent()
+        return None
+
+    def refresh_control_dropdown_item(self, control_id, new_name):
+        """Reload entire dropdown list, sort it, and select the renamed item without events"""
+        if not hasattr(self, 'control_dropdown') or not self.control_dropdown:
+            print("⚠️ No control dropdown reference available")
+            return
+
+        # Block signals to prevent events during rebuild
+        self.control_dropdown.blockSignals(True)
+
+        try:
+            # Clear the dropdown
+            self.control_dropdown.clear()
+
+            # Get all fields from field manager
+            if not hasattr(self, 'field_manager') or not self.field_manager:
+                self.field_manager = self._get_field_manager()
+
+            if not self.field_manager:
+                self.control_dropdown.addItem("No controls available", None)
+                return
+
+            # Get all fields
+            fields = []
+            if hasattr(self.field_manager, 'get_all_fields'):
+                fields = self.field_manager.get_all_fields()
+            elif hasattr(self.field_manager, 'fields'):
+                fields = self.field_manager.fields
+
+            if not fields:
+                self.control_dropdown.addItem("No controls available", None)
+                return
+
+            # Create list of (display_text, field_id) tuples for sorting
+            dropdown_items = []
+            for field in fields:
+                try:
+                    # Since control name and ID are the same, just use the name
+                    field_name = getattr(field, 'name', getattr(field, 'id', 'unknown'))
+                    dropdown_items.append((field_name, field.id))
+                except Exception as e:
+                    print(f"⚠️ Error processing field for dropdown: {e}")
+                    continue
+
+            # Sort by display text (field name)
+            dropdown_items.sort(key=lambda x: x[0].lower())
+
+            # Add sorted items to dropdown
+            selected_index = -1
+            for i, (display_text, field_id) in enumerate(dropdown_items):
+                self.control_dropdown.addItem(display_text, field_id)
+
+                # Track which index to select (the renamed field)
+                if field_id == control_id:
+                    selected_index = i
+
+            # Set selection to the renamed item (without triggering events)
+            if selected_index >= 0:
+                self.control_dropdown.setCurrentIndex(selected_index)
+
+            print(f"✅ Dropdown reloaded and sorted, selected: {new_name}")
+
+        except Exception as e:
+            print(f"❌ Error refreshing dropdown: {e}")
+
+        finally:
+            # Re-enable signals
+            self.control_dropdown.blockSignals(False)

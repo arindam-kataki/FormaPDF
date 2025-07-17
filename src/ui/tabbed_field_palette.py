@@ -381,6 +381,8 @@ class PropertiesTab(QWidget):
             from ui.enhanced_properties_panel import EnhancedPropertiesPanel
             self.properties_panel = EnhancedPropertiesPanel()
 
+            self.properties_panel.set_control_dropdown(self.control_dropdown)
+
             # Connect property change signals with signal conversion
             if hasattr(self.properties_panel, 'propertyChanged'):
                 self.properties_panel.propertyChanged.connect(self._on_property_changed_internal)

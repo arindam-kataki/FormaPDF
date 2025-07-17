@@ -103,19 +103,24 @@ class AppearancePropertiesWidget(QWidget):
 
     def set_appearance_properties(self, appearance_props: dict):
         """Set all appearance properties"""
-        self.appearance_props = appearance_props
+        # Block the main widget's signal during restoration
+        self.blockSignals(True)
 
-        # Update font properties (includes alignment)
-        if hasattr(self, 'font_widget') and 'font' in appearance_props:
-            self.font_widget.set_font_properties(appearance_props['font'])
+        try:
+            self.appearance_props = appearance_props
 
-        # Update border properties
-        if hasattr(self, 'border_widget') and 'border' in appearance_props:
-            self.border_widget.set_border_properties(appearance_props['border'])
+            # Your existing code here...
+            if hasattr(self, 'font_widget') and 'font' in appearance_props:
+                self.font_widget.set_font_properties(appearance_props['font'])
 
-        # Update background properties
-        if hasattr(self, 'bg_widget') and 'background' in appearance_props:
-            self.bg_widget.set_background_properties(appearance_props['background'])
+            if hasattr(self, 'border_widget') and 'border' in appearance_props:
+                self.border_widget.set_border_properties(appearance_props['border'])
+
+            if hasattr(self, 'bg_widget') and 'background' in appearance_props:
+                self.bg_widget.set_background_properties(appearance_props['background'])
+
+        finally:
+            self.blockSignals(False)
 
     def deprecated_set_appearance_properties(self, appearance_props: dict):
         """Set all appearance properties"""

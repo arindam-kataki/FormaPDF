@@ -687,10 +687,11 @@ class PropertiesPanel(QWidget):
         return None
 
     def handle_name_change(self, value):
+        print(f"✅ In handle_name_change")
         """Handle name field changes with validation"""
         if not self.current_field:
             return
-
+        print(f"✅ New Name: '{value}'")
         # Get the current name
         current_name = self.current_field.name
 
