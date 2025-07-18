@@ -44,6 +44,11 @@ class FormField:
     height: int
     page_number: int = 0
     required: bool = False
+    read_only: bool = False
+    tooltip: str = ""
+    locked: bool = False
+    visibility: str = "Visible"
+    orientation: str = "0"
     value: Any = ""
     properties: Dict[str, Any] = field(default_factory=dict)
 

@@ -230,26 +230,95 @@ class EnhancedPropertiesPanel(QWidget):
         self.properties_layout.addWidget(header_group)
 
     def _create_basic_properties(self, field: FormField):
-        """Create basic field properties"""
+        """Create basic properties with improved horizontal layout"""
         basic_group = QGroupBox("Basic Properties")
         basic_layout = QVBoxLayout()
 
-        # Field name
+        # Field Name (label and control on same line)
         name_layout = QHBoxLayout()
-        name_layout.addWidget(QLabel("Name:"))
+        name_label = QLabel("Field Name:")
+        name_label.setFixedWidth(80)  # Fixed width for alignment
         name_widget = TextPropertyWidget("name", field.name)
-        #name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
-        name_widget.connect_signal(self.handle_name_change)
+        name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        name_layout.addWidget(name_label)
         name_layout.addWidget(name_widget.widget)
         basic_layout.addLayout(name_layout)
         self.property_widgets["name"] = name_widget
 
-        # Required field
+        # Tooltip (label and control on same line)
+        tooltip_layout = QHBoxLayout()
+        tooltip_label = QLabel("Tooltip:")
+        tooltip_label.setFixedWidth(80)
+        tooltip_widget = TextPropertyWidget("tooltip", field.tooltip)
+        tooltip_widget.connect_signal(lambda value: self._emit_property_change("tooltip", value))
+        tooltip_layout.addWidget(tooltip_label)
+        tooltip_layout.addWidget(tooltip_widget.widget)
+        basic_layout.addLayout(tooltip_layout)
+        self.property_widgets["tooltip"] = tooltip_widget
+
+        # Visibility (label and control on same line)
+        visibility_layout = QHBoxLayout()
+        visibility_label = QLabel("Visibility:")
+        visibility_label.setFixedWidth(80)
+        visibility_choices = ["Visible", "Hidden", "Visible But Doesn't Print", "Hidden But Printable"]
+        visibility_widget = ChoicePropertyWidget("visibility", visibility_choices, field.visibility)
+        visibility_widget.connect_signal(lambda value: self._emit_property_change("visibility", value))
+        visibility_layout.addWidget(visibility_label)
+        visibility_layout.addWidget(visibility_widget.widget)
+        basic_layout.addLayout(visibility_layout)
+        self.property_widgets["visibility"] = visibility_widget
+
+        # Orientation (label, smaller dropdown, and "degrees" label on same line)
+        orientation_layout = QHBoxLayout()
+        orientation_label = QLabel("Orientation:")
+        orientation_label.setFixedWidth(80)
+        orientation_choices = ["0°", "90°", "180°", "270°"]
+        orientation_widget = ChoicePropertyWidget("orientation", orientation_choices, field.orientation)
+        orientation_widget.connect_signal(lambda value: self._emit_property_change("orientation", value))
+
+        # Make the dropdown smaller
+        orientation_widget.widget.setFixedWidth(70)  # Smaller dropdown width
+
+        # Add "degrees" label
+        degrees_label = QLabel("degrees")
+        degrees_label.setStyleSheet("color: #666; font-style: italic;")  # Subtle styling
+
+        orientation_layout.addWidget(orientation_label)
+        orientation_layout.addWidget(orientation_widget.widget)
+        orientation_layout.addWidget(degrees_label)
+        orientation_layout.addStretch()  # Push everything to the left
+
+        basic_layout.addLayout(orientation_layout)
+        self.property_widgets["orientation"] = orientation_widget
+
+        # Required and Read Only checkboxes on same line
+        checkboxes_layout = QHBoxLayout()
+
+        # Required checkbox
         required_widget = BoolPropertyWidget("required", field.required)
         required_widget.connect_signal(lambda value: self._emit_property_change("required", value))
-        required_widget.widget.setText("Required Field")
-        basic_layout.addWidget(required_widget.widget)
+        required_widget.widget.setText("Required")
+        checkboxes_layout.addWidget(required_widget.widget)
         self.property_widgets["required"] = required_widget
+
+        # Read Only checkbox (after required)
+        readonly_widget = BoolPropertyWidget("read_only", field.read_only)
+        readonly_widget.connect_signal(lambda value: self._emit_property_change("read_only", value))
+        readonly_widget.widget.setText("Read only")
+        checkboxes_layout.addWidget(readonly_widget.widget)
+        self.property_widgets["read_only"] = readonly_widget
+
+        # Add stretch to push checkboxes to the left
+        checkboxes_layout.addStretch()
+
+        basic_layout.addLayout(checkboxes_layout)
+
+        # Locked checkbox - last control in the group
+        locked_widget = BoolPropertyWidget("locked", field.locked)
+        locked_widget.connect_signal(lambda value: self._emit_property_change("locked", value))
+        locked_widget.widget.setText("Locked")
+        basic_layout.addWidget(locked_widget.widget)
+        self.property_widgets["locked"] = locked_widget
 
         basic_group.setLayout(basic_layout)
         self.properties_layout.addWidget(basic_group)
