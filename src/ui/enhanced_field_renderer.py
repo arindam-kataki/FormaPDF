@@ -186,6 +186,8 @@ class EnhancedFieldRenderer:
         # Convert coordinates to integers
         x, y, width, height = int(x), int(y), int(width), int(height)
 
+        self._render_field_name_label(painter, field, x, y, zoom_level)
+
         # Render based on field type
         if field.type == FieldType.TEXT:
             self._render_text_field_content(painter, field, x, y, width, height, text_alignment)
@@ -203,6 +205,50 @@ class EnhancedFieldRenderer:
             self._render_radio_content(painter, field, x, y, width, height)
         elif field.type == FieldType.LABEL:
             self._render_label_content(painter, field, x, y, width, height, text_alignment)
+        elif field.type == FieldType.FILE_UPLOAD:
+            self._render_file_upload_content(painter, field, x, y, width, height, text_alignment)
+
+    def _render_field_name_label(self, painter: QPainter, field: FormField,
+                                 x: float, y: float, zoom_level: float = 1.0):
+        """Render field name in black box above control"""
+        if not field.name:
+            return
+
+        painter.save()
+
+        # Calculate font size based on zoom
+        font_size = max(8, int(8 * zoom_level))
+        name_font = QFont("Arial", font_size)
+        painter.setFont(name_font)
+
+        # Measure text dimensions
+        font_metrics = painter.fontMetrics()
+        text_width = font_metrics.horizontalAdvance(field.name)
+        text_height = font_metrics.height()
+
+        # Calculate padding (scaled with zoom)
+        padding_x = max(4, int(4 * zoom_level))
+        padding_y = max(2, int(3 * zoom_level))
+
+        # Calculate box dimensions
+        box_width = text_width + (padding_x * 2)
+        box_height = text_height + (padding_y * 2)
+
+        # Position box so its bottom almost touches control top
+        box_x = int(x)
+        box_y = int(y - box_height - 1)  # 1px gap between box and control
+
+        # Draw black background box
+        box_rect = QRect(box_x, box_y, box_width, box_height)
+        painter.fillRect(box_rect, QColor(0, 0, 0))  # Black background
+
+        # Draw white text centered in box
+        painter.setPen(QPen(QColor(255, 255, 255)))  # White text
+        text_x = box_x + padding_x
+        text_y = box_y + padding_y + font_metrics.ascent()
+        painter.drawText(text_x, text_y, field.name)
+
+        painter.restore()
 
     def _create_font_from_properties(self, font_props: Dict[str, Any], field_height: float, zoom_level: float) -> QFont:
         """Create QFont from font properties"""
@@ -305,8 +351,100 @@ class EnhancedFieldRenderer:
         painter.drawText(text_rect, self._get_text_alignment_flag(alignment) | Qt.AlignmentFlag.AlignVCenter,
                          button_text)
 
+    def _render_file_upload_content(self, painter: QPainter, field: FormField,
+                                    x: int, y: int, width: int, height: int, alignment: str):
+        """Render file upload field content - Modern Upload Box style"""
+
+        # Get file upload properties
+        accepted_types = field.properties.get("accepted_types", "All Files")
+        max_size_mb = field.properties.get("max_size_mb", 10)
+        multiple_files = field.properties.get("multiple_files", False)
+
+        # Save current painter state
+        painter.save()
+
+        # Calculate icon size based on field height
+        icon_size = min(height - 8, 16)
+        icon_x = x + 8
+        icon_y = y + (height - icon_size) // 2
+
+        # Draw upload icon (⬆️ arrow)
+        icon_rect = QRect(icon_x, icon_y, icon_size, icon_size)
+
+        # Use Unicode arrow or draw simple arrow
+        painter.setPen(QPen(QColor(70, 130, 180), 2))  # Blue color
+
+        # Draw simple up arrow
+        arrow_center_x = icon_x + icon_size // 2
+        arrow_center_y = icon_y + icon_size // 2
+
+        # Arrow shaft (vertical line)
+        painter.drawLine(arrow_center_x, arrow_center_y + icon_size // 3,
+                         arrow_center_x, arrow_center_y - icon_size // 3)
+
+        # Arrow head (two lines forming ^)
+        arrow_head_size = icon_size // 4
+        painter.drawLine(arrow_center_x, arrow_center_y - icon_size // 3,
+                         arrow_center_x - arrow_head_size, arrow_center_y - icon_size // 3 + arrow_head_size)
+        painter.drawLine(arrow_center_x, arrow_center_y - icon_size // 3,
+                         arrow_center_x + arrow_head_size, arrow_center_y - icon_size // 3 + arrow_head_size)
+
+        # Main text: "Upload" + file type info
+        text_x = icon_x + icon_size + 8
+        text_y = y + height // 2
+
+        # Build main text
+        main_text = "Upload"
+
+        # Add file type constraint if not "All Files"
+        type_info = ""
+        if accepted_types == "PDF":
+            type_info = "PDF"
+        elif accepted_types == "Images (PNG, JPG)":
+            type_info = "Images"
+        elif accepted_types == "Documents (DOC, DOCX)":
+            type_info = "Documents"
+
+        if type_info:
+            main_text = f"Upload {type_info}"
+
+        # Draw main text
+        painter.setPen(QPen(QColor(70, 130, 180)))  # Blue to match icon
+        main_font = painter.font()
+        painter.setFont(main_font)
+        painter.drawText(text_x, text_y + 4, main_text)
+
+        # Draw secondary info (constraints) in smaller text below
+        if height > 30:  # Only show secondary info if field is tall enough
+            constraints = []
+
+            # Add size limit
+            if max_size_mb > 0:
+                constraints.append(f"{max_size_mb}MB max")
+
+            # Add multiple files indicator
+            if multiple_files:
+                constraints.append("Multiple files")
+
+            if constraints:
+                constraint_text = " • ".join(constraints)
+
+                # Smaller font for constraints
+                small_font = painter.font()
+                small_font.setPointSize(max(8, small_font.pointSize() - 2))
+                painter.setFont(small_font)
+
+                painter.setPen(QPen(QColor(128, 128, 128)))  # Gray for secondary info
+                painter.drawText(text_x, text_y + 16, constraint_text)
+
+        # Restore painter state
+        painter.restore()
+
     def _render_label_content(self, painter: QPainter, field: FormField,
                               x: int, y: int, width: int, height: int, alignment: str):
+
+        print(f"🏷️ Enhanced renderer: Rendering label ")
+
         """Render label content with alignment"""
         # Get label text from properties or use default
         label_text = field.properties.get("label_text", field.value if field.value else "Label")
@@ -369,6 +507,35 @@ class EnhancedFieldRenderer:
             dot_y = radio_y + (radio_size - dot_size) // 2
             painter.setBrush(QBrush(painter.pen().color()))
             painter.drawEllipse(dot_x, dot_y, dot_size, dot_size)
+
+    def _render_file_upload_field(self, painter: QPainter, field: FormField, x: int, y: int, width: int, height: int):
+        """Render file upload field content - Simple Upload Icon + Text"""
+
+        # Draw simple upload arrow icon
+        icon_size = min(height - 6, 14)
+        icon_x = x + 6
+        icon_y = y + (height - icon_size) // 2
+
+        # Simple up arrow
+        painter.setPen(QPen(QColor(70, 130, 180), 2))
+        arrow_center_x = icon_x + icon_size // 2
+        arrow_center_y = icon_y + icon_size // 2
+
+        # Arrow shaft
+        painter.drawLine(arrow_center_x, arrow_center_y + icon_size // 3,
+                         arrow_center_x, arrow_center_y - icon_size // 3)
+
+        # Arrow head
+        arrow_head_size = icon_size // 4
+        painter.drawLine(arrow_center_x, arrow_center_y - icon_size // 3,
+                         arrow_center_x - arrow_head_size, arrow_center_y - icon_size // 3 + arrow_head_size)
+        painter.drawLine(arrow_center_x, arrow_center_y - icon_size // 3,
+                         arrow_center_x + arrow_head_size, arrow_center_y - icon_size // 3 + arrow_head_size)
+
+        # "Upload" text
+        text_x = icon_x + icon_size + 8
+        painter.setPen(QPen(QColor(70, 130, 180)))
+        painter.drawText(text_x, y + height // 2 + 4, "Upload")
 
     def _render_field_name(self, painter: QPainter, field: FormField, x: int, y: int):
         """Render field name for debugging/selection"""

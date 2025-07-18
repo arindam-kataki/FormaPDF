@@ -934,6 +934,13 @@ class EnhancedPropertiesPanel(QWidget):
         file_layout.addWidget(size_widget.widget)
         self.property_widgets["max_size_mb"] = size_widget
 
+        # Multiple files
+        multiple_widget = BoolPropertyWidget("multiple_files", field.properties.get("multiple_files", False))
+        multiple_widget.connect_signal(lambda value: self._emit_property_change("multiple_files", value))
+        multiple_widget.widget.setText("Allow multiple file selection")
+        file_layout.addWidget(multiple_widget.widget)
+        self.property_widgets["multiple_files"] = multiple_widget
+
         file_group.setLayout(file_layout)
         self.properties_layout.addWidget(file_group)
 

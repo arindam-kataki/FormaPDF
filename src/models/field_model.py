@@ -747,7 +747,16 @@ class FieldManager(QObject):
             'radio': FieldType.RADIO,
             'dropdown': FieldType.DROPDOWN,
             'date': FieldType.DATE,
-            'number': FieldType.NUMBER
+            'number': FieldType.NUMBER,
+            'label': FieldType.LABEL,           # ← ADD THIS LINE
+            'email': FieldType.EMAIL,          # ← Also add these while you're at it
+            'phone': FieldType.PHONE,
+            'url': FieldType.URL,
+            'file_upload': FieldType.FILE_UPLOAD,
+            'password': FieldType.PASSWORD,
+            'textarea': FieldType.TEXTAREA,
+            'list_box': FieldType.LIST_BOX,
+            'button' : FieldType.BUTTON
         }
 
         return type_mapping.get(field_type.lower(), FieldType.TEXT)
