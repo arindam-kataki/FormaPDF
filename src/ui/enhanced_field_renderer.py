@@ -69,7 +69,7 @@ class EnhancedFieldRenderer:
 
         # Render field name (for debugging/selection)
         if is_selected:
-            self._render_field_name(painter, field, screen_x, screen_y)
+            #self._render_field_name(painter, field, screen_x, screen_y)
             self._render_resize_handles(painter, screen_x, screen_y, screen_width, screen_height)
 
     def _render_field_background(self, painter: QPainter, field: FormField, appearance: Dict[str, Any],
