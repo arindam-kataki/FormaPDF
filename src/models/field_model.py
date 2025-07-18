@@ -104,6 +104,11 @@ class FormField:
             'height': self.height,
             'page_number': self.page_number,
             'required': self.required,
+            'read_only': self.read_only,  # ← ADD THIS
+            'locked': self.locked,  # ← ADD THIS
+            'tooltip': self.tooltip,  # ← ADD THIS
+            'visibility': self.visibility,  # ← ADD THIS
+            'orientation': self.orientation,  # ← ADD THIS
             'value': self.value,
             'properties': self.properties.copy()
         }
@@ -121,6 +126,11 @@ class FormField:
             height=data['height'],
             page_number=data.get('page_number', 0),
             required=data.get('required', False),
+            read_only=data.get('read_only', False),      # ← ADD THIS
+            locked=data.get('locked', False),            # ← ADD THIS
+            tooltip=data.get('tooltip', ''),             # ← ADD THIS
+            visibility=data.get('visibility', 'Visible'), # ← ADD THIS
+            orientation=data.get('orientation', '0'),     # ← ADD THIS
             value=data.get('value', ''),
             properties=data.get('properties', {})
         )

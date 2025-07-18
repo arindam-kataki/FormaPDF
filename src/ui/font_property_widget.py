@@ -67,18 +67,18 @@ class FontPropertyWidget(QWidget):
         style_label = QLabel("Style:")
         style_label.setFixedWidth(50)
         style_label.setAlignment(Qt.AlignmentFlag.AlignLeft)  # Remove AlignVCenter from here
-        font_layout.addWidget(style_label, 3, 0,
-                              Qt.AlignmentFlag.AlignVCenter)  # Put it in the middle row (3) with VCenter alignment
+        #font_layout.addWidget(style_label, 3, 0,
+        #                      Qt.AlignmentFlag.AlignVCenter)  # Put it in the middle row (3) with VCenter alignment
 
         # Stack checkboxes vertically
         self.bold_check = QCheckBox("Bold")
-        font_layout.addWidget(self.bold_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        #font_layout.addWidget(self.bold_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         self.italic_check = QCheckBox("Italic")
-        font_layout.addWidget(self.italic_check, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        #font_layout.addWidget(self.italic_check, 3, 1, Qt.AlignmentFlag.AlignLeft)
 
         self.underline_check = QCheckBox("Underline")
-        font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
+        #font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addLayout(font_layout)
 
@@ -93,6 +93,7 @@ class FontPropertyWidget(QWidget):
         font_layout.addWidget(self.text_color_widget, 5, 1, Qt.AlignmentFlag.AlignLeft)
 
         # Text alignment (CONDITIONAL) ← Add this section
+        """
         if self.show_alignment:
             # Text alignment with label
             alignment_label = QLabel("Align:")
@@ -105,6 +106,21 @@ class FontPropertyWidget(QWidget):
             font_layout.addWidget(self.alignment_widget, 6, 1, Qt.AlignmentFlag.AlignLeft)
         else:
             self.alignment_widget = None  # ← Important: Set to None when not created
+        """
+        if self.show_alignment:
+            # Text alignment with label and dropdown
+            alignment_label = QLabel("Align:")
+            alignment_label.setFixedWidth(50)  # Same width as other labels
+            alignment_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
+
+            self.alignment_combo = QComboBox()
+            self.alignment_combo.addItems(["Left", "Center", "Right"])
+            self.alignment_combo.setCurrentText("Left")  # Default selection
+            self.alignment_combo.setFixedWidth(100)  # Consistent width
+            font_layout.addWidget(self.alignment_combo, 6, 1, Qt.AlignmentFlag.AlignLeft)
+        else:
+            self.alignment_combo = None  # ← Important: Set to None when not created
 
         self.setLayout(layout)
 
@@ -114,6 +130,7 @@ class FontPropertyWidget(QWidget):
         self.bold_check.toggled.connect(self.on_font_changed)
         self.italic_check.toggled.connect(self.on_font_changed)
         self.underline_check.toggled.connect(self.on_font_changed)
+        self.alignment_combo.currentTextChanged.connect(self.on_font_changed)
 
     def on_auto_size_toggled(self, checked: bool):
         """Handle auto-size toggle"""
@@ -127,7 +144,9 @@ class FontPropertyWidget(QWidget):
             'size': self.size_spinner.value() if not self.auto_size_check.isChecked() else 'auto',
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked(),
-            'underline': self.underline_check.isChecked()
+            'underline': self.underline_check.isChecked(),
+            'alignment': self.alignment_combo.currentText()
+
         }
         self.fontChanged.emit(self.font_props)
 
@@ -139,12 +158,13 @@ class FontPropertyWidget(QWidget):
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked(),
             'underline': self.underline_check.isChecked(),
+            'alignment': self.alignment_combo.currentText(),
             'color': self.text_color_widget.get_color()
         }
 
         # Only include alignment if widget exists - return simple string
-        if self.alignment_widget:
-            props['alignment'] = self.alignment_widget.get_alignment()  # Just "top-left"
+        if self.alignment_combo:
+            props['alignment'] = self.alignment_combo.currentText()  # Just "top-left"
 
         return props
 
@@ -165,8 +185,8 @@ class FontPropertyWidget(QWidget):
                     widget.blockSignals(block)
 
             # Block alignment widget signals if it exists
-            if self.alignment_widget and hasattr(self.alignment_widget, 'blockSignals'):
-                self.alignment_widget.blockSignals(block)
+            if self.alignment_combo and hasattr(self.alignment_combo, 'blockSignals'):
+                self.alignment_combo.blockSignals(block)
 
         except Exception as e:
             print(f"⚠️ Error blocking/unblocking signals: {e}")
@@ -238,10 +258,10 @@ class FontPropertyWidget(QWidget):
                         self.text_color_widget.set_color(qcolor)
 
             # Text alignment (only if widget exists) - simplified!
-            if self.alignment_widget and 'alignment' in props:
+            if self.alignment_combo and 'alignment' in props:
                 alignment = props['alignment']
                 if isinstance(alignment, str):
-                    self.alignment_widget.set_alignment(alignment)  # Just pass the string
+                    self.alignment_combo.setCurrentText(alignment)  # Just pass the string
 
             # Update internal font_props dictionary
             self.font_props.update(props)
@@ -265,11 +285,12 @@ class FontPropertyWidget(QWidget):
             'italic': False,
             'underline': False,
             'color': QColor(0, 0, 0),  # Black
+            'alignment': 'Left'
         }
 
         # Add default alignment if widget exists
-        if self.alignment_widget:
-            default_props['alignment'] = 'top-left'
+        if self.alignment_combo:
+            default_props['alignment'] = 'Left'
 
         self.set_font_properties(default_props)
 
@@ -295,12 +316,13 @@ class FontPropertyWidget(QWidget):
                     return False, "RGB color values must be between 0 and 255"
 
         # Validate alignment - simplified!
-        if 'alignment' in props and self.alignment_widget:
+        if 'alignment' in props and self.alignment_combo:
             alignment = props['alignment']
             if not isinstance(alignment, str):
                 return False, "Alignment must be a string"
 
             valid_alignments = [
+                'left', 'center', 'right',
                 'top-left', 'top-center', 'top-right',
                 'middle-left', 'middle-center', 'middle-right',
                 'bottom-left', 'bottom-center', 'bottom-right'
