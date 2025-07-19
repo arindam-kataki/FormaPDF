@@ -24,13 +24,13 @@ class FieldType(Enum):
     DATE = "date"
     BUTTON = "button"
     NUMBER = "number"               # FIXED: removed comma
-    EMAIL = "email"                 # FIXED: removed comma
+    #EMAIL = "email"                 # FIXED: removed comma
     LABEL = "label"                 # FIXED: removed comma
     FILE_UPLOAD = "file_upload"     # FIXED: changed to underscore, removed comma
-    PHONE = "phone"                 # FIXED: removed comma
-    URL = "url"                     # FIXED: removed comma
+    #PHONE = "phone"                 # FIXED: removed comma
+    #URL = "url"                     # FIXED: removed comma
     TEXTAREA = "textarea"           # FIXED: removed comma
-    PASSWORD = "password"
+    #PASSWORD = "password"
 
 @dataclass
 class FormField:
@@ -50,7 +50,12 @@ class FormField:
     visibility: str = "Visible"
     orientation: str = "0"
     value: Any = ""
+
     properties: Dict[str, Any] = field(default_factory=dict)
+
+    format_category: str = "None"
+    format_settings: str = "{}"
+    input_type: str = "text"
 
     @classmethod
     def create(cls, field_type: str, x: int, y: int, field_id: Optional[str] = None, page_number:int = 0) -> 'FormField':
@@ -69,13 +74,13 @@ class FormField:
             FieldType.DATE: (100, 25),
             FieldType.BUTTON: (80, 30),
             FieldType.NUMBER: (100, 25),
-            FieldType.EMAIL: (200, 25),
+            #FieldType.EMAIL: (200, 25),
             FieldType.LABEL: (100, 25),
             FieldType.FILE_UPLOAD: (150, 30),  # NEW: Slightly taller for browse button
-            FieldType.PHONE: (120, 25),  # NEW: Medium width for phone numbers
-            FieldType.URL: (200, 25),  # NEW: Wide for URLs
+            #FieldType.PHONE: (120, 25),  # NEW: Medium width for phone numbers
+            #FieldType.URL: (200, 25),  # NEW: Wide for URLs
             FieldType.TEXTAREA: (200, 60),  # NEW: Wide and tall for multi-line text
-            FieldType.PASSWORD: (150, 25)  # NEW: Same as text field
+            #FieldType.PASSWORD: (150, 25)  # NEW: Same as text field
         }
 
         field_type_enum = FieldType(field_type)
@@ -110,7 +115,10 @@ class FormField:
             'visibility': self.visibility,  # ← ADD THIS
             'orientation': self.orientation,  # ← ADD THIS
             'value': self.value,
-            'properties': self.properties.copy()
+            'properties': self.properties.copy(),
+            'format_category': self.format_category,
+            'format_settings': self.format_settings,
+            'input_type': self.input_type
         }
 
     @classmethod
@@ -132,7 +140,10 @@ class FormField:
             visibility=data.get('visibility', 'Visible'), # ← ADD THIS
             orientation=data.get('orientation', '0'),     # ← ADD THIS
             value=data.get('value', ''),
-            properties=data.get('properties', {})
+            properties=data.get('properties', {}),
+            format_category=data.get('format_category', 'None'),
+            format_settings=data.get('format_settings', '{}'),
+            input_type=data.get('input_type', 'text')
         )
 
     def contains_point(self, x: int, y: int) -> bool:
@@ -764,11 +775,11 @@ class FieldManager(QObject):
             'date': FieldType.DATE,
             'number': FieldType.NUMBER,
             'label': FieldType.LABEL,           # ← ADD THIS LINE
-            'email': FieldType.EMAIL,          # ← Also add these while you're at it
-            'phone': FieldType.PHONE,
-            'url': FieldType.URL,
+            #'email': FieldType.EMAIL,          # ← Also add these while you're at it
+            #'phone': FieldType.PHONE,
+            #'url': FieldType.URL,
             'file_upload': FieldType.FILE_UPLOAD,
-            'password': FieldType.PASSWORD,
+            #'password': FieldType.PASSWORD,
             'textarea': FieldType.TEXTAREA,
             'list_box': FieldType.LIST_BOX,
             'button' : FieldType.BUTTON

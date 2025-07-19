@@ -740,14 +740,14 @@ class FieldPropertySchema:
         """Define which property groups each field type gets"""
         return {
             FieldType.TEXT: [
-                "basic", "position_size", "appearance", "text_properties"
+                "basic", "position_size", "appearance", "text_properties", "text_format"
             ],
             FieldType.TEXTAREA: [
                 "basic", "position_size", "appearance", "textarea_properties"
             ],
-            FieldType.PASSWORD: [
-                "basic", "position_size", "appearance", "password_properties"
-            ],
+            #FieldType.PASSWORD: [
+            #    "basic", "position_size", "appearance", "password_properties"
+            #],
             FieldType.CHECKBOX: [
                 "basic", "position_size", "appearance", "checkbox_properties"
             ],
@@ -763,15 +763,15 @@ class FieldPropertySchema:
             FieldType.NUMBER: [
                 "basic", "position_size", "appearance", "number_properties"
             ],
-            FieldType.EMAIL: [
-                "basic", "position_size", "appearance", "email_properties"
-            ],
-            FieldType.PHONE: [
-                "basic", "position_size", "appearance", "phone_properties"
-            ],
-            FieldType.URL: [
-                "basic", "position_size", "appearance", "url_properties"
-            ],
+            #FieldType.EMAIL: [
+            #    "basic", "position_size", "appearance", "email_properties"
+            #],
+            #FieldType.PHONE: [
+            #    "basic", "position_size", "appearance", "phone_properties"
+            #],
+            #FieldType.URL: [
+            #    "basic", "position_size", "appearance", "url_properties"
+            #],
             FieldType.DATE: [
                 "basic", "position_size", "appearance", "date_properties"
             ],
