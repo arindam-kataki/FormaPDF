@@ -327,6 +327,28 @@ class EnhancedPropertiesPanel(QWidget):
         basic_group.setLayout(basic_layout)
         self.properties_layout.addWidget(basic_group)
 
+    def _create_advanced_properties(self, field: FormField):
+        """Create advanced properties section"""
+        advanced_group = QGroupBox("Advanced")
+        advanced_layout = QVBoxLayout()
+
+        # Read-only option
+        readonly_widget = BoolPropertyWidget("readonly", field.properties.get("readonly", False))
+        readonly_widget.connect_signal(lambda value: self._emit_property_change("readonly", value))
+        readonly_widget.widget.setText("Read-only")
+        advanced_layout.addWidget(readonly_widget.widget)
+        self.property_widgets["readonly"] = readonly_widget
+
+        # Tab order
+        advanced_layout.addWidget(QLabel("Tab Order:"))
+        tab_widget = NumberPropertyWidget("tab_order", field.properties.get("tab_order", 0), 0, 100)
+        tab_widget.connect_signal(lambda value: self._emit_property_change("tab_order", value))
+        advanced_layout.addWidget(tab_widget.widget)
+        self.property_widgets["tab_order"] = tab_widget
+
+        advanced_group.setLayout(advanced_layout)
+        self.properties_layout.addWidget(advanced_group)
+
     def _create_position_size_properties(self, field: FormField):
         """Create position and size properties"""
         pos_group = QGroupBox("Position & Size")
@@ -842,6 +864,14 @@ class EnhancedPropertiesPanel(QWidget):
         if self.current_field and property_name in self.property_widgets:
             self.property_widgets[property_name].set_value(value)
 
+    def question_update_field_property(self, field_id: str, property_name: str, value: Any):
+        """Update property widget when field changes externally"""
+        if (self.current_field and
+            self.current_field.id == field_id and
+            property_name in self.property_widgets):
+
+            widget = self.property_widgets[property_name]
+            widget.set_value(value)
     # Add this method to the EnhancedPropertiesPanel class in src/ui/enhanced_properties_panel.py
 
     def update_field_position_size(self, field_id: str, x: int, y: int, width: int, height: int):
