@@ -2,6 +2,7 @@
 Updated Properties Panel with Appearance Settings
 Enhanced properties panel that includes font, border, and background appearance settings
 """
+from typing import Any
 
 from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,

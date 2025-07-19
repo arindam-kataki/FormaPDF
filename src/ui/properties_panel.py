@@ -150,8 +150,12 @@ class ChoicePropertyWidget(PropertyWidget):
     def get_value(self):
         return self.widget.currentText()
 
-
 class PropertiesPanel(QWidget):
+
+    def __init__(self):
+        super().__init__()
+
+class XPropertiesPanel(QWidget):
     """Main properties panel for editing form field properties"""
 
     propertyChanged = pyqtSignal(str, str, object)  # field_id, property_name, value
