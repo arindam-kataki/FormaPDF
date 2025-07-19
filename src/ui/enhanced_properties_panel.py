@@ -14,7 +14,8 @@ from PyQt6.QtGui import QFont, QColor
 from models.field_model import FormField, FieldType
 from ui.appearance_properties_widget import AppearancePropertiesWidget
 from ui.properties_panel import ChoicePropertyWidget, MultilineTextPropertyWidget
-
+from ui.text_format_widget import TextFormatWidget
+import json
 
 class PropertyWidget:
     """Base class for property widgets"""
@@ -188,11 +189,13 @@ class EnhancedPropertiesPanel(QWidget):
                 child.widget().deleteLater()
         self.property_widgets.clear()
         self.appearance_widget = None
+        self.text_format_widget = None  # ← ADD THIS LINE
 
     def show_field_properties(self, field: FormField):
         """Show properties for the selected field"""
         self.current_field = field
         self.clear_properties()
+
 
         # Field header with type and ID
         #self._create_field_header(field)
@@ -470,6 +473,7 @@ class EnhancedPropertiesPanel(QWidget):
         """Create field type-specific properties"""
         if field.type == FieldType.TEXT:
             self._create_text_field_properties(field)
+            self._create_text_format_properties(field)
         elif field.type == FieldType.CHECKBOX:
             self._create_checkbox_properties(field)
         elif field.type == FieldType.DROPDOWN:
@@ -526,6 +530,67 @@ class EnhancedPropertiesPanel(QWidget):
 
         text_group.setLayout(text_layout)
         self.properties_layout.addWidget(text_group)
+
+    def _create_text_format_properties(self, field: FormField):
+        """Create text format properties"""
+
+        # Get current format configuration from field
+        current_format = {
+            'category': getattr(field, 'format_category', 'None'),
+            'settings': {}
+        }
+
+        # Parse format_settings if it exists
+        format_settings_json = getattr(field, 'format_settings', '{}')
+        try:
+            current_format['settings'] = json.loads(format_settings_json)
+        except (json.JSONDecodeError, AttributeError):
+            current_format['settings'] = {}
+
+        # Get input_type if it exists
+        input_type = getattr(field, 'input_type', 'text')
+        current_format['input_type'] = input_type
+
+        # Create format widget group
+        format_group = QGroupBox("Text Format")
+        format_layout = QVBoxLayout()
+        format_layout.setSpacing(8)
+        format_layout.setContentsMargins(10, 10, 10, 10)
+
+        # Create the text format widget
+        self.text_format_widget = TextFormatWidget(current_format)
+        self.text_format_widget.formatChanged.connect(self._on_text_format_changed)
+
+        format_layout.addWidget(self.text_format_widget)
+        format_group.setLayout(format_layout)
+
+        # Add to properties layout
+        self.properties_layout.addWidget(format_group)
+
+    def _on_text_format_changed(self, format_config: dict):
+        """Handle text format configuration changes"""
+        if not self.current_field:
+            return
+
+        print(f"DEBUG: Text format changed: {format_config}")  # ← Debug line, remove later
+
+        # Update field properties
+        self.current_field.format_category = format_config.get('category', 'None')
+        self.current_field.format_settings = json.dumps(format_config.get('settings', {}))
+
+        # Handle input_type for password masking
+        if 'input_type' in format_config:
+            self.current_field.input_type = format_config['input_type']
+
+        # Emit property changed signals (if the method exists)
+        if hasattr(self, '_emit_property_change'):
+            self._emit_property_change('format_category', self.current_field.format_category)
+            self._emit_property_change('format_settings', self.current_field.format_settings)
+            self._emit_property_change('input_type', getattr(self.current_field, 'input_type', 'text'))
+
+        # Emit field changed signal (if the method exists)
+        if hasattr(self, 'field_changed'):
+            self.field_changed.emit(self.current_field)
 
     def _create_checkbox_properties(self, field: FormField):
         """Create checkbox specific properties"""
