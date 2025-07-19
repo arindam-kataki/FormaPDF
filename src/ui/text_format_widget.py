@@ -1,20 +1,19 @@
 # src/ui/text_format_widget.py
 """
 Text Field Format Widget for FormaPDF
-Adobe Acrobat Pro compatible formatting with international number support
+Matches properties panel styling - no nested groups, consistent label/control layout
+Fixed individual settings storage/restoration
 """
 
 from typing import Dict, Any, Optional, List
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QComboBox, QSpinBox, QCheckBox, QLineEdit, QTextEdit,
-    QGroupBox, QPushButton, QFrame, QScrollArea
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+    QComboBox, QSpinBox, QCheckBox, QLineEdit, QTextEdit
 )
 
 from models.field_model import FieldType
-from models.field_property_schema import PropertyDefinition, PropertyGroup, PropertyWidgetType
 
 
 class TextFormatWidget(QWidget):
@@ -22,60 +21,48 @@ class TextFormatWidget(QWidget):
 
     formatChanged = pyqtSignal(dict)  # Emits format configuration
 
-    # Adobe Acrobat Pro format categories
+    # Format categories (simplified)
     FORMAT_CATEGORIES = {
-        'None': 'No formatting applied',
-        'Number': 'Format as numeric values',
-        'Percentage': 'Format as percentage values',
-        'Date': 'Format as date values',
-        'Time': 'Format as time values',
-        'Special': 'Special format patterns',
-        'Custom': 'Custom formatting with JavaScript'
+        'None': 'None',
+        'Number': 'Number',
+        'Percentage': 'Percentage',
+        'Date': 'Date',
+        'Time': 'Time',
+        'Special': 'Special',
+        'Custom': 'Custom'
     }
 
-    # International number separator styles
+    # International number separator styles (simplified labels)
     SEPARATOR_STYLES = {
         'comma_dot': {
-            'label': 'Comma + Dot (1,234.56)',
+            'label': '1,234.56',
             'thousands': ',',
-            'decimal': '.',
-            'regions': ['US', 'UK', 'Canada', 'Australia']
+            'decimal': '.'
         },
         'dot_comma': {
-            'label': 'Dot + Comma (1.234,56)',
+            'label': '1.234,56',
             'thousands': '.',
-            'decimal': ',',
-            'regions': ['Germany', 'France', 'Italy', 'Spain']
+            'decimal': ','
         },
         'space_comma': {
-            'label': 'Space + Comma (1 234,56)',
+            'label': '1 234,56',
             'thousands': ' ',
-            'decimal': ',',
-            'regions': ['France', 'Russia', 'Norway']
+            'decimal': ','
         },
         'space_dot': {
-            'label': 'Space + Dot (1 234.56)',
+            'label': '1 234.56',
             'thousands': ' ',
-            'decimal': '.',
-            'regions': ['Sweden', 'Finland']
-        },
-        'apostrophe_dot': {
-            'label': "Apostrophe + Dot (1'234.56)",
-            'thousands': "'",
-            'decimal': '.',
-            'regions': ['Switzerland']
+            'decimal': '.'
         },
         'dot_only': {
-            'label': 'Dot Only (1234.56)',
+            'label': '1234.56',
             'thousands': '',
-            'decimal': '.',
-            'regions': ['Simple format']
+            'decimal': '.'
         },
         'comma_only': {
-            'label': 'Comma Only (1234,56)',
+            'label': '1234,56',
             'thousands': '',
-            'decimal': ',',
-            'regions': ['Simple format']
+            'decimal': ','
         }
     }
 
@@ -94,14 +81,12 @@ class TextFormatWidget(QWidget):
     # Date format options
     DATE_FORMATS = [
         'MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD', 'DD-MM-YYYY',
-        'MMM DD, YYYY', 'DD MMM YYYY', 'YYYY/MM/DD', 'MM-DD-YYYY',
-        'MMMM DD, YYYY', 'DD MMMM YYYY', 'DDD, MMM DD, YYYY'
+        'MMM DD, YYYY', 'DD MMM YYYY', 'YYYY/MM/DD', 'MM-DD-YYYY'
     ]
 
     # Time format options
     TIME_FORMATS = [
-        'HH:MM', 'HH:MM:SS', 'H:MM AM/PM', 'H:MM:SS AM/PM',
-        'HH.MM', 'HH,MM'
+        'HH:MM', 'HH:MM:SS', 'H:MM AM/PM', 'H:MM:SS AM/PM'
     ]
 
     def __init__(self, initial_format: Dict[str, Any] = None):
@@ -115,437 +100,376 @@ class TextFormatWidget(QWidget):
 
         # UI components
         self.category_combo = None
-        self.options_scroll = None
-        self.options_widget = None
+        self.options_layout = None
         self.preview_label = None
+        self._loading_config = False  # Flag to prevent unwanted updates during load
 
         self.init_ui()
         self.load_format_config(self.format_config)
 
     def init_ui(self):
-        """Initialize the user interface"""
+        """Initialize the user interface to match properties panel style"""
         layout = QVBoxLayout()
         layout.setSpacing(8)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(0, 0, 0, 0)  # Remove margins to match other groups
 
-        # Title
-        title = QLabel("Text Field Format")
-        title.setStyleSheet("font-weight: bold; font-size: 14px; color: #333;")
-        layout.addWidget(title)
+        # Create format selection (label + dropdown on same line)
+        self.create_format_selection(layout)
 
-        # Format category selection
-        self.create_category_section(layout)
+        # Options container (no scrollable area, just direct layout)
+        options_widget = QWidget()
+        self.options_layout = QVBoxLayout()
+        self.options_layout.setSpacing(8)
+        self.options_layout.setContentsMargins(0, 0, 0, 0)
+        options_widget.setLayout(self.options_layout)
 
-        # Options container (scrollable)
-        self.create_options_section(layout)
+        layout.addWidget(options_widget)
 
-        # Preview section
+        # Preview section (simplified)
         self.create_preview_section(layout)
 
         self.setLayout(layout)
 
-    def create_category_section(self, parent_layout):
-        """Create format category selection section"""
-        group = QGroupBox("Format Category")
-        group_layout = QVBoxLayout()
+    def create_format_selection(self, parent_layout):
+        """Create format category selection - label + dropdown style"""
+        # Create horizontal layout for label + dropdown
+        format_layout = QHBoxLayout()
+        format_layout.setSpacing(8)
 
-        # Category dropdown
+        # Label (same width as other property labels)
+        format_label = QLabel("Format:")
+        format_label.setFixedWidth(80)  # Match other property labels
+        format_layout.addWidget(format_label)
+
+        # Dropdown (simplified - just category names)
         self.category_combo = QComboBox()
-        self.category_combo.setMaximumWidth(250)
+        self.category_combo.setMaximumWidth(120)  # Match other dropdowns
 
-        for category, description in self.FORMAT_CATEGORIES.items():
-            self.category_combo.addItem(f"{category} - {description}", category)
+        for category in self.FORMAT_CATEGORIES.keys():
+            self.category_combo.addItem(category, category)  # Just the name, no description
 
         self.category_combo.currentTextChanged.connect(self.on_category_changed)
-        group_layout.addWidget(self.category_combo)
+        format_layout.addWidget(self.category_combo)
 
-        group.setLayout(group_layout)
-        parent_layout.addWidget(group)
+        # Add stretch to push everything left
+        format_layout.addStretch()
 
-    def create_options_section(self, parent_layout):
-        """Create scrollable options section"""
-        group = QGroupBox("Format Options")
-        group_layout = QVBoxLayout()
-
-        # Scrollable area for options
-        self.options_scroll = QScrollArea()
-        self.options_scroll.setWidgetResizable(True)
-        self.options_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        self.options_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        self.options_scroll.setMaximumHeight(200)
-
-        # Options container widget
-        self.options_widget = QWidget()
-        self.options_scroll.setWidget(self.options_widget)
-
-        group_layout.addWidget(self.options_scroll)
-        group.setLayout(group_layout)
-        parent_layout.addWidget(group)
+        parent_layout.addLayout(format_layout)
 
     def create_preview_section(self, parent_layout):
-        """Create preview section"""
-        group = QGroupBox("Preview")
-        group_layout = QVBoxLayout()
+        """Create simplified preview section"""
+        # Preview label (same style as other property labels)
+        preview_label = QLabel("Preview:")
+        preview_label.setFixedWidth(80)
 
-        self.preview_label = QLabel("Sample formatted value")
+        # Preview value (simplified)
+        self.preview_label = QLabel("Sample text")
         self.preview_label.setStyleSheet(
-            "background-color: #f8f9fa; border: 1px solid #dee2e6; "
-            "padding: 8px; font-family: 'Courier New', monospace;"
+            "background-color: #f5f5f5; border: 1px solid #ccc; "
+            "padding: 4px; font-family: 'Courier New', monospace; font-size: 11px;"
         )
-        self.preview_label.setWordWrap(True)
+        self.preview_label.setMinimumHeight(25)
 
-        group_layout.addWidget(self.preview_label)
-        group.setLayout(group_layout)
-        parent_layout.addWidget(group)
+        # Horizontal layout for preview
+        preview_layout = QHBoxLayout()
+        preview_layout.setSpacing(8)
+        preview_layout.addWidget(preview_label)
+        preview_layout.addWidget(self.preview_label)
+        preview_layout.addStretch()
+
+        parent_layout.addLayout(preview_layout)
+
+    def get_setting(self, key: str, default: Any = None) -> Any:
+        """Safely get a setting value"""
+        return self.format_config.get('settings', {}).get(key, default)
 
     def on_category_changed(self):
         """Handle format category change"""
+        if self._loading_config:  # Skip during initial load
+            return
+
         category = self.category_combo.currentData()
         if category:
+            # Only reset settings if category actually changed
+            old_category = self.format_config.get('category', 'None')
             self.format_config['category'] = category
-            self.format_config['settings'] = {}
+
+            # Only clear settings if category changed (not on initial load)
+            if old_category != category:
+                self.format_config['settings'] = {}
+
             self.update_options_ui()
             self.update_preview()
             self.formatChanged.emit(self.format_config)
 
     def update_options_ui(self):
-        """Update options UI based on selected category"""
+        """Update options UI to match properties panel style"""
         category = self.format_config.get('category', 'None')
 
         # Clear existing options
-        if self.options_widget.layout():
-            self.clear_layout(self.options_widget.layout())
+        self.clear_layout(self.options_layout)
 
-        # Create new layout
-        layout = QVBoxLayout()
-        layout.setSpacing(8)
-
-        # Add category-specific options
+        # Add category-specific options with property panel styling
         if category == 'Number':
-            self.create_number_options(layout)
+            self.create_number_options_simple()
         elif category == 'Percentage':
-            self.create_percentage_options(layout)
+            self.create_percentage_options_simple()
         elif category == 'Date':
-            self.create_date_options(layout)
+            self.create_date_options_simple()
         elif category == 'Time':
-            self.create_time_options(layout)
+            self.create_time_options_simple()
         elif category == 'Special':
-            self.create_special_options(layout)
+            self.create_special_options_simple()
         elif category == 'Custom':
-            self.create_custom_options(layout)
-        else:  # None
-            no_options = QLabel("No formatting options available")
-            no_options.setStyleSheet("color: #6c757d; font-style: italic;")
-            layout.addWidget(no_options)
+            self.create_custom_options_simple()
+        # None category shows no additional options
 
-        self.options_widget.setLayout(layout)
-
-    def create_number_options(self, layout):
-        """Create number formatting options"""
-        grid = QGridLayout()
-        row = 0
+    def create_number_options_simple(self):
+        """Create simplified number formatting options"""
 
         # Separator style
-        grid.addWidget(QLabel("Separator Style:"), row, 0)
+        separator_combo = self.create_separator_combo()
+        self.add_property_row("Separator:", separator_combo)
+
+        # Decimal places
+        decimal_spin = QSpinBox()
+        decimal_spin.setRange(0, 10)
+        decimal_spin.setValue(self.get_setting('decimal_places', 2))
+        decimal_spin.setMaximumWidth(60)
+        decimal_spin.valueChanged.connect(lambda v: self.update_setting('decimal_places', v))
+        self.add_property_row("Decimal Places:", decimal_spin)
+
+        # Currency symbol
+        currency_edit = QLineEdit()
+        currency_edit.setMaximumWidth(80)
+        currency_edit.setPlaceholderText("$, €, ¥")
+        currency_edit.setText(self.get_setting('currency_symbol', ''))
+        currency_edit.textChanged.connect(lambda t: self.update_setting('currency_symbol', t))
+        self.add_property_row("Currency:", currency_edit)
+
+        # Negative style
+        negative_combo = QComboBox()
+        negative_combo.setMaximumWidth(120)
+        negative_options = ['Minus', 'Red', 'Parentheses', 'Red Parentheses']
+        negative_combo.addItems(negative_options)
+
+        # Set current value
+        current_negative = self.get_setting('negative_style', 'minus')
+        # Convert stored value back to display format
+        display_negative = current_negative.replace('_', ' ').title()
+        if display_negative in negative_options:
+            negative_combo.setCurrentText(display_negative)
+
+        negative_combo.currentTextChanged.connect(
+            lambda t: self.update_setting('negative_style', t.lower().replace(' ', '_')))
+        self.add_property_row("Negative:", negative_combo)
+
+    def create_percentage_options_simple(self):
+        """Create simplified percentage formatting options"""
+
+        # Separator style
+        separator_combo = self.create_separator_combo()
+        self.add_property_row("Separator:", separator_combo)
+
+        # Decimal places
+        decimal_spin = QSpinBox()
+        decimal_spin.setRange(0, 10)
+        decimal_spin.setValue(self.get_setting('decimal_places', 2))
+        decimal_spin.setMaximumWidth(60)
+        decimal_spin.valueChanged.connect(lambda v: self.update_setting('decimal_places', v))
+        self.add_property_row("Decimal Places:", decimal_spin)
+
+        # Multiply by 100 checkbox
+        multiply_check = QCheckBox("Multiply by 100")
+        multiply_check.setChecked(self.get_setting('multiply_by_100', True))
+        multiply_check.toggled.connect(lambda checked: self.update_setting('multiply_by_100', checked))
+        self.options_layout.addWidget(multiply_check)
+
+        # Space before % checkbox
+        space_check = QCheckBox("Space before %")
+        space_check.setChecked(self.get_setting('space_before_percent', False))
+        space_check.toggled.connect(lambda checked: self.update_setting('space_before_percent', checked))
+        self.options_layout.addWidget(space_check)
+
+    def create_date_options_simple(self):
+        """Create simplified date formatting options"""
+
+        # Date format
+        format_combo = QComboBox()
+        format_combo.setMaximumWidth(140)
+        format_combo.addItems(self.DATE_FORMATS)
+
+        # Set current value
+        current_format = self.get_setting('date_format', 'MM/DD/YYYY')
+        if current_format in self.DATE_FORMATS:
+            format_combo.setCurrentText(current_format)
+
+        format_combo.currentTextChanged.connect(lambda t: self.update_setting('date_format', t))
+        self.add_property_row("Format:", format_combo)
+
+        # Validate checkbox
+        validate_check = QCheckBox("Validate input")
+        validate_check.setChecked(self.get_setting('validate_date', True))
+        validate_check.toggled.connect(lambda checked: self.update_setting('validate_date', checked))
+        self.options_layout.addWidget(validate_check)
+
+        # Date range inputs
+        min_date_edit = QLineEdit()
+        min_date_edit.setMaximumWidth(100)
+        min_date_edit.setPlaceholderText("YYYY-MM-DD")
+        min_date_edit.setText(self.get_setting('min_date', ''))
+        min_date_edit.textChanged.connect(lambda t: self.update_setting('min_date', t))
+        self.add_property_row("Min Date:", min_date_edit)
+
+        max_date_edit = QLineEdit()
+        max_date_edit.setMaximumWidth(100)
+        max_date_edit.setPlaceholderText("YYYY-MM-DD")
+        max_date_edit.setText(self.get_setting('max_date', ''))
+        max_date_edit.textChanged.connect(lambda t: self.update_setting('max_date', t))
+        self.add_property_row("Max Date:", max_date_edit)
+
+    def create_time_options_simple(self):
+        """Create simplified time formatting options"""
+
+        # Time format
+        format_combo = QComboBox()
+        format_combo.setMaximumWidth(120)
+        format_combo.addItems(self.TIME_FORMATS)
+
+        # Set current value
+        current_format = self.get_setting('time_format', 'HH:MM')
+        if current_format in self.TIME_FORMATS:
+            format_combo.setCurrentText(current_format)
+
+        format_combo.currentTextChanged.connect(lambda t: self.update_setting('time_format', t))
+        self.add_property_row("Format:", format_combo)
+
+        # 24 hour checkbox
+        hour24_check = QCheckBox("24 Hour Format")
+        hour24_check.setChecked(self.get_setting('hour24_format', True))
+        hour24_check.toggled.connect(lambda checked: self.update_setting('hour24_format', checked))
+        self.options_layout.addWidget(hour24_check)
+
+        # Show seconds checkbox
+        seconds_check = QCheckBox("Show Seconds")
+        seconds_check.setChecked(self.get_setting('show_seconds', False))
+        seconds_check.toggled.connect(lambda checked: self.update_setting('show_seconds', checked))
+        self.options_layout.addWidget(seconds_check)
+
+        # Validate checkbox
+        validate_check = QCheckBox("Validate input")
+        validate_check.setChecked(self.get_setting('validate_time', True))
+        validate_check.toggled.connect(lambda checked: self.update_setting('validate_time', checked))
+        self.options_layout.addWidget(validate_check)
+
+    def create_special_options_simple(self):
+        """Create simplified special formatting options"""
+
+        # Pattern selection
+        pattern_combo = QComboBox()
+        pattern_combo.setMaximumWidth(150)
+
+        for key in self.SPECIAL_PATTERNS.keys():
+            display_name = key.replace('_', ' ').title()
+            pattern_combo.addItem(display_name, key)
+
+        # Set current value
+        current_pattern = self.get_setting('pattern', 'phone_us')
+        for i in range(pattern_combo.count()):
+            if pattern_combo.itemData(i) == current_pattern:
+                pattern_combo.setCurrentIndex(i)
+                break
+
+        pattern_combo.currentTextChanged.connect(lambda: self.update_setting('pattern', pattern_combo.currentData()))
+        self.add_property_row("Pattern:", pattern_combo)
+
+        # Custom mask (for custom patterns)
+        mask_edit = QLineEdit()
+        mask_edit.setMaximumWidth(120)
+        mask_edit.setPlaceholderText("(999) 999-9999")
+        mask_edit.setText(self.get_setting('custom_mask', ''))
+        mask_edit.textChanged.connect(lambda t: self.update_setting('custom_mask', t))
+        self.add_property_row("Custom Mask:", mask_edit)
+
+        # Placeholder character
+        placeholder_edit = QLineEdit()
+        placeholder_edit.setMaximumWidth(30)
+        placeholder_edit.setText(self.get_setting('placeholder_char', '_'))
+        placeholder_edit.textChanged.connect(lambda t: self.update_setting('placeholder_char', t))
+        self.add_property_row("Placeholder:", placeholder_edit)
+
+        # Keep mask checkbox
+        keep_mask_check = QCheckBox("Keep mask in value")
+        keep_mask_check.setChecked(self.get_setting('keep_mask', False))
+        keep_mask_check.toggled.connect(lambda checked: self.update_setting('keep_mask', checked))
+        self.options_layout.addWidget(keep_mask_check)
+
+    def create_custom_options_simple(self):
+        """Create simplified custom formatting options"""
+
+        # Format script (smaller text area)
+        format_edit = QTextEdit()
+        format_edit.setMaximumHeight(60)
+        format_edit.setPlaceholderText("JavaScript formatting code...")
+        format_edit.setPlainText(self.get_setting('format_script', ''))
+        format_edit.textChanged.connect(lambda: self.update_setting('format_script', format_edit.toPlainText()))
+        self.add_property_row("Format Script:", format_edit)
+
+        # Keystroke script
+        keystroke_edit = QTextEdit()
+        keystroke_edit.setMaximumHeight(60)
+        keystroke_edit.setPlaceholderText("JavaScript keystroke validation...")
+        keystroke_edit.setPlainText(self.get_setting('keystroke_script', ''))
+        keystroke_edit.textChanged.connect(
+            lambda: self.update_setting('keystroke_script', keystroke_edit.toPlainText()))
+        self.add_property_row("Keystroke Script:", keystroke_edit)
+
+        # Validation script
+        validation_edit = QTextEdit()
+        validation_edit.setMaximumHeight(60)
+        validation_edit.setPlaceholderText("JavaScript validation...")
+        validation_edit.setPlainText(self.get_setting('validation_script', ''))
+        validation_edit.textChanged.connect(
+            lambda: self.update_setting('validation_script', validation_edit.toPlainText()))
+        self.add_property_row("Validation Script:", validation_edit)
+
+    def create_separator_combo(self):
+        """Create separator style combo with simplified labels"""
         separator_combo = QComboBox()
-        separator_combo.setMaximumWidth(200)
+        separator_combo.setMaximumWidth(100)
 
         for key, config in self.SEPARATOR_STYLES.items():
             separator_combo.addItem(config['label'], key)
 
-        separator_combo.currentTextChanged.connect(
-            lambda: self.update_setting('separator_style', separator_combo.currentData())
-        )
-        grid.addWidget(separator_combo, row, 1)
-        row += 1
-
-        # Decimal places
-        grid.addWidget(QLabel("Decimal Places:"), row, 0)
-        decimal_spin = QSpinBox()
-        decimal_spin.setRange(0, 10)
-        decimal_spin.setValue(2)
-        decimal_spin.setMaximumWidth(60)
-        decimal_spin.valueChanged.connect(
-            lambda v: self.update_setting('decimal_places', v)
-        )
-        grid.addWidget(decimal_spin, row, 1)
-        row += 1
-
-        # Negative number style
-        grid.addWidget(QLabel("Negative Numbers:"), row, 0)
-        negative_combo = QComboBox()
-        negative_combo.setMaximumWidth(150)
-        negative_combo.addItems(['Minus Sign', 'Red Color', 'Parentheses', 'Red Parentheses'])
-        negative_combo.currentTextChanged.connect(
-            lambda: self.update_setting('negative_style', negative_combo.currentText().lower().replace(' ', '_'))
-        )
-        grid.addWidget(negative_combo, row, 1)
-        row += 1
-
-        # Currency symbol
-        grid.addWidget(QLabel("Currency Symbol:"), row, 0)
-        currency_edit = QLineEdit()
-        currency_edit.setMaximumWidth(60)
-        currency_edit.setPlaceholderText("$, €, ¥")
-        currency_edit.textChanged.connect(
-            lambda t: self.update_setting('currency_symbol', t)
-        )
-        grid.addWidget(currency_edit, row, 1)
-
-        # Symbol position
-        position_combo = QComboBox()
-        position_combo.setMaximumWidth(80)
-        position_combo.addItems(['Before', 'After'])
-        position_combo.currentTextChanged.connect(
-            lambda: self.update_setting('symbol_position', position_combo.currentText().lower())
-        )
-        grid.addWidget(position_combo, row, 2)
-        row += 1
-
-        # Show leading zero
-        leading_zero_check = QCheckBox("Show Leading Zero")
-        leading_zero_check.setChecked(True)
-        leading_zero_check.toggled.connect(
-            lambda checked: self.update_setting('leading_zero', checked)
-        )
-        grid.addWidget(leading_zero_check, row, 0, 1, 2)
-
-        layout.addLayout(grid)
-
-    def create_percentage_options(self, layout):
-        """Create percentage formatting options"""
-        grid = QGridLayout()
-        row = 0
-
-        # Separator style (inherit from number format)
-        grid.addWidget(QLabel("Separator Style:"), row, 0)
-        separator_combo = QComboBox()
-        separator_combo.setMaximumWidth(200)
-
-        for key, config in self.SEPARATOR_STYLES.items():
-            if config['decimal'] in ['.', ',']:  # Only show relevant separators for percentages
-                separator_combo.addItem(config['label'], key)
+        # Set current selection from stored value
+        current_style = self.get_setting('separator_style', 'comma_dot')
+        for i in range(separator_combo.count()):
+            if separator_combo.itemData(i) == current_style:
+                separator_combo.setCurrentIndex(i)
+                break
 
         separator_combo.currentTextChanged.connect(
             lambda: self.update_setting('separator_style', separator_combo.currentData())
         )
-        grid.addWidget(separator_combo, row, 1)
-        row += 1
+        return separator_combo
 
-        # Decimal places
-        grid.addWidget(QLabel("Decimal Places:"), row, 0)
-        decimal_spin = QSpinBox()
-        decimal_spin.setRange(0, 10)
-        decimal_spin.setValue(2)
-        decimal_spin.setMaximumWidth(60)
-        decimal_spin.valueChanged.connect(
-            lambda v: self.update_setting('decimal_places', v)
-        )
-        grid.addWidget(decimal_spin, row, 1)
-        row += 1
+    def add_property_row(self, label_text: str, widget):
+        """Add a property row with consistent styling"""
+        row_layout = QHBoxLayout()
+        row_layout.setSpacing(8)
 
-        # Multiply by 100
-        multiply_check = QCheckBox("Multiply by 100 (0.25 → 25%)")
-        multiply_check.setChecked(True)
-        multiply_check.toggled.connect(
-            lambda checked: self.update_setting('multiply_by_100', checked)
-        )
-        grid.addWidget(multiply_check, row, 0, 1, 2)
-        row += 1
+        # Label with fixed width
+        label = QLabel(label_text)
+        label.setFixedWidth(80)  # Match other property labels
+        row_layout.addWidget(label)
 
-        # Space before %
-        space_check = QCheckBox("Space before % symbol")
-        space_check.toggled.connect(
-            lambda checked: self.update_setting('space_before_percent', checked)
-        )
-        grid.addWidget(space_check, row, 0, 1, 2)
+        # Widget
+        row_layout.addWidget(widget)
 
-        layout.addLayout(grid)
+        # Stretch to push everything left
+        row_layout.addStretch()
 
-    def create_date_options(self, layout):
-        """Create date formatting options"""
-        grid = QGridLayout()
-        row = 0
-
-        # Date format
-        grid.addWidget(QLabel("Date Format:"), row, 0)
-        format_combo = QComboBox()
-        format_combo.setMaximumWidth(150)
-        format_combo.addItems(self.DATE_FORMATS)
-        format_combo.currentTextChanged.connect(
-            lambda: self.update_setting('date_format', format_combo.currentText())
-        )
-        grid.addWidget(format_combo, row, 1)
-        row += 1
-
-        # Validate date
-        validate_check = QCheckBox("Validate date input")
-        validate_check.setChecked(True)
-        validate_check.toggled.connect(
-            lambda checked: self.update_setting('validate_date', checked)
-        )
-        grid.addWidget(validate_check, row, 0, 1, 2)
-        row += 1
-
-        # Date range
-        grid.addWidget(QLabel("Min Date:"), row, 0)
-        min_date_edit = QLineEdit()
-        min_date_edit.setPlaceholderText("YYYY-MM-DD")
-        min_date_edit.setMaximumWidth(100)
-        min_date_edit.textChanged.connect(
-            lambda t: self.update_setting('min_date', t)
-        )
-        grid.addWidget(min_date_edit, row, 1)
-        row += 1
-
-        grid.addWidget(QLabel("Max Date:"), row, 0)
-        max_date_edit = QLineEdit()
-        max_date_edit.setPlaceholderText("YYYY-MM-DD")
-        max_date_edit.setMaximumWidth(100)
-        max_date_edit.textChanged.connect(
-            lambda t: self.update_setting('max_date', t)
-        )
-        grid.addWidget(max_date_edit, row, 1)
-
-        layout.addLayout(grid)
-
-    def create_time_options(self, layout):
-        """Create time formatting options"""
-        grid = QGridLayout()
-        row = 0
-
-        # Time format
-        grid.addWidget(QLabel("Time Format:"), row, 0)
-        format_combo = QComboBox()
-        format_combo.setMaximumWidth(120)
-        format_combo.addItems(self.TIME_FORMATS)
-        format_combo.currentTextChanged.connect(
-            lambda: self.update_setting('time_format', format_combo.currentText())
-        )
-        grid.addWidget(format_combo, row, 1)
-        row += 1
-
-        # 24 hour format
-        hour24_check = QCheckBox("24 Hour Format")
-        hour24_check.setChecked(True)
-        hour24_check.toggled.connect(
-            lambda checked: self.update_setting('hour24_format', checked)
-        )
-        grid.addWidget(hour24_check, row, 0, 1, 2)
-        row += 1
-
-        # Show seconds
-        seconds_check = QCheckBox("Show Seconds")
-        seconds_check.toggled.connect(
-            lambda checked: self.update_setting('show_seconds', checked)
-        )
-        grid.addWidget(seconds_check, row, 0, 1, 2)
-        row += 1
-
-        # Validate time
-        validate_check = QCheckBox("Validate time input")
-        validate_check.setChecked(True)
-        validate_check.toggled.connect(
-            lambda checked: self.update_setting('validate_time', checked)
-        )
-        grid.addWidget(validate_check, row, 0, 1, 2)
-
-        layout.addLayout(grid)
-
-    def create_special_options(self, layout):
-        """Create special formatting options"""
-        grid = QGridLayout()
-        row = 0
-
-        # Pattern selection
-        grid.addWidget(QLabel("Special Pattern:"), row, 0)
-        pattern_combo = QComboBox()
-        pattern_combo.setMaximumWidth(180)
-
-        for key, config in self.SPECIAL_PATTERNS.items():
-            pattern_combo.addItem(key.replace('_', ' ').title(), key)
-
-        pattern_combo.currentTextChanged.connect(
-            lambda: self.update_setting('pattern', pattern_combo.currentData())
-        )
-        grid.addWidget(pattern_combo, row, 1)
-        row += 1
-
-        # Custom mask (for custom_mask pattern)
-        grid.addWidget(QLabel("Custom Mask:"), row, 0)
-        mask_edit = QLineEdit()
-        mask_edit.setPlaceholderText("(999) 999-9999")
-        mask_edit.setMaximumWidth(120)
-        mask_edit.textChanged.connect(
-            lambda t: self.update_setting('custom_mask', t)
-        )
-        grid.addWidget(mask_edit, row, 1)
-        row += 1
-
-        # Placeholder character
-        grid.addWidget(QLabel("Placeholder Char:"), row, 0)
-        placeholder_edit = QLineEdit()
-        placeholder_edit.setText("_")
-        placeholder_edit.setMaximumWidth(30)
-        placeholder_edit.textChanged.connect(
-            lambda t: self.update_setting('placeholder_char', t)
-        )
-        grid.addWidget(placeholder_edit, row, 1)
-        row += 1
-
-        # Keep mask in value
-        keep_mask_check = QCheckBox("Keep mask characters in value")
-        keep_mask_check.toggled.connect(
-            lambda checked: self.update_setting('keep_mask', checked)
-        )
-        grid.addWidget(keep_mask_check, row, 0, 1, 2)
-
-        layout.addLayout(grid)
-
-    def create_custom_options(self, layout):
-        """Create custom JavaScript formatting options"""
-        grid = QGridLayout()
-        row = 0
-
-        # Format script
-        grid.addWidget(QLabel("Format Script:"), row, 0)
-        row += 1
-
-        format_edit = QTextEdit()
-        format_edit.setMaximumHeight(60)
-        format_edit.setPlaceholderText("JavaScript code for formatting...")
-        format_edit.textChanged.connect(
-            lambda: self.update_setting('format_script', format_edit.toPlainText())
-        )
-        grid.addWidget(format_edit, row, 0, 1, 2)
-        row += 1
-
-        # Keystroke script
-        grid.addWidget(QLabel("Keystroke Script:"), row, 0)
-        row += 1
-
-        keystroke_edit = QTextEdit()
-        keystroke_edit.setMaximumHeight(60)
-        keystroke_edit.setPlaceholderText("JavaScript code for keystroke validation...")
-        keystroke_edit.textChanged.connect(
-            lambda: self.update_setting('keystroke_script', keystroke_edit.toPlainText())
-        )
-        grid.addWidget(keystroke_edit, row, 0, 1, 2)
-        row += 1
-
-        # Validation script
-        grid.addWidget(QLabel("Validation Script:"), row, 0)
-        row += 1
-
-        validation_edit = QTextEdit()
-        validation_edit.setMaximumHeight(60)
-        validation_edit.setPlaceholderText("JavaScript code for validation...")
-        validation_edit.textChanged.connect(
-            lambda: self.update_setting('validation_script', validation_edit.toPlainText())
-        )
-        grid.addWidget(validation_edit, row, 0, 1, 2)
-
-        layout.addLayout(grid)
+        self.options_layout.addLayout(row_layout)
 
     def update_setting(self, key: str, value: Any):
         """Update a format setting and refresh preview"""
@@ -553,6 +477,9 @@ class TextFormatWidget(QWidget):
             self.format_config['settings'] = {}
 
         self.format_config['settings'][key] = value
+        print(f"DEBUG: Updated setting {key} = {value}")  # Debug line
+        print(f"DEBUG: Current settings: {self.format_config['settings']}")  # Debug line
+
         self.update_preview()
         self.formatChanged.emit(self.format_config)
 
@@ -589,7 +516,6 @@ class TextFormatWidget(QWidget):
         separator_style = settings.get('separator_style', 'comma_dot')
         decimal_places = settings.get('decimal_places', 2)
         currency_symbol = settings.get('currency_symbol', '')
-        symbol_position = settings.get('symbol_position', 'before')
 
         # Get separator configuration
         sep_config = self.SEPARATOR_STYLES.get(separator_style, self.SEPARATOR_STYLES['comma_dot'])
@@ -604,30 +530,23 @@ class TextFormatWidget(QWidget):
             parts = formatted.split('.')
             formatted = decimal_sep.join(parts)
 
-        # Add thousands separator
-        if thousands_sep:
+        # Add thousands separator (simplified)
+        if thousands_sep and decimal_sep in formatted:
             parts = formatted.split(decimal_sep)
             integer_part = parts[0]
 
-            # Add thousands separators (simplified)
+            # Add thousands separators every 3 digits from right
             if len(integer_part) > 3:
-                # Insert separators every 3 digits from right
                 chars = list(integer_part)
                 for i in range(len(chars) - 3, 0, -3):
                     chars.insert(i, thousands_sep)
                 integer_part = ''.join(chars)
 
-            if len(parts) > 1:
-                formatted = integer_part + decimal_sep + parts[1]
-            else:
-                formatted = integer_part
+            formatted = integer_part + decimal_sep + parts[1] if len(parts) > 1 else integer_part
 
         # Add currency symbol
         if currency_symbol:
-            if symbol_position == 'before':
-                formatted = currency_symbol + formatted
-            else:
-                formatted = formatted + currency_symbol
+            formatted = currency_symbol + formatted
 
         return formatted
 
@@ -665,8 +584,6 @@ class TextFormatWidget(QWidget):
         preview = preview.replace('MM', f"{now.month:02d}")
         preview = preview.replace('DD', f"{now.day:02d}")
         preview = preview.replace('MMM', now.strftime('%b'))
-        preview = preview.replace('MMMM', now.strftime('%B'))
-        preview = preview.replace('DDD', now.strftime('%a'))
 
         return preview
 
@@ -699,18 +616,22 @@ class TextFormatWidget(QWidget):
 
     def load_format_config(self, config: Dict[str, Any]):
         """Load format configuration into UI"""
-        self.format_config = config
+        self._loading_config = True  # Prevent change signals during load
 
-        # Set category
-        category = config.get('category', 'None')
+        self.format_config = config.copy() if config else {'category': 'None', 'settings': {}}
+
+        # Set category dropdown
+        category = self.format_config.get('category', 'None')
         for i in range(self.category_combo.count()):
             if self.category_combo.itemData(i) == category:
                 self.category_combo.setCurrentIndex(i)
                 break
 
-        # Update options and preview
+        # Update options UI with current settings
         self.update_options_ui()
         self.update_preview()
+
+        self._loading_config = False  # Re-enable change signals
 
     def get_format_config(self) -> Dict[str, Any]:
         """Get current format configuration"""
@@ -724,30 +645,3 @@ class TextFormatWidget(QWidget):
                 child.widget().deleteLater()
             elif child.layout():
                 self.clear_layout(child.layout())
-
-
-# Property definition for integration with field schema
-def create_text_format_property_group() -> PropertyGroup:
-    """Create property group for text format configuration"""
-    return PropertyGroup(
-        name="text_format",
-        label="Text Format",
-        description="Configure text field formatting options",
-        properties=[
-            PropertyDefinition(
-                name="format_category",
-                label="Format Category",
-                widget_type=PropertyWidgetType.CHOICE,
-                default_value="None",
-                choices=list(TextFormatWidget.FORMAT_CATEGORIES.keys()),
-                description="Type of formatting to apply"
-            ),
-            PropertyDefinition(
-                name="format_settings",
-                label="Format Settings",
-                widget_type=PropertyWidgetType.TEXT,  # JSON string
-                default_value="{}",
-                description="Category-specific format configuration"
-            )
-        ]
-    )

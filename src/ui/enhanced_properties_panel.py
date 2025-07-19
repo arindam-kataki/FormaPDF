@@ -242,7 +242,8 @@ class EnhancedPropertiesPanel(QWidget):
         name_label = QLabel("Field Name:")
         name_label.setFixedWidth(80)  # Fixed width for alignment
         name_widget = TextPropertyWidget("name", field.name)
-        name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        #name_widget.connect_signal(lambda value: self._emit_property_change("name", value))
+        name_widget.widget.editingFinished.connect(lambda: self.handle_name_change(name_widget.widget.text()))
         name_layout.addWidget(name_label)
         name_layout.addWidget(name_widget.widget)
         basic_layout.addLayout(name_layout)
