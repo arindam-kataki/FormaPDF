@@ -364,7 +364,7 @@ class ProjectManagementMixin:
             self.project_saved.emit(self.current_project_path)
 
             if hasattr(self, 'statusBar'):
-                self.statusBar().showMessage("Project saved", 2000)
+                self.statusBar().showMessage("Project saved to " + self.current_project_path, 2000)
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to save project:\n{str(e)}")
@@ -605,33 +605,776 @@ class ProjectManagementMixin:
 
     def update_project_data_before_save(self):
         """
-        Hook for main window to update project data before saving
-        Override this in your main window to save current form data, etc.
+        Enhanced version that serializes field settings - HARDCODED APPROACH
+        Directly replace the existing method in project_management_mixin.py
         """
         if not self.current_project_data:
             return
 
-        # Update modification time
-        self.current_project_data["project_info"]["modified_date"] = datetime.now().isoformat()
+        try:
+            from datetime import datetime
 
-        # Hook for subclass to add form data, etc.
-        # Example:
-        # self.current_project_data["form_data"] = self.get_current_form_data()
-        # self.current_project_data["user_preferences"] = self.get_current_preferences()
+            # Update modification time
+            self.current_project_data["project_info"]["modified_date"] = datetime.now().isoformat()
+
+            # ===== FIND THE FIELD MANAGER =====
+            field_manager = None
+            all_fields = []
+
+            print("🔍 Looking for field_manager...")
+
+            # Try different locations for field_manager (hardcoded check)
+            if hasattr(self, 'field_manager') and self.field_manager:
+                field_manager = self.field_manager
+                print(f"✅ Found field_manager in main window")
+            elif hasattr(self, 'pdf_canvas') and self.pdf_canvas and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+                print(f"✅ Found field_manager in pdf_canvas")
+            else:
+                print("❌ No field_manager found")
+
+            # Get fields from field_manager (hardcoded access)
+            if field_manager:
+                if hasattr(field_manager, 'get_all_fields'):
+                    all_fields = field_manager.get_all_fields()
+                    print(f"✅ Got {len(all_fields)} fields from get_all_fields()")
+                elif hasattr(field_manager, 'all_fields'):
+                    all_fields = field_manager.all_fields
+                    print(f"✅ Got {len(all_fields)} fields from all_fields")
+                elif hasattr(field_manager, 'fields'):
+                    all_fields = field_manager.fields
+                    print(f"✅ Got {len(all_fields)} fields from fields")
+
+            # ===== SERIALIZE FIELDS (HARDCODED) =====
+            if all_fields:
+                print(f"🔄 Serializing {len(all_fields)} fields...")
+
+                enhanced_field_definitions = []
+                form_data = {}
+
+                for i, field in enumerate(all_fields):
+                    try:
+                        # Get field attributes safely (hardcoded extraction)
+                        field_id = getattr(field, 'id', f'field_{i}')
+                        field_type = getattr(field, 'type', 'text')
+                        if hasattr(field_type, 'value'):
+                            field_type = field_type.value
+                        else:
+                            field_type = str(field_type)
+
+                        # Create enhanced field data (hardcoded structure)
+                        enhanced_field_data = {
+                            'id': field_id,
+                            'type': field_type,
+                            'name': getattr(field, 'name', f'field_{i}'),
+                            'display_name': getattr(field, 'display_name', getattr(field, 'name', f'field_{i}')),
+
+                            # Position and size (hardcoded)
+                            'geometry': {
+                                'x': getattr(field, 'x', 0),
+                                'y': getattr(field, 'y', 0),
+                                'width': getattr(field, 'width', 100),
+                                'height': getattr(field, 'height', 25),
+                                'page_number': getattr(field, 'page_number', 0)
+                            },
+
+                            # Basic properties (hardcoded)
+                            'basic_properties': {
+                                'required': getattr(field, 'required', False),
+                                'read_only': getattr(field, 'read_only', False),
+                                'locked': getattr(field, 'locked', False),
+                                'tooltip': getattr(field, 'tooltip', ''),
+                                'visibility': getattr(field, 'visibility', 'Visible'),
+                                'orientation': getattr(field, 'orientation', '0'),
+                                'value': getattr(field, 'value', ''),
+                                'input_type': getattr(field, 'input_type', 'text'),
+                                'map_to': getattr(field, 'map_to', 'Auto')
+                            },
+
+                            # Custom properties (hardcoded)
+                            'custom_properties': getattr(field, 'properties', {}).copy() if getattr(field, 'properties',
+                                                                                                    None) else {},
+
+                            # Format settings (hardcoded)
+                            'format_settings': {
+                                'format_category': getattr(field, 'format_category', 'None'),
+                                'format_settings': getattr(field, 'format_settings', '{}')
+                            },
+
+                            # Basic property groups (hardcoded - simplified)
+                            'property_groups': self._get_basic_property_groups(field),
+
+                            # Metadata (hardcoded)
+                            'metadata': {
+                                'created_date': datetime.now().isoformat(),
+                                'field_version': '2.0',
+                                'schema_version': '1.0'
+                            }
+                        }
+
+                        enhanced_field_definitions.append(enhanced_field_data)
+
+                        # Collect form data (hardcoded)
+                        form_data[field_id] = getattr(field, 'value', '')
+
+                        print(f"✅ Serialized field: {field_id}")
+
+                    except Exception as e:
+                        print(f"❌ Error serializing field {i}: {e}")
+                        # Fallback to basic field data (hardcoded)
+                        try:
+                            basic_field = {
+                                'id': getattr(field, 'id', f'field_{i}'),
+                                'type': str(getattr(field, 'type', 'text')),
+                                'name': getattr(field, 'name', f'field_{i}'),
+                                'x': getattr(field, 'x', 0),
+                                'y': getattr(field, 'y', 0),
+                                'width': getattr(field, 'width', 100),
+                                'height': getattr(field, 'height', 25),
+                                'page_number': getattr(field, 'page_number', 0),
+                                'value': getattr(field, 'value', ''),
+                                'properties': getattr(field, 'properties', {})
+                            }
+                            enhanced_field_definitions.append(basic_field)
+                            form_data[basic_field['id']] = basic_field['value']
+                        except:
+                            print(f"❌ Complete failure for field {i}")
+
+                # Store field definitions (hardcoded)
+                self.current_project_data["field_definitions"] = enhanced_field_definitions
+
+                # Store form data (hardcoded)
+                self.current_project_data["form_data"] = form_data
+
+                # Create field summary (hardcoded)
+                field_summary = {
+                    'total_fields': len(all_fields),
+                    'fields_by_type': {},
+                    'fields_by_page': {},
+                    'serialization_date': datetime.now().isoformat(),
+                    'schema_version': '2.0'
+                }
+
+                # Count by type and page (hardcoded)
+                for field in all_fields:
+                    try:
+                        field_type = getattr(field, 'type', 'unknown')
+                        if hasattr(field_type, 'value'):
+                            field_type = field_type.value
+                        else:
+                            field_type = str(field_type)
+
+                        page_num = str(getattr(field, 'page_number', 0))
+
+                        field_summary['fields_by_type'][field_type] = field_summary['fields_by_type'].get(field_type,
+                                                                                                          0) + 1
+                        field_summary['fields_by_page'][page_num] = field_summary['fields_by_page'].get(page_num, 0) + 1
+                    except:
+                        pass
+
+                self.current_project_data["field_summary"] = field_summary
+
+                print(f"✅ Serialized {len(enhanced_field_definitions)} fields with {len(form_data)} form values")
+
+            else:
+                print("⚠️ No fields found to serialize")
+                # Set empty defaults (hardcoded)
+                self.current_project_data["field_definitions"] = []
+                self.current_project_data["form_data"] = {}
+
+            # ===== USER PREFERENCES (HARDCODED) =====
+            user_preferences = {}
+
+            # Get zoom level (hardcoded)
+            try:
+                if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'zoom_factor'):
+                    user_preferences['zoom_level'] = int(self.pdf_canvas.zoom_factor * 100)
+            except:
+                pass
+
+            # Get current page (hardcoded)
+            try:
+                if hasattr(self, 'current_page'):
+                    user_preferences['current_page'] = self.current_page
+                elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'current_page'):
+                    user_preferences['current_page'] = self.pdf_canvas.current_page
+            except:
+                user_preferences['current_page'] = 0
+
+            # Get grid visibility (hardcoded)
+            try:
+                if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'show_grid'):
+                    user_preferences['show_grid'] = self.pdf_canvas.show_grid
+                else:
+                    user_preferences['show_grid'] = False
+            except:
+                user_preferences['show_grid'] = False
+
+            # Get panel visibility (hardcoded)
+            try:
+                if hasattr(self, 'left_panel') and hasattr(self.left_panel, 'isVisible'):
+                    user_preferences['left_panel_visible'] = self.left_panel.isVisible()
+                else:
+                    user_preferences['left_panel_visible'] = True
+            except:
+                user_preferences['left_panel_visible'] = True
+
+            self.current_project_data["user_preferences"] = user_preferences
+
+            # ===== UPDATE HISTORY (HARDCODED) =====
+            history = self.current_project_data.get("history", {})
+            history["total_edits"] = history.get("total_edits", 0) + 1
+            history["last_save"] = datetime.now().isoformat()
+            self.current_project_data["history"] = history
+
+            print("🎉 Enhanced project save complete!")
+
+        except Exception as e:
+            print(f"❌ Error in enhanced save: {e}")
+            import traceback
+            traceback.print_exc()
+            # Basic fallback (hardcoded)
+            self.current_project_data["project_info"]["modified_date"] = datetime.now().isoformat()
+
+    def _get_basic_property_groups(self, field):
+        """
+        Helper method for basic property groups - HARDCODED
+        Add this method to project_management_mixin.py
+        """
+        try:
+            # Get field properties (hardcoded)
+            field_properties = getattr(field, 'properties', {})
+            field_type = getattr(field, 'type', 'text')
+            if hasattr(field_type, 'value'):
+                field_type = field_type.value
+            else:
+                field_type = str(field_type)
+
+            # Basic property groups based on field type (hardcoded)
+            property_groups = {}
+
+            # Basic properties for all fields (hardcoded)
+            property_groups['basic'] = {
+                'name': 'basic',
+                'label': 'Basic Properties',
+                'properties': {
+                    'name': {'value': getattr(field, 'name', ''), 'label': 'Field Name'},
+                    'required': {'value': getattr(field, 'required', False), 'label': 'Required'},
+                    'read_only': {'value': getattr(field, 'read_only', False), 'label': 'Read Only'},
+                    'tooltip': {'value': getattr(field, 'tooltip', ''), 'label': 'Tooltip'}
+                }
+            }
+
+            # Type-specific properties (hardcoded)
+            if field_type in ['text', 'email', 'phone', 'url']:
+                property_groups['text_properties'] = {
+                    'name': 'text_properties',
+                    'label': 'Text Properties',
+                    'properties': {
+                        'max_length': {'value': field_properties.get('max_length', 100), 'label': 'Max Length'},
+                        'placeholder': {'value': field_properties.get('placeholder', ''), 'label': 'Placeholder'},
+                        'multiline': {'value': field_properties.get('multiline', False), 'label': 'Multiline'}
+                    }
+                }
+            elif field_type == 'number':
+                property_groups['number_properties'] = {
+                    'name': 'number_properties',
+                    'label': 'Number Properties',
+                    'properties': {
+                        'min_value': {'value': field_properties.get('min_value', 0), 'label': 'Minimum Value'},
+                        'max_value': {'value': field_properties.get('max_value', 1000), 'label': 'Maximum Value'},
+                        'decimal_places': {'value': field_properties.get('decimal_places', 0),
+                                           'label': 'Decimal Places'}
+                    }
+                }
+            elif field_type in ['dropdown', 'radio', 'checkbox']:
+                property_groups['choice_properties'] = {
+                    'name': 'choice_properties',
+                    'label': 'Choice Properties',
+                    'properties': {
+                        'options': {'value': field_properties.get('options', []), 'label': 'Options'},
+                        'default_value': {'value': field_properties.get('default_value', ''), 'label': 'Default Value'}
+                    }
+                }
+
+            return property_groups
+
+        except Exception as e:
+            print(f"❌ Error getting basic property groups: {e}")
+            return {}
+
+    def _serialize_field_property_groups(self, field):
+        """
+        Helper method to serialize property groups for a specific field
+        Add this as a new method in project_management_mixin.py
+        """
+        try:
+            property_groups = self._property_schema.get_property_groups_for_field_type(field.type)
+            groups_data = {}
+
+            for group in property_groups:
+                group_data = {
+                    'name': group.name,
+                    'label': group.label,
+                    'description': group.description,
+                    'properties': {}
+                }
+
+                # Serialize each property in the group
+                for prop in group.properties:
+                    prop_value = field.properties.get(prop.name, prop.default_value)
+                    group_data['properties'][prop.name] = {
+                        'value': prop_value,
+                        'default_value': prop.default_value,
+                        'widget_type': prop.widget_type.value,
+                        'label': prop.label,
+                        'description': prop.description
+                    }
+
+                    # Add additional property metadata if available
+                    if hasattr(prop, 'choices') and prop.choices:
+                        group_data['properties'][prop.name]['choices'] = prop.choices
+                    if hasattr(prop, 'min_value') and prop.min_value is not None:
+                        group_data['properties'][prop.name]['min_value'] = prop.min_value
+                    if hasattr(prop, 'max_value') and prop.max_value is not None:
+                        group_data['properties'][prop.name]['max_value'] = prop.max_value
+                    if hasattr(prop, 'placeholder') and prop.placeholder:
+                        group_data['properties'][prop.name]['placeholder'] = prop.placeholder
+
+                groups_data[group.name] = group_data
+
+            return groups_data
+
+        except Exception as e:
+            print(f"❌ Error serializing property groups: {e}")
+            return {}
 
     def load_project_settings(self, project_data: Dict[str, Any]):
         """
-        Hook for main window to load project-specific settings
-        Override this in your main window to restore zoom, page, etc.
+        Complete enhanced method that loads field settings, restores fields, and refreshes UI
+        Replace the existing load_project_settings() method in project_management_mixin.py
         """
-        preferences = project_data.get("user_preferences", {})
+        try:
+            print("🔄 Loading project settings with field restoration and UI refresh...")
 
-        # Example settings that could be restored:
-        # zoom_level = preferences.get("zoom_level", 100)
-        # current_page = preferences.get("current_page", 1)
-        # view_mode = preferences.get("view_mode", "single_page")
+            # ===== FIND THE FIELD MANAGER =====
+            field_manager = None
 
-        print(f"📋 Loading project settings: {len(preferences)} preferences")
+            print("🔍 Looking for field_manager to restore fields...")
+
+            if hasattr(self, 'field_manager') and self.field_manager:
+                field_manager = self.field_manager
+                print(f"✅ Found field_manager in main window")
+            elif hasattr(self, 'pdf_canvas') and self.pdf_canvas and hasattr(self.pdf_canvas, 'field_manager'):
+                field_manager = self.pdf_canvas.field_manager
+                print(f"✅ Found field_manager in pdf_canvas")
+            else:
+                print("❌ No field_manager found for restoration")
+
+            # ===== RESTORE FIELDS =====
+            field_definitions = project_data.get("field_definitions", [])
+
+            if field_definitions and field_manager:
+                print(f"🔄 Restoring {len(field_definitions)} fields...")
+
+                # Clear existing fields first (hardcoded)
+                if hasattr(field_manager, 'clear_all_fields'):
+                    field_manager.clear_all_fields()
+                    print("✅ Cleared existing fields")
+                elif hasattr(field_manager, 'all_fields'):
+                    field_manager.all_fields.clear()
+                    if hasattr(field_manager, 'selected_fields'):
+                        field_manager.selected_fields.clear()
+                    print("✅ Cleared existing fields (direct)")
+
+                # Restore each field (hardcoded)
+                restored_count = 0
+                for i, field_data in enumerate(field_definitions):
+                    try:
+                        # Create field from saved data (hardcoded restoration)
+                        restored_field = self._restore_field_from_data(field_data)
+
+                        if restored_field:
+                            # Add field to manager (hardcoded)
+                            if hasattr(field_manager, 'add_field'):
+                                field_manager.add_field(restored_field)
+                            elif hasattr(field_manager, 'all_fields'):
+                                field_manager.all_fields.append(restored_field)
+
+                            restored_count += 1
+                            print(f"✅ Restored field {i + 1}/{len(field_definitions)}: {restored_field.id}")
+                        else:
+                            print(f"❌ Failed to restore field {i + 1}")
+
+                    except Exception as e:
+                        print(f"❌ Error restoring field {i + 1}: {e}")
+                        continue
+
+                print(f"🎉 Restored {restored_count}/{len(field_definitions)} fields successfully")
+
+                # Emit field manager signals if available (hardcoded)
+                try:
+                    if hasattr(field_manager, 'field_list_changed'):
+                        field_manager.field_list_changed.emit()
+                    print("✅ Emitted field_list_changed signal")
+                except:
+                    pass
+
+            elif field_definitions and not field_manager:
+                print(f"⚠️ Found {len(field_definitions)} fields to restore but no field_manager available")
+            else:
+                print("📝 No fields to restore")
+
+            # ===== RESTORE FORM DATA =====
+            form_data = project_data.get("form_data", {})
+            if form_data and field_manager:
+                print(f"🔄 Restoring form data for {len(form_data)} fields...")
+
+                # Get all fields from manager (hardcoded)
+                all_fields = []
+                if hasattr(field_manager, 'get_all_fields'):
+                    all_fields = field_manager.get_all_fields()
+                elif hasattr(field_manager, 'all_fields'):
+                    all_fields = field_manager.all_fields
+
+                # Restore field values (hardcoded)
+                restored_values = 0
+                for field_id, value in form_data.items():
+                    for field in all_fields:
+                        if getattr(field, 'id', '') == field_id:
+                            field.value = value
+                            restored_values += 1
+                            print(f"✅ Restored value for {field_id}: '{value}'")
+                            break
+
+                print(f"✅ Form data restoration complete: {restored_values}/{len(form_data)} values restored")
+
+            # ===== RESTORE USER PREFERENCES =====
+            preferences = project_data.get("user_preferences", {})
+            print(f"🔄 Restoring {len(preferences)} user preferences...")
+
+            # Restore zoom level (hardcoded)
+            zoom_level = preferences.get("zoom_level", 100)
+            try:
+                if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'set_zoom'):
+                    self.pdf_canvas.set_zoom(zoom_level / 100.0)
+                    print(f"✅ Restored zoom level: {zoom_level}%")
+                elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'zoom_factor'):
+                    self.pdf_canvas.zoom_factor = zoom_level / 100.0
+                    print(f"✅ Set zoom factor: {zoom_level}%")
+            except Exception as e:
+                print(f"⚠️ Could not restore zoom: {e}")
+
+            # Restore current page (hardcoded)
+            current_page = preferences.get("current_page", 1)
+            try:
+                if hasattr(self, 'go_to_page'):
+                    self.go_to_page(current_page)
+                    print(f"✅ Restored current page: {current_page}")
+                elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'current_page'):
+                    self.pdf_canvas.current_page = current_page
+                    print(f"✅ Set current page: {current_page}")
+                elif hasattr(self, 'current_page'):
+                    self.current_page = current_page
+                    print(f"✅ Set current page property: {current_page}")
+            except Exception as e:
+                print(f"⚠️ Could not restore page: {e}")
+
+            # Restore grid visibility (hardcoded)
+            show_grid = preferences.get("show_grid", False)
+            try:
+                if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'set_grid_visible'):
+                    self.pdf_canvas.set_grid_visible(show_grid)
+                    print(f"✅ Restored grid visibility: {show_grid}")
+                elif hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'show_grid'):
+                    self.pdf_canvas.show_grid = show_grid
+                    print(f"✅ Set grid visibility: {show_grid}")
+            except Exception as e:
+                print(f"⚠️ Could not restore grid: {e}")
+
+            # Restore left panel state (hardcoded)
+            left_panel_visible = preferences.get("left_panel_visible", True)
+            try:
+                if hasattr(self, 'left_panel'):
+                    if left_panel_visible:
+                        if hasattr(self.left_panel, 'show'):
+                            self.left_panel.show()
+                        elif hasattr(self.left_panel, 'setVisible'):
+                            self.left_panel.setVisible(True)
+                    else:
+                        if hasattr(self.left_panel, 'hide'):
+                            self.left_panel.hide()
+                        elif hasattr(self.left_panel, 'setVisible'):
+                            self.left_panel.setVisible(False)
+                    print(f"✅ Restored left panel visibility: {left_panel_visible}")
+            except Exception as e:
+                print(f"⚠️ Could not restore panel: {e}")
+
+            # ===== REFRESH UI CONTROLS =====
+            print("🔄 Refreshing UI controls after field restoration...")
+
+            try:
+                # Refresh the Properties tab dropdown list
+                if hasattr(self, 'field_palette') and self.field_palette:
+                    print("  🔄 Found field_palette, refreshing Properties tab...")
+
+                    if hasattr(self.field_palette, 'properties_tab'):
+                        properties_tab = self.field_palette.properties_tab
+                        print("  🔄 Found properties_tab, updating dropdown...")
+
+                        # Set field manager reference if not already set
+                        if not hasattr(properties_tab, 'field_manager') or not properties_tab.field_manager:
+                            if field_manager:
+                                properties_tab.field_manager = field_manager
+                                print("  ✅ Set field_manager on properties_tab")
+
+                        # Refresh the control dropdown list
+                        if hasattr(properties_tab, 'refresh_control_list'):
+                            properties_tab.refresh_control_list()
+                            print("  ✅ Called refresh_control_list()")
+                        elif hasattr(properties_tab, 'control_dropdown'):
+                            # Manual refresh if refresh_control_list doesn't exist
+                            self._manual_refresh_dropdown(properties_tab)
+                            print("  ✅ Manual dropdown refresh completed")
+
+                        # Check dropdown count after refresh
+                        if hasattr(properties_tab, 'control_dropdown'):
+                            count = properties_tab.control_dropdown.count()
+                            print(f"  📊 Dropdown now has {count} items")
+
+                    else:
+                        print("  ⚠️ No properties_tab found in field_palette")
+
+                    # Update field palette connections
+                    if hasattr(self.field_palette, 'set_field_manager') and field_manager:
+                        self.field_palette.set_field_manager(field_manager)
+                        print("  ✅ Updated field_palette field_manager")
+
+                else:
+                    print("  ⚠️ No field_palette found")
+
+                # Refresh the tabbed field palette connections
+                if hasattr(self, '_ensure_field_manager_integration'):
+                    self._ensure_field_manager_integration()
+                    print("  ✅ Called _ensure_field_manager_integration()")
+
+                # Force canvas refresh to show restored fields
+                if hasattr(self, 'pdf_canvas'):
+                    if hasattr(self.pdf_canvas, 'update'):
+                        self.pdf_canvas.update()
+                        print("  ✅ Refreshed PDF canvas")
+                    if hasattr(self.pdf_canvas, 'repaint'):
+                        self.pdf_canvas.repaint()
+                        print("  ✅ Repainted PDF canvas")
+
+                print("✅ UI controls refresh completed successfully!")
+
+            except Exception as e:
+                print(f"❌ Error refreshing UI controls: {e}")
+                import traceback
+                traceback.print_exc()
+
+            print("🎉 Project settings loaded successfully with field restoration and UI refresh!")
+
+        except Exception as e:
+            print(f"❌ Error loading project settings: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _manual_refresh_dropdown(self, properties_tab):
+        """
+        Manual dropdown refresh when refresh_control_list() doesn't exist
+        Add this helper method to project_management_mixin.py
+        """
+        try:
+            dropdown = properties_tab.control_dropdown
+            field_manager = getattr(properties_tab, 'field_manager', None)
+
+            if not field_manager:
+                print("    ❌ No field_manager for manual refresh")
+                return
+
+            # Block signals during update
+            dropdown.blockSignals(True)
+
+            try:
+                # Clear existing items
+                dropdown.clear()
+
+                # Get all fields
+                all_fields = []
+                if hasattr(field_manager, 'get_all_fields'):
+                    all_fields = field_manager.get_all_fields()
+                elif hasattr(field_manager, 'all_fields'):
+                    all_fields = field_manager.all_fields
+
+                print(f"    🔄 Manual refresh: found {len(all_fields)} fields")
+
+                if not all_fields:
+                    dropdown.addItem("No controls available", None)
+                    print("    📝 Added 'No controls available' placeholder")
+                else:
+                    # Add "No controls selected" as first option
+                    dropdown.addItem("No controls selected", None)
+
+                    # Add each field to dropdown
+                    for field in all_fields:
+                        try:
+                            field_id = getattr(field, 'id', 'unknown')
+                            field_type = getattr(field, 'type', 'unknown')
+                            if hasattr(field_type, 'value'):
+                                field_type = field_type.value
+                            else:
+                                field_type = str(field_type)
+
+                            display_text = f"{field_type.title()} - {field_id}"
+                            dropdown.addItem(display_text, field_id)
+                            print(f"    ✅ Added: {display_text}")
+
+                        except Exception as e:
+                            print(f"    ❌ Error adding field to dropdown: {e}")
+                            continue
+
+                    print(f"    ✅ Manual refresh complete: {dropdown.count()} items")
+
+            finally:
+                # Re-enable signals
+                dropdown.blockSignals(False)
+
+        except Exception as e:
+            print(f"❌ Error in manual dropdown refresh: {e}")
+
+    def _restore_field_from_data(self, field_data: Dict[str, Any]):
+        """
+        Helper method to restore a field from saved data - HARDCODED APPROACH
+        Add this method to project_management_mixin.py (same as before)
+        """
+        try:
+            from src.models.field_model import FormField, FieldType
+
+            # Check if this is enhanced format or legacy format (hardcoded)
+            if 'geometry' in field_data and 'basic_properties' in field_data:
+                # Enhanced format (hardcoded restoration)
+                geometry = field_data['geometry']
+                basic_props = field_data.get('basic_properties', {})
+                custom_props = field_data.get('custom_properties', {})
+                format_settings = field_data.get('format_settings', {})
+
+                # Create field with enhanced data (hardcoded)
+                field = FormField(
+                    id=field_data['id'],
+                    type=FieldType(field_data['type']),
+                    name=field_data['name'],
+                    x=geometry['x'],
+                    y=geometry['y'],
+                    width=geometry['width'],
+                    height=geometry['height'],
+                    page_number=geometry.get('page_number', 0),
+                    required=basic_props.get('required', False),
+                    read_only=basic_props.get('read_only', False),
+                    locked=basic_props.get('locked', False),
+                    tooltip=basic_props.get('tooltip', ''),
+                    visibility=basic_props.get('visibility', 'Visible'),
+                    orientation=basic_props.get('orientation', '0'),
+                    value=basic_props.get('value', ''),
+                    properties=custom_props.copy() if custom_props else {},
+                    format_category=format_settings.get('format_category', 'None'),
+                    format_settings=format_settings.get('format_settings', '{}'),
+                    input_type=basic_props.get('input_type', 'text'),
+                    map_to=basic_props.get('map_to', 'Auto')
+                )
+
+                # Restore property group values (hardcoded)
+                property_groups = field_data.get('property_groups', {})
+                for group_name, group_data in property_groups.items():
+                    properties = group_data.get('properties', {})
+                    for prop_name, prop_data in properties.items():
+                        if 'value' in prop_data:
+                            field.properties[prop_name] = prop_data['value']
+
+                print(f"✅ Restored enhanced format field: {field.id}")
+                return field
+
+            else:
+                # Legacy format (hardcoded restoration)
+                if hasattr(FormField, 'from_dict'):
+                    field = FormField.from_dict(field_data)
+                    print(f"✅ Restored legacy format field: {field.id}")
+                    return field
+                else:
+                    # Manual legacy restoration (hardcoded)
+                    field = FormField(
+                        id=field_data.get('id', 'unknown'),
+                        type=FieldType(field_data.get('type', 'text')),
+                        name=field_data.get('name', 'unknown'),
+                        x=field_data.get('x', 0),
+                        y=field_data.get('y', 0),
+                        width=field_data.get('width', 100),
+                        height=field_data.get('height', 25),
+                        page_number=field_data.get('page_number', 0),
+                        required=field_data.get('required', False),
+                        value=field_data.get('value', ''),
+                        properties=field_data.get('properties', {})
+                    )
+                    print(f"✅ Restored manual legacy field: {field.id}")
+                    return field
+
+        except Exception as e:
+            print(f"❌ Error restoring field from data: {e}")
+            return None
+
+    def _deserialize_enhanced_field(self, field_data: Dict[str, Any]):
+        """
+        Helper method to deserialize enhanced field format
+        Add this as a new method in project_management_mixin.py
+        """
+        try:
+            from src.models.field_model import FormField, FieldType
+
+            # Extract enhanced field data
+            geometry = field_data['geometry']
+            basic_props = field_data.get('basic_properties', {})
+            custom_props = field_data.get('custom_properties', {})
+            format_settings = field_data.get('format_settings', {})
+
+            # Create field with enhanced data
+            field = FormField(
+                id=field_data['id'],
+                type=FieldType(field_data['type']),
+                name=field_data['name'],
+                x=geometry['x'],
+                y=geometry['y'],
+                width=geometry['width'],
+                height=geometry['height'],
+                page_number=geometry.get('page_number', 0),
+                required=basic_props.get('required', False),
+                read_only=basic_props.get('read_only', False),
+                locked=basic_props.get('locked', False),
+                tooltip=basic_props.get('tooltip', ''),
+                visibility=basic_props.get('visibility', 'Visible'),
+                orientation=basic_props.get('orientation', '0'),
+                value=basic_props.get('value', ''),
+                properties=custom_props,
+                format_category=format_settings.get('format_category', 'None'),
+                format_settings=format_settings.get('format_settings', '{}'),
+                input_type=basic_props.get('input_type', 'text'),
+                map_to=basic_props.get('map_to', 'Auto')
+            )
+
+            # Restore property group values
+            property_groups = field_data.get('property_groups', {})
+            for group_name, group_data in property_groups.items():
+                properties = group_data.get('properties', {})
+                for prop_name, prop_data in properties.items():
+                    if 'value' in prop_data:
+                        field.properties[prop_name] = prop_data['value']
+
+            return field
+
+        except Exception as e:
+            print(f"❌ Error deserializing enhanced field: {e}")
+            # Fallback to basic deserialization
+            return FormField.from_dict(field_data)
 
     # =========================
     # LEGACY SUPPORT HOOKS
