@@ -324,7 +324,7 @@ class EnhancedFieldRenderer:
     def _render_signature_content(self, painter: QPainter, field: FormField,
                                   x: int, y: int, width: int, height: int):
         """Render signature field content"""
-        painter.drawText(x + 5, y + height // 2 + 4, "Signature Area")
+        painter.drawText(x + 5, y + height // 2 + 4, field.map_to)
 
         # Draw signature line
         line_y = y + height - 10

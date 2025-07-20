@@ -10,7 +10,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont
 
-from ui.properties_panel import PropertiesPanel  # Existing properties panel
+from ui.property_widgets import PropertiesPanel  # Existing properties panel
 
 
 class ControlsTab(QWidget):
@@ -77,17 +77,17 @@ class ControlsTab(QWidget):
         # Define field types with icons and descriptions
         field_types = [
             ("text", "📝", "Text Field", "Single line text input"),
-            ("textarea", "📄", "Text Area", "Multi-line text input"),
-            ("password", "🔒", "Password", "Password input field"),
+            #("textarea", "📄", "Text Area", "Multi-line text input"),
+            #("password", "🔒", "Password", "Password input field"),
             ("checkbox", "☑️", "Checkbox", "Checkable box"),
             ("radio", "🔘", "Radio Button", "Single selection option"),
             ("dropdown", "📋", "Dropdown", "Selection list"),
             ("list_box", "📋", "List Box", "Multi-selection list"),
-            ("date", "📅", "Date Field", "Date picker"),
-            ("number", "🔢", "Number Field", "Numeric input"),
-            ("email", "📧", "Email Field", "Email address input"),
-            ("phone", "📞", "Phone", "Phone number input"),
-            ("url", "🔗", "URL", "Website URL input"),
+            #("date", "📅", "Date Field", "Date picker"),
+            #("number", "🔢", "Number Field", "Numeric input"),
+            #("email", "📧", "Email Field", "Email address input"),
+            #("phone", "📞", "Phone", "Phone number input"),
+            #("url", "🔗", "URL", "Website URL input"),
             ("file_upload", "📎", "File Upload", "File selection input"),
             ("button", "🔘", "Button", "Clickable button"),
             ("label", "🏷️", "Label", "Text label"),
@@ -402,7 +402,7 @@ class PropertiesTab(QWidget):
 
             # Fallback to original PropertiesPanel
             try:
-                from ui.properties_panel import PropertiesPanel
+                from ui.property_widgets import PropertiesPanel
                 self.properties_panel = PropertiesPanel()
 
                 # Connect property change signals with signal conversion
@@ -1003,6 +1003,7 @@ class PropertiesTab(QWidget):
                     self.properties_placeholder.setText(f"Properties for {str(field_type).title()} field:\n{field_id}")
                 else:
                     self.properties_placeholder.setText("Properties panel will appear here when a control is selected")
+
 
         except Exception as e:
             print(f"❌ Error updating properties display: {e}")

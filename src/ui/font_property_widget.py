@@ -72,13 +72,13 @@ class FontPropertyWidget(QWidget):
 
         # Stack checkboxes vertically
         self.bold_check = QCheckBox("Bold")
-        #font_layout.addWidget(self.bold_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(self.bold_check, 2, 1, Qt.AlignmentFlag.AlignLeft)
 
         self.italic_check = QCheckBox("Italic")
-        #font_layout.addWidget(self.italic_check, 3, 1, Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(self.italic_check, 3, 1, Qt.AlignmentFlag.AlignLeft)
 
         self.underline_check = QCheckBox("Underline")
-        #font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
+        font_layout.addWidget(self.underline_check, 4, 1, Qt.AlignmentFlag.AlignLeft)
 
         layout.addLayout(font_layout)
 
@@ -119,6 +119,7 @@ class FontPropertyWidget(QWidget):
             self.alignment_combo.setCurrentText("Left")  # Default selection
             self.alignment_combo.setFixedWidth(100)  # Consistent width
             font_layout.addWidget(self.alignment_combo, 6, 1, Qt.AlignmentFlag.AlignLeft)
+            self.alignment_combo.currentTextChanged.connect(self.on_font_changed)
         else:
             self.alignment_combo = None  # ← Important: Set to None when not created
 
@@ -130,7 +131,7 @@ class FontPropertyWidget(QWidget):
         self.bold_check.toggled.connect(self.on_font_changed)
         self.italic_check.toggled.connect(self.on_font_changed)
         self.underline_check.toggled.connect(self.on_font_changed)
-        self.alignment_combo.currentTextChanged.connect(self.on_font_changed)
+
 
     def on_auto_size_toggled(self, checked: bool):
         """Handle auto-size toggle"""

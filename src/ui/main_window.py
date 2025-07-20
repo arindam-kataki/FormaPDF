@@ -36,7 +36,7 @@ except ImportError:
 try:
     from ui.field_palette import EnhancedFieldPalette
     from ui.tabbed_field_palette import TabbedFieldPalette
-    from ui.properties_panel import PropertiesPanel
+    #from ui.property_widgets import PropertiesPanel
     FIELD_PALETTE_AVAILABLE = True
 except ImportError:
     print("Warning: FieldPalette not available")
@@ -45,13 +45,13 @@ except ImportError:
 
 try:
     from ui.enhanced_properties_panel import EnhancedPropertiesPanel
-    from ui.properties_panel import PropertiesPanel  # Keep original as fallback
+    from ui.property_widgets import PropertiesPanel  # Keep original as fallback
     PROPERTIES_PANEL_AVAILABLE = True
     ENHANCED_PROPERTIES_AVAILABLE = True
 except ImportError:
     print("Warning: Enhanced PropertiesPanel not available, falling back to original")
     try:
-        from ui.properties_panel import PropertiesPanel
+        from ui.property_widgets import PropertiesPanel
         PROPERTIES_PANEL_AVAILABLE = True
         ENHANCED_PROPERTIES_AVAILABLE = False
     except ImportError:

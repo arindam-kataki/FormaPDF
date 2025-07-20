@@ -56,6 +56,8 @@ class FormField:
     format_category: str = "None"
     format_settings: str = "{}"
     input_type: str = "text"
+    map_to: str = "Auto"
+
 
     @classmethod
     def create(cls, field_type: str, x: int, y: int, field_id: Optional[str] = None, page_number:int = 0) -> 'FormField':
@@ -85,6 +87,7 @@ class FormField:
 
         field_type_enum = FieldType(field_type)
         width, height = default_sizes.get(field_type_enum, (100, 25))
+        map_to = "Auto"
 
         return cls(
             id=field_id,
@@ -118,7 +121,8 @@ class FormField:
             'properties': self.properties.copy(),
             'format_category': self.format_category,
             'format_settings': self.format_settings,
-            'input_type': self.input_type
+            'input_type': self.input_type,
+            'map_to': self.map_to,
         }
 
     @classmethod
@@ -143,7 +147,8 @@ class FormField:
             properties=data.get('properties', {}),
             format_category=data.get('format_category', 'None'),
             format_settings=data.get('format_settings', '{}'),
-            input_type=data.get('input_type', 'text')
+            input_type=data.get('input_type', 'text'),
+            map_to = data.get('map_to', 'Auto')
         )
 
     def contains_point(self, x: int, y: int) -> bool:
@@ -238,6 +243,68 @@ class FieldManager(QObject):
         self.page_manager = PageManager()
 
         print("✅ FieldManager initialized with list-based field management")
+
+
+
+    # ==========================================
+    # DOCUSIGN MAPPING
+    # ==========================================
+
+    def get_mapping_choices_for_field_type(self, field_type: FieldType) -> List[str]:
+        """Get DocuSign mapping options specific to each field type"""
+
+        base_choices = ["Auto"]
+
+        field_mappings = {
+            FieldType.TEXT: [
+                "DS-Text",
+                "DS-SSN",
+                "DS-Email",
+                "DS-Numbers",
+                "DS-Letters",
+                "DS-Date",
+                "DS-ZIP",
+                "DS-ZIP+4",
+                "DS-Formula",
+                "DS-Custom"
+            ],
+            FieldType.LABEL: [
+                "DS-Note",
+                "DS-Full Name",
+                "DS-First Name",
+                "DS-Last Name",
+                "DS-Company",
+                "DS-Title",
+                "DS-Email Address",
+                "DS-Date Signed",
+                "DS-EnvelopeId"
+            ],
+            FieldType.SIGNATURE: [
+                "DS-Sign Here",
+                "DS-Initial Here",
+                "DS-Draw",
+                "DS-Approve",
+                "DS-Decline",
+                "DS-Stamp",
+                "DS-eHanko"
+            ],
+            FieldType.BUTTON: [
+                "DS-Approve", "DS-Decline", "DS-Calculate"
+            ],
+        }
+
+        field_choices = field_mappings.get(field_type, [])
+        return base_choices if not field_choices else field_choices
+
+    def get_default_mapping(self, field_type: FieldType) -> str:
+        """Get intelligent default mapping based on field type"""
+        defaults = {
+            FieldType.TEXT: "DS-Text",
+            FieldType.LABEL: "DS-Note",
+            FieldType.SIGNATURE: "DS-SignHere",
+            FieldType.BUTTON: "DS-Approve",
+        }
+        return defaults.get(field_type, "Auto")
 
     # ==========================================
     # FIELD CREATION AND DELETION

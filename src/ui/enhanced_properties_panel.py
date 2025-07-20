@@ -14,7 +14,7 @@ from PyQt6.QtGui import QFont, QColor
 
 from models.field_model import FormField, FieldType
 from ui.appearance_properties_widget import AppearancePropertiesWidget
-from ui.properties_panel import ChoicePropertyWidget, MultilineTextPropertyWidget
+from ui.property_widgets import ChoicePropertyWidget, MultilineTextPropertyWidget
 from ui.text_format_widget import TextFormatWidget
 import json
 
@@ -261,6 +261,31 @@ class EnhancedPropertiesPanel(QWidget):
         basic_layout.addLayout(tooltip_layout)
         self.property_widgets["tooltip"] = tooltip_widget
 
+        map_to_layout = QHBoxLayout()
+        map_to_label = QLabel("Map to:")
+        map_to_label.setFixedWidth(80)
+
+        self.field_manager = self._get_field_manager()
+
+        # Get field-specific choices from field manager
+        if hasattr(self, 'field_manager') and self.field_manager:
+            map_to_choices = self.field_manager.get_mapping_choices_for_field_type(field.type)
+            default_mapping = self.field_manager.get_default_mapping(field.type)
+        else:
+            # Fallback if field_manager not available
+            map_to_choices = ["None"]
+            default_mapping = "Auto"
+
+        # Get current value or use default
+        current_map_to = getattr(field, 'map_to', default_mapping)
+
+        map_to_widget = ChoicePropertyWidget("map_to", map_to_choices, current_map_to)
+        map_to_widget.connect_signal(lambda value: self._emit_property_change("map_to", value))
+        map_to_layout.addWidget(map_to_label)
+        map_to_layout.addWidget(map_to_widget.widget)
+        basic_layout.addLayout(map_to_layout)
+        self.property_widgets["map_to"] = map_to_widget
+
         # Visibility (label and control on same line)
         visibility_layout = QHBoxLayout()
         visibility_label = QLabel("Visibility:")
@@ -270,7 +295,7 @@ class EnhancedPropertiesPanel(QWidget):
         visibility_widget.connect_signal(lambda value: self._emit_property_change("visibility", value))
         visibility_layout.addWidget(visibility_label)
         visibility_layout.addWidget(visibility_widget.widget)
-        basic_layout.addLayout(visibility_layout)
+        #basic_layout.addLayout(visibility_layout)
         self.property_widgets["visibility"] = visibility_widget
 
         # Orientation (label, smaller dropdown, and "degrees" label on same line)
@@ -293,7 +318,7 @@ class EnhancedPropertiesPanel(QWidget):
         orientation_layout.addWidget(degrees_label)
         orientation_layout.addStretch()  # Push everything to the left
 
-        basic_layout.addLayout(orientation_layout)
+        #basic_layout.addLayout(orientation_layout)
         self.property_widgets["orientation"] = orientation_widget
 
         # Required and Read Only checkboxes on same line
@@ -472,14 +497,14 @@ class EnhancedPropertiesPanel(QWidget):
         elif field_type == FieldType.NUMBER:
             return ['font', 'border', 'background', 'alignment']
 
-        elif field_type == FieldType.EMAIL:
-            return ['font', 'border', 'background', 'alignment']
+        #elif field_type == FieldType.EMAIL:
+        #    return ['font', 'border', 'background', 'alignment']
 
-        elif field_type == FieldType.PHONE:
-            return ['font', 'border', 'background', 'alignment']
+        #elif field_type == FieldType.PHONE:
+        #    return ['font', 'border', 'background', 'alignment']
 
-        elif field_type == FieldType.URL:
-            return ['font', 'border', 'background', 'alignment']
+        #elif field_type == FieldType.URL:
+        #    return ['font', 'border', 'background', 'alignment']
 
         elif field_type == FieldType.RADIO:
             return ['border']  # Minimal for radio buttons
@@ -487,8 +512,8 @@ class EnhancedPropertiesPanel(QWidget):
         elif field_type == FieldType.FILE_UPLOAD:
             return ['font', 'border', 'background']
 
-        elif field_type == FieldType.PASSWORD:
-            return ['font', 'border', 'background']
+        #elif field_type == FieldType.PASSWORD:
+        #    return ['font', 'border', 'background']
 
         else:
             return ['font', 'border', 'background']  # Default fallback
@@ -838,6 +863,22 @@ class EnhancedPropertiesPanel(QWidget):
     def _emit_property_change(self, property_name: str, value):
         """Emit property change signal"""
         self.propertyChanged.emit(property_name, value)
+
+    def _on_map_to_changed(self, map_to_value: str):
+        """Handle Map to dropdown change - update field behavior and display"""
+        try:
+            # First emit the property change as usual
+            self._emit_property_change("map_to", map_to_value)
+
+            # Then update the field's display/behavior based on selection
+            if hasattr(self, 'current_field') and self.current_field:
+                self._update_field_display_for_mapping(self.current_field, map_to_value)
+
+            print(f"🔄 Map to changed: {map_to_value}")
+
+        except Exception as e:
+            print(f"❌ Error handling map to change: {e}")
+
 
     def _emit_geometry_change(self):
         """Emit combined geometry change"""
