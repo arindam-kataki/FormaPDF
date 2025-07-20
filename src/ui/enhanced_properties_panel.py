@@ -211,7 +211,7 @@ class EnhancedPropertiesPanel(QWidget):
         self._create_appearance_properties(field)
 
         # Field-specific properties
-        self._create_field_specific_properties(field)
+        # self._create_field_specific_properties(field)
 
         # Add stretch to push everything to top
         self.properties_layout.addStretch()
@@ -471,31 +471,31 @@ class EnhancedPropertiesPanel(QWidget):
         """Return list of appearance properties to show for each field type"""
 
         if field_type == FieldType.TEXT:
-            return ['font', 'border', 'background', 'alignment']
+            return ['font', 'formatting-text'] #, 'border', 'background', 'alignment']
 
         elif field_type == FieldType.BUTTON:
-            return ['font', 'border', 'background']  # No alignment for buttons
+            return ['font', 'formatting'] #, 'border', 'background']  # No alignment for buttons
 
         elif field_type == FieldType.SIGNATURE:
-            return ['border']  # Only border for signatures
+            return ['font']  # Only border for signatures
 
         elif field_type == FieldType.LABEL:
-            return ['font', 'background', 'alignment']  # No border for labels
+            return ['font', 'formatting'] #'background', 'alignment']  # No border for labels
 
         elif field_type == FieldType.CHECKBOX:
-            return ['border']  # Minimal appearance for checkboxes
+            return ['font','formatting']  # Minimal appearance for checkboxes
 
         elif field_type == FieldType.DROPDOWN:
-            return ['font', 'border', 'background']
+            return ['font', 'formatting'] # 'border', 'background']
 
         elif field_type == FieldType.LIST_BOX:
-            return ['font', 'border', 'background']
+            return ['font', 'formatting'] # 'border', 'background']
 
-        elif field_type == FieldType.DATE:
-            return ['font', 'border', 'background']
+        #elif field_type == FieldType.DATE:
+        #    return ['font', 'border', 'background']
 
-        elif field_type == FieldType.NUMBER:
-            return ['font', 'border', 'background', 'alignment']
+        #elif field_type == FieldType.NUMBER:
+        #    return ['font', 'border', 'background', 'alignment']
 
         #elif field_type == FieldType.EMAIL:
         #    return ['font', 'border', 'background', 'alignment']
@@ -510,7 +510,7 @@ class EnhancedPropertiesPanel(QWidget):
             return ['border']  # Minimal for radio buttons
 
         elif field_type == FieldType.FILE_UPLOAD:
-            return ['font', 'border', 'background']
+            return ['font', 'formatting'] #'border', 'background']
 
         #elif field_type == FieldType.PASSWORD:
         #    return ['font', 'border', 'background']
@@ -519,6 +519,7 @@ class EnhancedPropertiesPanel(QWidget):
             return ['font', 'border', 'background']  # Default fallback
 
     def _create_field_specific_properties(self, field: FormField):
+
         """Create field type-specific properties"""
         if field.type == FieldType.TEXT:
             self._create_text_field_properties(field)
@@ -556,7 +557,7 @@ class EnhancedPropertiesPanel(QWidget):
 
     def _create_text_field_properties(self, field: FormField):
         """Create text field specific properties"""
-        text_group = QGroupBox("Text Properties")
+        text_group = QGroupBox("Text Properties_21")
         text_layout = QVBoxLayout()
         text_layout.setSpacing(8)
         text_layout.setContentsMargins(10, 10, 10, 10)

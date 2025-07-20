@@ -283,7 +283,7 @@ class EnhancedFieldRenderer:
     def _render_text_field_content(self, painter: QPainter, field: FormField,
                                    x: int, y: int, width: int, height: int, alignment: str):
         """Render text field content with alignment"""
-        value = field.value if field.value else "Text Field"
+        value = field.value if field.value else "Input Field"
         text_rect = painter.boundingRect(x + 5, y, width - 10, height,
                                          self._get_text_alignment_flag(alignment) | Qt.AlignmentFlag.AlignVCenter,
                                          str(value))
@@ -447,7 +447,7 @@ class EnhancedFieldRenderer:
 
         """Render label content with alignment"""
         # Get label text from properties or use default
-        label_text = field.properties.get("label_text", field.value if field.value else "Label")
+        label_text = field.properties.get("label_text", field.value if field.value else field.map_to)
 
         # Get word wrap setting
         word_wrap = field.properties.get("word_wrap", True)

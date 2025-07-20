@@ -76,13 +76,13 @@ class ControlsTab(QWidget):
 
         # Define field types with icons and descriptions
         field_types = [
-            ("text", "📝", "Text Field", "Single line text input"),
+            ("text", "📝", "Input Field", "Single line text input"),
             #("textarea", "📄", "Text Area", "Multi-line text input"),
             #("password", "🔒", "Password", "Password input field"),
             ("checkbox", "☑️", "Checkbox", "Checkable box"),
             ("radio", "🔘", "Radio Button", "Single selection option"),
             ("dropdown", "📋", "Dropdown", "Selection list"),
-            ("list_box", "📋", "List Box", "Multi-selection list"),
+            #("list_box", "📋", "List Box", "Multi-selection list"),
             #("date", "📅", "Date Field", "Date picker"),
             #("number", "🔢", "Number Field", "Numeric input"),
             #("email", "📧", "Email Field", "Email address input"),
@@ -90,7 +90,7 @@ class ControlsTab(QWidget):
             #("url", "🔗", "URL", "Website URL input"),
             ("file_upload", "📎", "File Upload", "File selection input"),
             ("button", "🔘", "Button", "Clickable button"),
-            ("label", "🏷️", "Label", "Text label"),
+            ("label", "🏷️", "Static Text", "Text"),
             ("signature", "✍️", "Signature", "Digital signature area"),
         ]
 

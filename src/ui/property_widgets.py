@@ -386,14 +386,14 @@ class XPropertiesPanel(QWidget):
 
         # X position
         pos_layout.addWidget(QLabel("X:"), 0, 0)
-        x_widget = NumberPropertyWidget("x", field.x, 0, 2000)
+        x_widget = NumberPropertyWidget("x", field.x, min_val=-2000, max_val=2000)
         #x_widget.connect_signal(lambda value: self._emit_property_change("x", value))
         pos_layout.addWidget(x_widget.widget, 0, 1)
         self.property_widgets["x"] = x_widget
 
         # Y position
         pos_layout.addWidget(QLabel("Y:"), 1, 0)
-        y_widget = NumberPropertyWidget("y", field.y, 0, 2000)
+        y_widget = NumberPropertyWidget("y", field.y, min_val=-2000, max_val=2000)
         #y_widget.connect_signal(lambda value: self._emit_property_change("y", value))
         pos_layout.addWidget(y_widget.widget, 1, 1)
         self.property_widgets["y"] = y_widget
@@ -439,7 +439,7 @@ class XPropertiesPanel(QWidget):
 
     def _create_text_field_properties(self, field: FormField):
         """Create text field specific properties"""
-        text_group = QGroupBox("Text Properties")
+        text_group = QGroupBox("Text Propertie_s")
         text_layout = QVBoxLayout()
 
         # Set proper spacing and margins

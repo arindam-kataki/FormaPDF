@@ -42,8 +42,12 @@ class FontPropertyWidget(QWidget):
         self.font_combo = QComboBox()
         self.font_combo.setMaximumWidth(120)  # Reasonable width for font names
         self.font_combo.setMinimumWidth(120)
-        self.font_combo.addItems(['Arial', 'Times New Roman', 'Courier New', 'Helvetica', 'Georgia'])
+        #self.font_combo.addItems(['Arial', 'Times New Roman', 'Courier New', 'Helvetica', 'Georgia'])
+        # --- change to fonts supported by docusign
+        self.font_combo.addItems(
+            ['Arial', 'Calibri', 'Times New Roman', 'Helvetica', 'Georgia', 'Verdana', 'Tahoma', 'Courier New'])
         font_layout.addWidget(self.font_combo, 0, 1, Qt.AlignmentFlag.AlignLeft)
+
 
         # Font size
         size_label = QLabel("Size:")
@@ -61,7 +65,7 @@ class FontPropertyWidget(QWidget):
         self.auto_size_check = QCheckBox("Auto")
         self.auto_size_check.setToolTip("Automatically size font to fit field height")
         self.auto_size_check.toggled.connect(self.on_auto_size_toggled)
-        font_layout.addWidget(self.auto_size_check, 1, 2, Qt.AlignmentFlag.AlignLeft)
+        #font_layout.addWidget(self.auto_size_check, 1, 2, Qt.AlignmentFlag.AlignLeft)
 
         # Font style checkboxes - stacked vertically
         style_label = QLabel("Style:")
@@ -112,14 +116,14 @@ class FontPropertyWidget(QWidget):
             alignment_label = QLabel("Align:")
             alignment_label.setFixedWidth(50)  # Same width as other labels
             alignment_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
-            font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
+            #font_layout.addWidget(alignment_label, 6, 0, Qt.AlignmentFlag.AlignVCenter)
 
             self.alignment_combo = QComboBox()
             self.alignment_combo.addItems(["Left", "Center", "Right"])
             self.alignment_combo.setCurrentText("Left")  # Default selection
             self.alignment_combo.setFixedWidth(100)  # Consistent width
-            font_layout.addWidget(self.alignment_combo, 6, 1, Qt.AlignmentFlag.AlignLeft)
-            self.alignment_combo.currentTextChanged.connect(self.on_font_changed)
+            #font_layout.addWidget(self.alignment_combo, 6, 1, Qt.AlignmentFlag.AlignLeft)
+            #self.alignment_combo.currentTextChanged.connect(self.on_font_changed)
         else:
             self.alignment_combo = None  # ← Important: Set to None when not created
 
@@ -146,7 +150,7 @@ class FontPropertyWidget(QWidget):
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked(),
             'underline': self.underline_check.isChecked(),
-            'alignment': self.alignment_combo.currentText()
+            #'alignment': self.alignment_combo.currentText()
 
         }
         self.fontChanged.emit(self.font_props)
@@ -159,7 +163,7 @@ class FontPropertyWidget(QWidget):
             'bold': self.bold_check.isChecked(),
             'italic': self.italic_check.isChecked(),
             'underline': self.underline_check.isChecked(),
-            'alignment': self.alignment_combo.currentText(),
+            #'alignment': self.alignment_combo.currentText(),
             'color': self.text_color_widget.get_color()
         }
 
@@ -174,6 +178,7 @@ class FontPropertyWidget(QWidget):
         try:
             widgets_to_block = [
                 self.font_combo,
+                self.size_combo,
                 self.size_spinner,
                 self.bold_check,
                 self.italic_check,

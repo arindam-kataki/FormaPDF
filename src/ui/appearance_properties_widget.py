@@ -27,7 +27,7 @@ class AppearancePropertiesWidget(QWidget):
 
         # Font properties group (only if requested)
         if 'font' in self.show_properties:
-            self.font_group = QGroupBox("Text")
+            self.font_group = QGroupBox("Formatting")
             font_layout = QVBoxLayout()
             show_text_alignment = 'alignment' in self.show_properties
             self.font_widget = FontPropertyWidget(
