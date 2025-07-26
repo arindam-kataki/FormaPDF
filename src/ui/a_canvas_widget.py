@@ -5,7 +5,7 @@ from typing import Optional, List
 
 
 class CanvasWidget(QWidget):
-    """Canvas widget for rendering PDF pages - listens to document signals"""
+    """Canvas widget for rendering PDF pages - fixed paint loop issue"""
 
     # Signals
     pageChanged = pyqtSignal(int)  # Emitted when current page changes
@@ -32,6 +32,10 @@ class CanvasWidget(QWidget):
         self.render_timer.setSingleShot(True)
         self.needs_render = False
 
+        # CRITICAL: Prevent infinite paint loops
+        self.is_painting = False
+        self.paint_count = 0
+
         # UI settings
         self.setMinimumSize(400, 300)
         self.setMouseTracking(True)
@@ -39,34 +43,60 @@ class CanvasWidget(QWidget):
         # Background
         self.setStyleSheet("background-color: #2b2b2b;")
 
+        print("🎨 Canvas widget initialized")
+
     @pyqtSlot(object)
     def on_document_loaded(self, document):
         """Handle document loaded signal from main window"""
-        print(f"Canvas: Document loaded with {document.get_page_count()} pages")
+        print(f"📄 Canvas: Document loaded with {document.get_page_count()} pages")
         self._load_document(document)
 
     @pyqtSlot()
     def on_document_closed(self):
         """Handle document closed signal from main window"""
-        print("Canvas: Document closed")
+        print("❌ Canvas: Document closed")
         self._clear_document()
 
     def _load_document(self, document):
         """Internal method to load document into canvas"""
+        print("🔄 Loading document into canvas...")
         self.document = document
 
         if document:
-            from a_layout_manager import LayoutManager
-            self.layout_manager = LayoutManager(document, self.zoom_level)
-            self._update_canvas_size()
-            self.current_page = 0
-            self.pageChanged.emit(0)
-            self.schedule_render()
+            try:
+                from a_layout_manager import LayoutManager
+                print("📐 Creating layout manager...")
+                self.layout_manager = LayoutManager(document, self.zoom_level)
+
+                # Get canvas size info
+                width, height = self.layout_manager.get_canvas_size()
+                print(f"📏 Canvas size calculated: {width}x{height}")
+
+                self._update_canvas_size()
+                self.current_page = 0
+                self.pageChanged.emit(0)
+
+                # Set initial visible pages - simplified
+                print("🔍 Setting initial visible pages...")
+                visible_pages = [0]  # Start with just first page
+                if self.document.get_page_count() > 1:
+                    visible_pages.append(1)
+
+                print(f"👁️ Initial visible pages: {visible_pages}")
+                self.visible_pages = visible_pages
+                self.schedule_render()
+
+                print("✅ Document loaded successfully into canvas")
+            except Exception as e:
+                print(f"❌ Error loading document into canvas: {e}")
+                import traceback
+                traceback.print_exc()
         else:
             self._clear_document()
 
     def _clear_document(self):
         """Internal method to clear document from canvas"""
+        print("🧹 Clearing document from canvas...")
         self.document = None
         self.layout_manager = None
         self.rendered_pages.clear()
@@ -74,16 +104,12 @@ class CanvasWidget(QWidget):
         self.current_page = 0
         self.update()
 
-    def load_document(self, document):
-        """DEPRECATED: Use signals instead. Load a PDF document for display"""
-        print("Warning: load_document() is deprecated. Use document signals instead.")
-        self._load_document(document)
-
     def set_zoom(self, zoom_level: float):
         """Set zoom level and update layout"""
         zoom_level = max(0.1, min(5.0, zoom_level))  # Clamp zoom range
 
         if abs(self.zoom_level - zoom_level) > 0.01:  # Avoid unnecessary updates
+            print(f"🔍 Setting zoom to {zoom_level:.2f}")
             self.zoom_level = zoom_level
 
             if self.layout_manager:
@@ -132,6 +158,11 @@ class CanvasWidget(QWidget):
 
     def set_visible_pages(self, page_indices: List[int], viewport_rect: QRectF):
         """Set which pages are currently visible"""
+        # Prevent updates during painting
+        if self.is_painting:
+            return
+
+        print(f"👁️ Setting visible pages: {page_indices}")
         self.visible_pages = page_indices
         self.viewport_rect = viewport_rect
         self.schedule_render()
@@ -162,13 +193,17 @@ class CanvasWidget(QWidget):
     def get_visible_pages_in_viewport(self, viewport_rect: QRectF) -> List[int]:
         """Get list of page indices visible in viewport"""
         if self.layout_manager:
-            return self.layout_manager.get_visible_pages(viewport_rect)
+            visible = self.layout_manager.get_visible_pages(viewport_rect)
+            print(f"🔍 Visible pages in viewport {viewport_rect}: {visible}")
+            return visible
         return []
 
     def get_canvas_size(self) -> tuple:
         """Get total canvas size needed"""
         if self.layout_manager:
-            return self.layout_manager.get_canvas_size()
+            size = self.layout_manager.get_canvas_size()
+            print(f"📏 Canvas size: {size}")
+            return size
         return (400, 300)
 
     def document_to_canvas_coordinates(self, page_index: int, doc_x: float, doc_y: float) -> tuple:
@@ -202,20 +237,33 @@ class CanvasWidget(QWidget):
 
     def schedule_render(self):
         """Schedule a render update (with debouncing)"""
+        if self.is_painting:  # Don't schedule during painting
+            return
+
+        print("⏰ Scheduling render...")
         self.needs_render = True
         self.render_timer.stop()
-        self.render_timer.start(50)  # 50ms delay for debouncing
+        self.render_timer.start(100)  # Increased delay to 100ms
 
     def _perform_render(self):
         """Perform the actual rendering"""
+        if self.is_painting:  # Skip if currently painting
+            print("⏸️ Skipping render - currently painting")
+            return
+
+        print("🎨 Performing render...")
         if not self.needs_render or not self.document or not self.layout_manager:
+            print("❌ Render cancelled - missing components")
             return
 
         self.needs_render = False
 
+        print(f"🎨 Rendering pages: {self.visible_pages}")
+
         # Render visible pages that aren't cached
         for page_index in self.visible_pages:
             if page_index not in self.rendered_pages:
+                print(f"🖼️ Rendering page {page_index}...")
                 self._render_page(page_index)
 
         # Clean up cache - keep only visible pages + 2 adjacent
@@ -229,48 +277,90 @@ class CanvasWidget(QWidget):
         for page_idx in pages_to_remove:
             del self.rendered_pages[page_idx]
 
-        self.update()  # Trigger paint event
+        print(f"🎨 Render complete. Cached pages: {list(self.rendered_pages.keys())}")
+
+        # Only call update if not currently painting
+        if not self.is_painting:
+            self.update()  # Trigger paint event
 
     def _render_page(self, page_index: int):
         """Render a single page"""
         try:
-            pixmap = self.document.render_page(page_index, self.zoom_level)
+            print(f"🖼️ Rendering page {page_index} at zoom {self.zoom_level:.2f}")
+
+            # CRITICAL FIX: Use consistent DPI calculation
+            # Calculate render DPI based on zoom to match layout manager expectations
+            base_dpi = 72  # PDF native DPI
+            render_dpi = int(base_dpi * self.zoom_level)
+
+            print(f"📐 Using render DPI: {render_dpi} (zoom: {self.zoom_level:.2f})")
+
+            pixmap = self.document.render_page(page_index, 1.0, render_dpi)  # Use zoom=1.0, control via DPI
+            print(f"✅ Page {page_index} rendered: {pixmap.width()}x{pixmap.height()}")
+
             self.rendered_pages[page_index] = pixmap
         except Exception as e:
-            print(f"Error rendering page {page_index}: {e}")
+            print(f"❌ Error rendering page {page_index}: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _update_canvas_size(self):
         """Update canvas size based on layout"""
         if self.layout_manager:
             width, height = self.layout_manager.get_canvas_size()
+            print(f"📏 Updating canvas size to: {width}x{height}")
             self.resize(max(width, 400), max(height, 300))
+            print(f"📏 Canvas widget size: {self.size()}")
 
     def paintEvent(self, event):
-        """Paint the visible pages"""
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-        # Paint background
-        painter.fillRect(self.rect(), QBrush(Qt.GlobalColor.darkGray))
-
-        if not self.document or not self.layout_manager:
-            self._paint_no_document(painter)
+        """Paint the visible pages - with loop prevention"""
+        # CRITICAL: Prevent infinite paint loops
+        if self.is_painting:
+            print("🔄 Paint event blocked - already painting")
             return
 
-        # Paint visible pages
-        for page_index in self.visible_pages:
-            self._paint_page(painter, page_index)
+        self.is_painting = True
+        self.paint_count += 1
+
+        print(f"🎨 Paint event #{self.paint_count}. Visible pages: {self.visible_pages}")
+
+        try:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Paint background
+            painter.fillRect(self.rect(), QBrush(Qt.GlobalColor.darkGray))
+
+            if not self.document or not self.layout_manager:
+                self._paint_no_document(painter)
+                return
+
+            # Paint visible pages
+            pages_painted = 0
+            for page_index in self.visible_pages:
+                if self._paint_page(painter, page_index):
+                    pages_painted += 1
+
+            print(f"🎨 Paint complete. Pages painted: {pages_painted}")
+
+        finally:
+            # ALWAYS reset painting flag
+            self.is_painting = False
 
     def _paint_no_document(self, painter):
         """Paint message when no document is loaded"""
         painter.setPen(QPen(Qt.GlobalColor.white))
         painter.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "No document loaded")
+        print("🎨 Painted 'no document' message")
 
-    def _paint_page(self, painter, page_index: int):
-        """Paint a single page"""
+    def _paint_page(self, painter, page_index: int) -> bool:
+        """Paint a single page - returns True if painted"""
         page_rect = self.layout_manager.get_page_rect(page_index)
         if not page_rect:
-            return
+            print(f"❌ No page rect for page {page_index}")
+            return False
+
+        print(f"🎨 Painting page {page_index} at rect {page_rect}")
 
         # Draw page background
         painter.fillRect(page_rect, QBrush(Qt.GlobalColor.white))
@@ -282,23 +372,18 @@ class CanvasWidget(QWidget):
         # Draw rendered content if available
         if page_index in self.rendered_pages:
             pixmap = self.rendered_pages[page_index]
+            print(f"🖼️ Drawing pixmap for page {page_index}: {pixmap.width()}x{pixmap.height()}")
 
-            # Center the pixmap in the page rect
-            x_offset = (page_rect.width() - pixmap.width()) / 2
-            y_offset = (page_rect.height() - pixmap.height()) / 2
-
-            draw_rect = QRectF(
-                page_rect.left() + x_offset,
-                page_rect.top() + y_offset,
-                pixmap.width(),
-                pixmap.height()
-            )
-
-            painter.drawPixmap(draw_rect.toRect(), pixmap)
+            # FIXED: Scale pixmap to fit page rect exactly
+            painter.drawPixmap(page_rect.toRect(), pixmap)
+            print(f"✅ Pixmap scaled and drawn for page {page_index}")
         else:
             # Draw loading indicator
             painter.setPen(QPen(Qt.GlobalColor.gray))
             painter.drawText(page_rect, Qt.AlignmentFlag.AlignCenter, f"Loading page {page_index + 1}...")
+            print(f"⏳ Loading indicator drawn for page {page_index}")
+
+        return True
 
     def mousePressEvent(self, event):
         """Handle mouse press events"""
@@ -313,7 +398,7 @@ class CanvasWidget(QWidget):
 
                 # Emit signal with page and document coordinates
                 self.mousePositionChanged.emit(page_index, doc_x, doc_y)
-                print(f"Clicked on page {page_index + 1} at document coords ({doc_x:.1f}, {doc_y:.1f})")
+                print(f"🖱️ Clicked on page {page_index + 1} at document coords ({doc_x:.1f}, {doc_y:.1f})")
 
         super().mousePressEvent(event)
 

@@ -2,12 +2,16 @@ import sys
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QScrollArea, QVBoxLayout,
                              QHBoxLayout, QWidget, QPushButton, QLabel, QSlider,
                              QFileDialog, QMenuBar, QStatusBar, QToolBar)
-from PyQt6.QtCore import Qt, QTimer, QRectF
+from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal
 from PyQt6.QtGui import QAction
 
 
 class PDFMainWindow(QMainWindow):
-    """Main window - pure UI container with minimal logic"""
+    """Main window - with proper scroll area and canvas size handling"""
+
+    # Signals for document management
+    documentLoaded = pyqtSignal(object)  # Emitted when document is loaded
+    documentClosed = pyqtSignal()  # Emitted when document is closed
 
     def __init__(self):
         super().__init__()
@@ -29,7 +33,6 @@ class PDFMainWindow(QMainWindow):
 
         # Initialize UI
         self._setup_ui()
-        self._connect_signals()
 
         # Window properties
         self.setWindowTitle("PDF Viewer")
@@ -136,9 +139,11 @@ class PDFMainWindow(QMainWindow):
     def _create_scroll_area(self):
         """Create the scrollable area with canvas widget"""
         self.scroll_area = QScrollArea()
-        self.scroll_area.setWidgetResizable(True)
-        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+
+        # CRITICAL: Set these properties for proper scrolling
+        self.scroll_area.setWidgetResizable(False)  # Let canvas control its own size
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)  # Center the canvas
+        self.scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
         # Create canvas widget
@@ -152,20 +157,29 @@ class PDFMainWindow(QMainWindow):
         scrollbar = self.scroll_area.verticalScrollBar()
         scrollbar.valueChanged.connect(self._on_scroll_changed)
 
+        # Connect canvas signals immediately after creation
+        self._connect_signals()
+
     def _create_status_bar(self):
         """Create the status bar"""
         self.status_bar = QStatusBar()
         self.setStatusBar(self.status_bar)
-        self.status_bar.showMessage("Ready")
+        self.status_bar.showMessage("Ready - Open a PDF file to get started")
 
     def _connect_signals(self):
         """Connect canvas widget signals to main window handlers"""
-        # Connect after canvas is created
-        pass  # Will be connected in _create_scroll_area via canvas creation
+        if self.canvas_widget:
+            # Connect canvas signals
+            self.canvas_widget.pageChanged.connect(self._on_page_changed)
+            self.canvas_widget.zoomChanged.connect(self._on_zoom_changed)
 
-    # Event Handlers - delegate to canvas widget
+            # Connect document management signals
+            self.documentLoaded.connect(self.canvas_widget.on_document_loaded)
+            self.documentClosed.connect(self.canvas_widget.on_document_closed)
+
+    # Event Handlers - signal-driven architecture
     def _on_open_file(self):
-        """Handle file open - delegate to canvas"""
+        """Handle file open - emit document loaded signal"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, "Open PDF", "", "PDF Files (*.pdf)")
 
@@ -176,71 +190,222 @@ class PDFMainWindow(QMainWindow):
                 # Close existing document
                 if self.document:
                     self.document.close()
+                    self.documentClosed.emit()
 
                 # Load new document
                 self.document = PDFDocument(file_path)
                 self.total_pages = self.document.get_page_count()
 
-                # Load into canvas widget
-                self.canvas_widget.load_document(self.document)
-
-                # Connect canvas signals after document is loaded
-                self.canvas_widget.pageChanged.connect(self._on_page_changed)
-                self.canvas_widget.zoomChanged.connect(self._on_zoom_changed)
+                # Emit signal for canvas to listen to
+                self.documentLoaded.emit(self.document)
 
                 # Update UI
                 self.current_page = 0
                 self._update_navigation_state()
                 self.status_bar.showMessage(f"Loaded: {file_path}")
 
-                # Reset scroll to top
-                self.scroll_area.verticalScrollBar().setValue(0)
+                # IMPORTANT: Update scroll area after document loads
+                QTimer.singleShot(100, self._update_scroll_area)
 
             except Exception as e:
                 self.status_bar.showMessage(f"Error loading PDF: {e}")
+                print(f"Error loading PDF: {e}")
+
+    def _update_scroll_area(self):
+        """Update scroll area after document is loaded"""
+        if self.canvas_widget and self.canvas_widget.layout_manager:
+            # Get the canvas size from layout manager
+            canvas_width, canvas_height = self.canvas_widget.get_canvas_size()
+            print(f"📏 Setting canvas size: {canvas_width}x{canvas_height}")
+
+            # Resize the canvas widget to match the calculated size
+            self.canvas_widget.resize(canvas_width, canvas_height)
+
+            # Force scroll area to update its scroll bars
+            self.scroll_area.updateGeometry()
+
+            # Initial viewport setup
+            self._setup_initial_viewport()
+
+            print(f"📏 Scroll area viewport: {self.scroll_area.viewport().size()}")
+            print(f"📏 Canvas widget size: {self.canvas_widget.size()}")
+
+    def _setup_initial_viewport(self):
+        """Setup initial viewport and visible pages"""
+        if not self.canvas_widget or not self.canvas_widget.layout_manager:
+            return
+
+        # Get scroll area viewport
+        viewport = self.scroll_area.viewport()
+        viewport_rect = QRectF(0, 0, viewport.width(), viewport.height())
+
+        # Get visible pages for initial viewport
+        visible_pages = self.canvas_widget.get_visible_pages_in_viewport(viewport_rect)
+
+        # Set visible pages in canvas
+        self.canvas_widget.set_visible_pages(visible_pages, viewport_rect)
+
+        # Reset scroll to top
+        self.scroll_area.verticalScrollBar().setValue(0)
+        self.scroll_area.horizontalScrollBar().setValue(0)
+
+        print(f"👁️ Initial viewport setup complete. Visible pages: {visible_pages}")
 
     def _on_zoom_in(self):
-        """Handle zoom in - delegate to canvas"""
+        """Handle zoom in - maintain current position"""
         if self.canvas_widget:
+            # Save current scroll position and page
+            old_scroll_y = self.scroll_area.verticalScrollBar().value()
+            old_page = self.current_page
+
             self.canvas_widget.zoom_in()
 
+            # Restore position after zoom
+            QTimer.singleShot(100, lambda: self._restore_zoom_position(old_page, old_scroll_y))
+
     def _on_zoom_out(self):
-        """Handle zoom out - delegate to canvas"""
+        """Handle zoom out - maintain current position"""
         if self.canvas_widget:
+            # Save current scroll position and page
+            old_scroll_y = self.scroll_area.verticalScrollBar().value()
+            old_page = self.current_page
+
             self.canvas_widget.zoom_out()
 
+            # Restore position after zoom
+            QTimer.singleShot(100, lambda: self._restore_zoom_position(old_page, old_scroll_y))
+
     def _on_zoom_slider_changed(self, value):
-        """Handle zoom slider - delegate to canvas"""
+        """Handle zoom slider - maintain current position"""
         if self.canvas_widget:
+            # Save current scroll position and page
+            old_scroll_y = self.scroll_area.verticalScrollBar().value()
+            old_page = self.current_page
+
             zoom_level = value / 100.0
             self.canvas_widget.set_zoom(zoom_level)
 
+            # Restore position after zoom
+            QTimer.singleShot(100, lambda: self._restore_zoom_position(old_page, old_scroll_y))
+
     def _on_fit_width(self):
-        """Handle fit width - delegate to canvas"""
+        """Handle fit width - maintain current page"""
         if self.canvas_widget:
+            # Save current page
+            old_page = self.current_page
+
             available_width = self.scroll_area.viewport().width()
             self.canvas_widget.fit_to_width(available_width)
 
+            # Navigate to the same page after fit
+            QTimer.singleShot(100, lambda: self._navigate_to_page_with_margin(old_page))
+
     def _on_fit_page(self):
-        """Handle fit page - delegate to canvas"""
+        """Handle fit page - maintain current page"""
         if self.canvas_widget:
+            # Save current page
+            old_page = self.current_page
+
             available_width = self.scroll_area.viewport().width()
             available_height = self.scroll_area.viewport().height()
             self.canvas_widget.fit_to_page(available_width, available_height)
 
+            # Navigate to the same page after fit
+            QTimer.singleShot(100, lambda: self._navigate_to_page_with_margin(old_page))
+
+    def _restore_zoom_position(self, target_page: int, old_scroll_y: int):
+        """Restore position after zoom operation"""
+        try:
+            if not self.canvas_widget or not self.canvas_widget.layout_manager:
+                return
+
+            # Method 1: Try to maintain relative position on the same page
+            page_y = self.canvas_widget.get_page_y_position(target_page)
+
+            # Calculate what percentage down the old page we were
+            if self.canvas_widget.layout_manager:
+                old_page_rect = self.canvas_widget.layout_manager.get_page_rect(target_page)
+                if old_page_rect:
+                    # Calculate relative position within the page (0.0 to 1.0)
+                    relative_position = 0.0
+                    if old_page_rect.height() > 0:
+                        page_relative_y = old_scroll_y - old_page_rect.top()
+                        relative_position = max(0.0, min(1.0, page_relative_y / old_page_rect.height()))
+
+                    # Apply the same relative position to the new (zoomed) page
+                    new_page_rect = self.canvas_widget.layout_manager.get_page_rect(target_page)
+                    if new_page_rect:
+                        new_scroll_y = new_page_rect.top() + (relative_position * new_page_rect.height())
+
+                        # Apply top margin
+                        top_margin = self.canvas_widget.layout_manager.PAGE_SPACING_VERTICAL
+                        final_scroll_y = max(0, new_scroll_y - top_margin)
+
+                        print(
+                            f"🔍 Zoom position restore: page {target_page}, relative pos {relative_position:.2f}, scroll to {final_scroll_y}")
+                        self.scroll_area.verticalScrollBar().setValue(int(final_scroll_y))
+
+                        # Update scroll area after position change
+                        self._update_scroll_area()
+                        return
+
+            # Fallback: Navigate to the page start with margin
+            self._navigate_to_page_with_margin(target_page)
+
+        except Exception as e:
+            print(f"❌ Error restoring zoom position: {e}")
+            # Final fallback: just go to the page
+            self._navigate_to_page_with_margin(target_page)
+
+    def _navigate_to_page_with_margin(self, page_index: int):
+        """Navigate to a page with proper top margin"""
+        if not self.canvas_widget:
+            return
+
+        try:
+            page_index = max(0, min(page_index, self.total_pages - 1))
+            y_position = self.canvas_widget.get_page_y_position(page_index)
+
+            # Apply top margin
+            top_margin = 0
+            if self.canvas_widget.layout_manager:
+                top_margin = self.canvas_widget.layout_manager.PAGE_SPACING_VERTICAL
+
+            scroll_position = max(0, y_position - top_margin)
+            self.scroll_area.verticalScrollBar().setValue(int(scroll_position))
+
+            print(f"📍 Navigated to page {page_index + 1} with margin")
+
+        except Exception as e:
+            print(f"❌ Error navigating to page: {e}")
+
     def _on_previous_page(self):
-        """Handle previous page - delegate to canvas"""
+        """Handle previous page - delegate to canvas with proper margin"""
         if self.canvas_widget and self.current_page > 0:
             target_page = self.current_page - 1
             y_position = self.canvas_widget.get_page_y_position(target_page)
-            self.scroll_area.verticalScrollBar().setValue(int(y_position))
+
+            # FIXED: Use layout manager constants for proper spacing
+            top_margin = 0
+            if self.canvas_widget.layout_manager:
+                top_margin = self.canvas_widget.layout_manager.PAGE_SPACING_VERTICAL
+
+            scroll_position = max(0, y_position - top_margin)
+            self.scroll_area.verticalScrollBar().setValue(int(scroll_position))
 
     def _on_next_page(self):
-        """Handle next page - delegate to canvas"""
+        """Handle next page - delegate to canvas with proper margin"""
         if self.canvas_widget and self.current_page < self.total_pages - 1:
             target_page = self.current_page + 1
             y_position = self.canvas_widget.get_page_y_position(target_page)
-            self.scroll_area.verticalScrollBar().setValue(int(y_position))
+
+            # FIXED: Use layout manager constants for proper spacing
+            top_margin = 0
+            if self.canvas_widget.layout_manager:
+                top_margin = self.canvas_widget.layout_manager.PAGE_SPACING_VERTICAL
+
+            scroll_position = max(0, y_position - top_margin)
+            self.scroll_area.verticalScrollBar().setValue(int(scroll_position))
 
     def _on_scroll_changed(self, value):
         """Handle scroll position changes"""
@@ -283,6 +448,7 @@ class PDFMainWindow(QMainWindow):
         """Handle page change signal from canvas"""
         self.current_page = page_index
         self._update_navigation_state()
+        print(f"Page changed to: {page_index + 1}")
 
     def _on_zoom_changed(self, zoom_level):
         """Handle zoom change signal from canvas"""
@@ -294,6 +460,8 @@ class PDFMainWindow(QMainWindow):
         self.zoom_slider.blockSignals(True)
         self.zoom_slider.setValue(zoom_percent)
         self.zoom_slider.blockSignals(False)
+
+        print(f"Zoom changed to: {zoom_percent}%")
 
     def _update_navigation_state(self):
         """Update navigation buttons and page display"""
@@ -309,6 +477,7 @@ class PDFMainWindow(QMainWindow):
     def closeEvent(self, event):
         """Handle window close event"""
         if self.document:
+            self.documentClosed.emit()
             self.document.close()
         event.accept()
 
