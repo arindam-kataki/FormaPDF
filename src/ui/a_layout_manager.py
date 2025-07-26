@@ -3,19 +3,24 @@ from PyQt6.QtCore import QSizeF, QRectF, QPointF
 
 
 class LayoutManager:
-    """Manages page positioning and coordinate transformations with full implementation"""
+    """Manages page positioning and coordinate transformations with configurable spacing"""
 
-    def __init__(self, document, zoom: float = 1.0, page_spacing: int = 10):
+    # Layout constants - easily configurable
+    PAGE_SPACING_VERTICAL = 15  # Pixels between pages vertically
+    PAGE_SPACING_HORIZONTAL = 15  # Pixels on left and right of pages
+    PAGE_MARGIN_TOP = 15  # Pixels above first page
+    PAGE_MARGIN_BOTTOM = 15  # Pixels below last page
+
+    def __init__(self, document, zoom: float = 1.0):
         self.document = document
         self.zoom = zoom
-        self.page_spacing = page_spacing  # pixels between pages
         self.page_positions = []  # List of QRectF for each page in canvas coordinates
         self.total_width = 0
         self.total_height = 0
         self._calculate_layout()
 
     def _calculate_layout(self):
-        """Calculate positions for all pages in canvas coordinates"""
+        """Calculate positions for all pages with proper spacing and different page sizes"""
         self.page_positions.clear()
 
         if not self.document or self.document.get_page_count() == 0:
@@ -23,10 +28,16 @@ class LayoutManager:
             self.total_height = 0
             return
 
-        current_y = 0
-        max_width = 0
+        current_y = self.PAGE_MARGIN_TOP  # Start with top margin
+        max_page_width = 0
 
-        # Vertical stacking layout
+        # First pass: find the maximum page width to center all pages
+        for i in range(self.document.get_page_count()):
+            page_size = self.document.get_page_size(i)
+            canvas_width = page_size.width() * self.zoom
+            max_page_width = max(max_page_width, canvas_width)
+
+        # Second pass: position pages with centering
         for i in range(self.document.get_page_count()):
             page_size = self.document.get_page_size(i)
 
@@ -34,18 +45,27 @@ class LayoutManager:
             canvas_width = page_size.width() * self.zoom
             canvas_height = page_size.height() * self.zoom
 
-            # Center horizontally (assuming fixed canvas width or auto-centering)
-            x = 0  # Will be adjusted by canvas for centering
+            # Center this page horizontally within the maximum page width
+            x_offset = (max_page_width - canvas_width) / 2
+            x = self.PAGE_SPACING_HORIZONTAL + x_offset
 
+            # Create page rectangle
             page_rect = QRectF(x, current_y, canvas_width, canvas_height)
             self.page_positions.append(page_rect)
 
-            max_width = max(max_width, canvas_width)
-            current_y += canvas_height + self.page_spacing
+            # Move to next page position
+            current_y += canvas_height + self.PAGE_SPACING_VERTICAL
 
         # Calculate total canvas size
-        self.total_width = max_width
-        self.total_height = current_y - self.page_spacing if current_y > 0 else 0
+        # Width: max page width + horizontal margins on both sides
+        self.total_width = max_page_width + (2 * self.PAGE_SPACING_HORIZONTAL)
+
+        # Height: last page bottom + bottom margin
+        if self.page_positions:
+            last_page_bottom = self.page_positions[-1].bottom()
+            self.total_height = last_page_bottom + self.PAGE_MARGIN_BOTTOM
+        else:
+            self.total_height = self.PAGE_MARGIN_TOP + self.PAGE_MARGIN_BOTTOM
 
     def set_zoom(self, zoom: float):
         """Update zoom level and recalculate layout"""
@@ -58,7 +78,7 @@ class LayoutManager:
         return self.zoom
 
     def get_canvas_size(self) -> Tuple[int, int]:
-        """Get total canvas size needed for all pages"""
+        """Get total canvas size needed for all pages including margins"""
         return int(self.total_width), int(self.total_height)
 
     def get_page_rect(self, page_index: int) -> Optional[QRectF]:
@@ -83,22 +103,30 @@ class LayoutManager:
 
     def get_page_at_position(self, y_position: float) -> int:
         """Get page index at given Y position"""
+        # Handle positions before first page
+        if y_position < self.PAGE_MARGIN_TOP:
+            return 0
+
+        # Handle positions after last page
+        if y_position > self.total_height - self.PAGE_MARGIN_BOTTOM:
+            return max(0, len(self.page_positions) - 1)
+
+        # Find page that contains this Y position
         for i, page_rect in enumerate(self.page_positions):
             if page_rect.top() <= y_position <= page_rect.bottom():
                 return i
 
-        # If not within any page, return closest
-        if y_position < 0:
-            return 0
-        elif y_position > self.total_height:
-            return len(self.page_positions) - 1
-
-        # Find closest page
+        # If between pages, find the closest page
         min_distance = float('inf')
         closest_page = 0
+
         for i, page_rect in enumerate(self.page_positions):
-            distance = min(abs(y_position - page_rect.top()),
-                           abs(y_position - page_rect.bottom()))
+            # Distance to top edge
+            dist_to_top = abs(y_position - page_rect.top())
+            # Distance to bottom edge
+            dist_to_bottom = abs(y_position - page_rect.bottom())
+            distance = min(dist_to_top, dist_to_bottom)
+
             if distance < min_distance:
                 min_distance = distance
                 closest_page = i
@@ -139,7 +167,7 @@ class LayoutManager:
     def get_page_y_position(self, page_index: int) -> float:
         """Get Y position where page starts in canvas coordinates"""
         page_rect = self.get_page_rect(page_index)
-        return page_rect.top() if page_rect else 0.0
+        return page_rect.top() if page_rect else self.PAGE_MARGIN_TOP
 
     def get_page_bounds_in_canvas(self, page_index: int) -> Optional[QRectF]:
         """Get page bounds in canvas coordinates"""
@@ -166,19 +194,29 @@ class LayoutManager:
             'total_width': self.total_width,
             'total_height': self.total_height,
             'zoom_level': self.zoom,
-            'page_spacing': self.page_spacing,
-            'layout_type': 'vertical_stack'
+            'vertical_spacing': self.PAGE_SPACING_VERTICAL,
+            'horizontal_spacing': self.PAGE_SPACING_HORIZONTAL,
+            'top_margin': self.PAGE_MARGIN_TOP,
+            'bottom_margin': self.PAGE_MARGIN_BOTTOM,
+            'layout_type': 'vertical_stack_centered'
         }
 
-    def set_page_spacing(self, spacing: int):
-        """Set spacing between pages and recalculate layout"""
-        if self.page_spacing != spacing:
-            self.page_spacing = spacing
-            self._calculate_layout()
+    def get_page_spacing_vertical(self) -> int:
+        """Get current vertical page spacing"""
+        return self.PAGE_SPACING_VERTICAL
 
-    def get_page_spacing(self) -> int:
-        """Get current page spacing"""
-        return self.page_spacing
+    def get_page_spacing_horizontal(self) -> int:
+        """Get current horizontal page spacing"""
+        return self.PAGE_SPACING_HORIZONTAL
+
+    def get_page_margins(self) -> dict:
+        """Get page margins"""
+        return {
+            'top': self.PAGE_MARGIN_TOP,
+            'bottom': self.PAGE_MARGIN_BOTTOM,
+            'left': self.PAGE_SPACING_HORIZONTAL,
+            'right': self.PAGE_SPACING_HORIZONTAL
+        }
 
     def get_page_size_in_canvas(self, page_index: int) -> Optional[QSizeF]:
         """Get page size in canvas coordinates"""
@@ -192,3 +230,16 @@ class LayoutManager:
         if self.document and 0 <= page_index < self.document.get_page_count():
             return self.document.get_page_size(page_index)
         return None
+
+    @classmethod
+    def set_layout_constants(cls, vertical_spacing: int = None, horizontal_spacing: int = None,
+                             top_margin: int = None, bottom_margin: int = None):
+        """Update layout constants globally"""
+        if vertical_spacing is not None:
+            cls.PAGE_SPACING_VERTICAL = vertical_spacing
+        if horizontal_spacing is not None:
+            cls.PAGE_SPACING_HORIZONTAL = horizontal_spacing
+        if top_margin is not None:
+            cls.PAGE_MARGIN_TOP = top_margin
+        if bottom_margin is not None:
+            cls.PAGE_MARGIN_BOTTOM = bottom_margin
