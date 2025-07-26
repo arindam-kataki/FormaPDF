@@ -186,7 +186,7 @@ class EnhancedFieldRenderer:
         # Convert coordinates to integers
         x, y, width, height = int(x), int(y), int(width), int(height)
 
-        self._render_field_name_label(painter, field, x, y, zoom_level)
+        self._render_field_name_label(painter, field, x, y, 1.5)
 
         # Render based on field type
         if field.type == FieldType.TEXT:
@@ -210,7 +210,7 @@ class EnhancedFieldRenderer:
 
     def _render_field_name_label(self, painter: QPainter, field: FormField,
                                  x: float, y: float, zoom_level: float = 1.0):
-        """Render field name in black box above control"""
+        """Render field name in black box above control with 50% opacity"""
         if not field.name:
             return
 
@@ -238,12 +238,14 @@ class EnhancedFieldRenderer:
         box_x = int(x)
         box_y = int(y - box_height - 1)  # 1px gap between box and control
 
-        # Draw black background box
+        # Draw black background box with 50% opacity
         box_rect = QRect(box_x, box_y, box_width, box_height)
-        painter.fillRect(box_rect, QColor(0, 0, 0))  # Black background
+        black_bg = QColor(0, 0, 0, 127)  # Black with 50% opacity (127 out of 255)
+        painter.fillRect(box_rect, black_bg)
 
-        # Draw white text centered in box
-        painter.setPen(QPen(QColor(255, 255, 255)))  # White text
+        # Draw white text with 50% opacity
+        white_text = QColor(255, 255, 255, 127)  # White with 50% opacity (127 out of 255)
+        painter.setPen(QPen(white_text))
         text_x = box_x + padding_x
         text_y = box_y + padding_y + font_metrics.ascent()
         painter.drawText(text_x, text_y, field.name)

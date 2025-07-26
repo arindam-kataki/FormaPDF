@@ -472,7 +472,7 @@ class PDFViewerMainWindow(QMainWindow, ProjectManagementMixin, ToolbarManager):
     def init_ui(self):
         """Initialize the user interface"""
                 # Window setup - Enhanced for resizability
-        self.setWindowTitle("PDF Voice Editor - Enhanced with Draggable Fields")
+        self.setWindowTitle("FormaPDF - PDF Form Editor")
 
         # Set initial size and make fully resizable
         self.setGeometry(100, 100, 1400, 900)
@@ -2989,7 +2989,7 @@ def main():
     app = QApplication(sys.argv)
 
     # Set application properties
-    app.setApplicationName("PDF Voice Editor")
+    app.setApplicationName("FormaPDF - PDF Form Editor")
     app.setApplicationVersion("1.1")
 
     # Set application icon if available

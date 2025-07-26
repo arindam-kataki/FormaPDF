@@ -494,19 +494,7 @@ class EnhancedDragHandler(QObject):
             # Emit property changed
             self.propertiesChanged.emit(self.get_selected_fields())
 
-            # ✅ CLEAR SELECTION AFTER DRAG ENDS
-            print("🧹 Clearing selection after drag completion")
-            field_count = len(self.get_selected_fields())
-            if hasattr(self, 'field_manager') and self.field_manager:
-                self.field_manager.clear_selection()
 
-            # Also clear canvas selection handler
-            if hasattr(self.canvas, 'selection_handler') and self.canvas.selection_handler:
-                try:
-                    self.canvas.selection_handler.clear_selection()
-                    print("🧹 Cleared canvas selection handler")
-                except Exception as e:
-                    print(f"⚠️ Error clearing canvas selection: {e}")
 
 
         self.is_dragging = False

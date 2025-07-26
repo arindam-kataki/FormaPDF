@@ -319,7 +319,7 @@ class ProjectManagementMixin:
 
         # Update window title
         project_name = project_data.get("project_info", {}).get("name", "Unknown")
-        self.setWindowTitle(f"PDF Voice Editor - {project_name}")
+        self.setWindowTitle(f"FormaPDF - {project_name}")
 
         # Enable project-specific UI elements
         self.set_project_ui_enabled(True)
@@ -395,7 +395,7 @@ class ProjectManagementMixin:
                 self.project_modified_changed.emit(False)
 
                 # Update window title
-                self.setWindowTitle(f"PDF Voice Editor - {Path(file_path).stem}")
+                self.setWindowTitle(f"FormaPDF - {Path(file_path).stem}")
 
                 self.project_saved.emit(file_path)
                 if hasattr(self, 'statusBar'):
@@ -418,7 +418,7 @@ class ProjectManagementMixin:
         self.project_modified = False
 
         # Reset UI
-        self.setWindowTitle("PDF Voice Editor")
+        self.setWindowTitle("FormaPDF - PDF Form Editor")
         self.set_project_ui_enabled(False)
         if hasattr(self, 'project_status_label'):
             self.project_status_label.setText("No project loaded")
@@ -446,7 +446,7 @@ class ProjectManagementMixin:
             # Update window title if name changed
             new_name = updated_data.get("project_info", {}).get("name", "")
             if new_name:
-                self.setWindowTitle(f"PDF Voice Editor - {new_name}")
+                self.setWindowTitle(f"FormaPDF - {new_name}")
 
     # =========================
     # PROJECT STATE MANAGEMENT
@@ -605,8 +605,8 @@ class ProjectManagementMixin:
 
     def update_project_data_before_save(self):
         """
-        Enhanced version that serializes field settings - HARDCODED APPROACH
-        Directly replace the existing method in project_management_mixin.py
+        Enhanced version with PROPER appearance/formatting serialization
+        Replace your existing method with this version
         """
         if not self.current_project_data:
             return
@@ -623,7 +623,6 @@ class ProjectManagementMixin:
 
             print("🔍 Looking for field_manager...")
 
-            # Try different locations for field_manager (hardcoded check)
             if hasattr(self, 'field_manager') and self.field_manager:
                 field_manager = self.field_manager
                 print(f"✅ Found field_manager in main window")
@@ -633,7 +632,7 @@ class ProjectManagementMixin:
             else:
                 print("❌ No field_manager found")
 
-            # Get fields from field_manager (hardcoded access)
+            # Get fields from field_manager
             if field_manager:
                 if hasattr(field_manager, 'get_all_fields'):
                     all_fields = field_manager.get_all_fields()
@@ -641,20 +640,17 @@ class ProjectManagementMixin:
                 elif hasattr(field_manager, 'all_fields'):
                     all_fields = field_manager.all_fields
                     print(f"✅ Got {len(all_fields)} fields from all_fields")
-                elif hasattr(field_manager, 'fields'):
-                    all_fields = field_manager.fields
-                    print(f"✅ Got {len(all_fields)} fields from fields")
 
-            # ===== SERIALIZE FIELDS (HARDCODED) =====
+            # ===== ENHANCED FIELD SERIALIZATION WITH APPEARANCE =====
             if all_fields:
-                print(f"🔄 Serializing {len(all_fields)} fields...")
+                print(f"🔄 Serializing {len(all_fields)} fields with appearance properties...")
 
                 enhanced_field_definitions = []
                 form_data = {}
 
                 for i, field in enumerate(all_fields):
                     try:
-                        # Get field attributes safely (hardcoded extraction)
+                        # Get field attributes safely
                         field_id = getattr(field, 'id', f'field_{i}')
                         field_type = getattr(field, 'type', 'text')
                         if hasattr(field_type, 'value'):
@@ -662,14 +658,61 @@ class ProjectManagementMixin:
                         else:
                             field_type = str(field_type)
 
-                        # Create enhanced field data (hardcoded structure)
+                        # ===== EXTRACT APPEARANCE PROPERTIES =====
+                        appearance_properties = {}
+                        field_properties = getattr(field, 'properties', {})
+
+                        print(f"  🎨 Processing appearance for field {field_id}...")
+                        print(f"    Field properties keys: {list(field_properties.keys())}")
+
+                        # Check if appearance properties exist in field.properties
+                        if 'appearance' in field_properties:
+                            appearance_properties = field_properties['appearance'].copy()
+                            print(f"    ✅ Found appearance properties: {list(appearance_properties.keys())}")
+                        else:
+                            print(f"    ⚠️ No 'appearance' key in field properties")
+
+                            # Check for individual appearance properties at root level
+                            appearance_keys = [
+                                'font_family', 'font_size', 'font_bold', 'font_italic', 'text_color',
+                                'background_color', 'border_style', 'border_color', 'border_width'
+                            ]
+
+                            for key in appearance_keys:
+                                if key in field_properties:
+                                    appearance_properties[key] = field_properties[key]
+                                    print(f"    ✅ Found root-level appearance property: {key}")
+
+                        # Check for nested font/border/background properties
+                        if 'font' in field_properties:
+                            if 'font' not in appearance_properties:
+                                appearance_properties['font'] = {}
+                            appearance_properties['font'].update(field_properties['font'])
+                            print(f"    ✅ Found font properties: {field_properties['font']}")
+
+                        if 'border' in field_properties:
+                            if 'border' not in appearance_properties:
+                                appearance_properties['border'] = {}
+                            appearance_properties['border'].update(field_properties['border'])
+                            print(f"    ✅ Found border properties: {field_properties['border']}")
+
+                        if 'background' in field_properties:
+                            if 'background' not in appearance_properties:
+                                appearance_properties['background'] = {}
+                            appearance_properties['background'].update(field_properties['background'])
+                            print(f"    ✅ Found background properties: {field_properties['background']}")
+
+                        serializable_appearance = self._serialize_qcolor_properties(appearance_properties)
+
+
+                        # Create enhanced field data
                         enhanced_field_data = {
                             'id': field_id,
                             'type': field_type,
                             'name': getattr(field, 'name', f'field_{i}'),
                             'display_name': getattr(field, 'display_name', getattr(field, 'name', f'field_{i}')),
 
-                            # Position and size (hardcoded)
+                            # Position and size
                             'geometry': {
                                 'x': getattr(field, 'x', 0),
                                 'y': getattr(field, 'y', 0),
@@ -678,7 +721,7 @@ class ProjectManagementMixin:
                                 'page_number': getattr(field, 'page_number', 0)
                             },
 
-                            # Basic properties (hardcoded)
+                            # Basic properties
                             'basic_properties': {
                                 'required': getattr(field, 'required', False),
                                 'read_only': getattr(field, 'read_only', False),
@@ -691,37 +734,43 @@ class ProjectManagementMixin:
                                 'map_to': getattr(field, 'map_to', 'Auto')
                             },
 
-                            # Custom properties (hardcoded)
-                            'custom_properties': getattr(field, 'properties', {}).copy() if getattr(field, 'properties',
-                                                                                                    None) else {},
+                            # ===== ENHANCED APPEARANCE SERIALIZATION =====
+                            #'appearance_properties': appearance_properties,  # ← NEW: Dedicated appearance section
+                            'appearance_properties': serializable_appearance,  # ✅ Contains hex strings
 
-                            # Format settings (hardcoded)
+                            # Custom properties (everything else)
+                            'custom_properties': {k: v for k, v in field_properties.items()
+                                                  if k not in ['appearance', 'font', 'border', 'background']},
+
+                            # Format settings
                             'format_settings': {
                                 'format_category': getattr(field, 'format_category', 'None'),
                                 'format_settings': getattr(field, 'format_settings', '{}')
                             },
 
-                            # Basic property groups (hardcoded - simplified)
-                            'property_groups': self._get_basic_property_groups(field),
+                            # Property groups (existing method)
+                            'property_groups': self._get_basic_property_groups(field) if hasattr(self,
+                                                                                                 '_get_basic_property_groups') else {},
 
-                            # Metadata (hardcoded)
+                            # Metadata
                             'metadata': {
                                 'created_date': datetime.now().isoformat(),
-                                'field_version': '2.0',
-                                'schema_version': '1.0'
+                                'field_version': '2.1',  # Increment version for appearance support
+                                'schema_version': '1.0',
+                                'has_appearance_data': len(appearance_properties) > 0
                             }
                         }
 
                         enhanced_field_definitions.append(enhanced_field_data)
 
-                        # Collect form data (hardcoded)
+                        # Collect form data
                         form_data[field_id] = getattr(field, 'value', '')
 
-                        print(f"✅ Serialized field: {field_id}")
+                        print(f"  ✅ Serialized field: {field_id} (appearance: {len(appearance_properties)} props)")
 
                     except Exception as e:
                         print(f"❌ Error serializing field {i}: {e}")
-                        # Fallback to basic field data (hardcoded)
+                        # Fallback to basic field data
                         try:
                             basic_field = {
                                 'id': getattr(field, 'id', f'field_{i}'),
@@ -733,66 +782,64 @@ class ProjectManagementMixin:
                                 'height': getattr(field, 'height', 25),
                                 'page_number': getattr(field, 'page_number', 0),
                                 'value': getattr(field, 'value', ''),
-                                'properties': getattr(field, 'properties', {})
+                                'properties': getattr(field, 'properties', {}),
+                                'appearance_properties': {}  # Empty appearance for fallback
                             }
                             enhanced_field_definitions.append(basic_field)
                             form_data[basic_field['id']] = basic_field['value']
                         except:
                             print(f"❌ Complete failure for field {i}")
 
-                # Store field definitions (hardcoded)
+                # Store field definitions
                 self.current_project_data["field_definitions"] = enhanced_field_definitions
 
-                # Store form data (hardcoded)
+                # Store form data
                 self.current_project_data["form_data"] = form_data
 
-                # Create field summary (hardcoded)
+                # Create field summary
                 field_summary = {
                     'total_fields': len(all_fields),
                     'fields_by_type': {},
                     'fields_by_page': {},
+                    'appearance_fields': 0,  # Count fields with appearance data
                     'serialization_date': datetime.now().isoformat(),
-                    'schema_version': '2.0'
+                    'schema_version': '2.1'
                 }
 
-                # Count by type and page (hardcoded)
-                for field in all_fields:
+                # Count by type and page, and appearance
+                for field_def in enhanced_field_definitions:
                     try:
-                        field_type = getattr(field, 'type', 'unknown')
-                        if hasattr(field_type, 'value'):
-                            field_type = field_type.value
-                        else:
-                            field_type = str(field_type)
-
-                        page_num = str(getattr(field, 'page_number', 0))
+                        field_type = field_def.get('type', 'unknown')
+                        page_num = str(field_def.get('geometry', {}).get('page_number', 0))
 
                         field_summary['fields_by_type'][field_type] = field_summary['fields_by_type'].get(field_type,
                                                                                                           0) + 1
                         field_summary['fields_by_page'][page_num] = field_summary['fields_by_page'].get(page_num, 0) + 1
+
+                        if field_def.get('appearance_properties'):
+                            field_summary['appearance_fields'] += 1
                     except:
                         pass
 
                 self.current_project_data["field_summary"] = field_summary
 
-                print(f"✅ Serialized {len(enhanced_field_definitions)} fields with {len(form_data)} form values")
+                print(f"✅ Enhanced serialization complete: {len(enhanced_field_definitions)} fields")
+                print(f"📊 Fields with appearance data: {field_summary['appearance_fields']}")
 
             else:
                 print("⚠️ No fields found to serialize")
-                # Set empty defaults (hardcoded)
                 self.current_project_data["field_definitions"] = []
                 self.current_project_data["form_data"] = {}
 
-            # ===== USER PREFERENCES (HARDCODED) =====
+            # ===== USER PREFERENCES =====
             user_preferences = {}
 
-            # Get zoom level (hardcoded)
             try:
                 if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'zoom_factor'):
                     user_preferences['zoom_level'] = int(self.pdf_canvas.zoom_factor * 100)
             except:
                 pass
 
-            # Get current page (hardcoded)
             try:
                 if hasattr(self, 'current_page'):
                     user_preferences['current_page'] = self.current_page
@@ -801,7 +848,6 @@ class ProjectManagementMixin:
             except:
                 user_preferences['current_page'] = 0
 
-            # Get grid visibility (hardcoded)
             try:
                 if hasattr(self, 'pdf_canvas') and hasattr(self.pdf_canvas, 'show_grid'):
                     user_preferences['show_grid'] = self.pdf_canvas.show_grid
@@ -810,7 +856,6 @@ class ProjectManagementMixin:
             except:
                 user_preferences['show_grid'] = False
 
-            # Get panel visibility (hardcoded)
             try:
                 if hasattr(self, 'left_panel') and hasattr(self.left_panel, 'isVisible'):
                     user_preferences['left_panel_visible'] = self.left_panel.isVisible()
@@ -821,19 +866,19 @@ class ProjectManagementMixin:
 
             self.current_project_data["user_preferences"] = user_preferences
 
-            # ===== UPDATE HISTORY (HARDCODED) =====
+            # ===== UPDATE HISTORY =====
             history = self.current_project_data.get("history", {})
             history["total_edits"] = history.get("total_edits", 0) + 1
             history["last_save"] = datetime.now().isoformat()
             self.current_project_data["history"] = history
 
-            print("🎉 Enhanced project save complete!")
+            print("🎉 Enhanced project save complete with appearance properties!")
 
         except Exception as e:
             print(f"❌ Error in enhanced save: {e}")
             import traceback
             traceback.print_exc()
-            # Basic fallback (hardcoded)
+            # Basic fallback
             self.current_project_data["project_info"]["modified_date"] = datetime.now().isoformat()
 
     def _get_basic_property_groups(self, field):
@@ -1011,6 +1056,22 @@ class ProjectManagementMixin:
                         continue
 
                 print(f"🎉 Restored {restored_count}/{len(field_definitions)} fields successfully")
+
+                # ADD THIS:
+                # Update field counter to prevent ID collisions
+                if hasattr(field_manager, '_update_field_counter_from_restored_fields'):
+                    field_manager._update_field_counter_from_restored_fields()
+                elif hasattr(field_manager, '_field_counter'):
+                    # Manual counter update if method doesn't exist
+                    max_counter = 0
+                    for field in (field_manager.all_fields if hasattr(field_manager, 'all_fields') else []):
+                        field_id = getattr(field, 'id', '')
+                        import re
+                        match = re.search(r'_(\d+)$', field_id)
+                        if match:
+                            max_counter = max(max_counter, int(match.group(1)))
+                    field_manager._field_counter = max_counter
+                    print(f"✅ Updated field counter to {max_counter}")
 
                 # Emit field manager signals if available (hardcoded)
                 try:
@@ -1246,21 +1307,39 @@ class ProjectManagementMixin:
 
     def _restore_field_from_data(self, field_data: Dict[str, Any]):
         """
-        Helper method to restore a field from saved data - HARDCODED APPROACH
-        Add this method to project_management_mixin.py (same as before)
+        Enhanced field restoration that includes appearance properties
+        Update your existing method with this version
         """
         try:
             from src.models.field_model import FormField, FieldType
 
-            # Check if this is enhanced format or legacy format (hardcoded)
+            # Check if this is enhanced format with appearance data
             if 'geometry' in field_data and 'basic_properties' in field_data:
-                # Enhanced format (hardcoded restoration)
+                # Enhanced format
                 geometry = field_data['geometry']
                 basic_props = field_data.get('basic_properties', {})
                 custom_props = field_data.get('custom_properties', {})
                 format_settings = field_data.get('format_settings', {})
 
-                # Create field with enhanced data (hardcoded)
+                # ===== RESTORE APPEARANCE PROPERTIES =====
+                appearance_props = field_data.get('appearance_properties', {})
+
+                # Combine all properties for the field
+                all_properties = custom_props.copy()
+
+                # Add appearance properties
+                if appearance_props:
+                    all_properties['appearance'] = appearance_props
+                    print(f"  🎨 Restoring appearance properties: {list(appearance_props.keys())}")
+
+                    # Also add individual appearance properties for compatibility
+                    for key, value in appearance_props.items():
+                        if isinstance(value, dict):
+                            all_properties[key] = value
+                        else:
+                            all_properties[key] = value
+
+                # Create field with enhanced data
                 field = FormField(
                     id=field_data['id'],
                     type=FieldType(field_data['type']),
@@ -1277,14 +1356,14 @@ class ProjectManagementMixin:
                     visibility=basic_props.get('visibility', 'Visible'),
                     orientation=basic_props.get('orientation', '0'),
                     value=basic_props.get('value', ''),
-                    properties=custom_props.copy() if custom_props else {},
+                    properties=all_properties,  # ← Include appearance properties
                     format_category=format_settings.get('format_category', 'None'),
                     format_settings=format_settings.get('format_settings', '{}'),
                     input_type=basic_props.get('input_type', 'text'),
                     map_to=basic_props.get('map_to', 'Auto')
                 )
 
-                # Restore property group values (hardcoded)
+                # Restore property group values
                 property_groups = field_data.get('property_groups', {})
                 for group_name, group_data in property_groups.items():
                     properties = group_data.get('properties', {})
@@ -1292,17 +1371,17 @@ class ProjectManagementMixin:
                         if 'value' in prop_data:
                             field.properties[prop_name] = prop_data['value']
 
-                print(f"✅ Restored enhanced format field: {field.id}")
+                print(f"✅ Restored enhanced format field with appearance: {field.id}")
                 return field
 
             else:
-                # Legacy format (hardcoded restoration)
+                # Legacy format
                 if hasattr(FormField, 'from_dict'):
                     field = FormField.from_dict(field_data)
                     print(f"✅ Restored legacy format field: {field.id}")
                     return field
                 else:
-                    # Manual legacy restoration (hardcoded)
+                    # Manual legacy restoration
                     field = FormField(
                         id=field_data.get('id', 'unknown'),
                         type=FieldType(field_data.get('type', 'text')),
@@ -1322,6 +1401,38 @@ class ProjectManagementMixin:
         except Exception as e:
             print(f"❌ Error restoring field from data: {e}")
             return None
+
+    def _serialize_qcolor_properties(self, properties_dict: dict) -> dict:
+        """Convert QColor objects to JSON-serializable hex strings"""
+        from PyQt6.QtGui import QColor
+
+        def convert_value(value):
+            if isinstance(value, QColor):
+                return value.name()  # Returns "#RRGGBB" format
+            elif isinstance(value, dict):
+                return {k: convert_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [convert_value(item) for item in value]
+            else:
+                return value
+
+        return convert_value(properties_dict)
+
+    def _deserialize_qcolor_properties(self, properties_dict: dict) -> dict:
+        """Convert hex strings back to QColor objects"""
+        from PyQt6.QtGui import QColor
+
+        def convert_value(value):
+            if isinstance(value, str) and value.startswith('#') and len(value) in [4, 7, 9]:
+                if all(c in '0123456789ABCDEFabcdef' for c in value[1:]):
+                    return QColor(value)
+            elif isinstance(value, dict):
+                return {k: convert_value(v) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [convert_value(item) for item in value]
+            return value
+
+        return convert_value(properties_dict)
 
     def _deserialize_enhanced_field(self, field_data: Dict[str, Any]):
         """

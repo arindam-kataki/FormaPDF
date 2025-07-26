@@ -373,6 +373,11 @@ class RecentProjectsDialog(QDialog):
         )
 
         if reply == QMessageBox.StandardButton.Yes:
+            # Need to call the project manager to actually save the changes
+            if hasattr(self.parent(), 'project_manager'):
+                self.parent().project_manager.clear_recent_projects()
+
+            # Clear local data and refresh UI
             self.recent_projects.clear()
             self.populate_projects_table()
 

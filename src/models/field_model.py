@@ -447,6 +447,32 @@ class FieldManager(QObject):
         except Exception as e:
             print(f"❌ Error clearing fields: {e}")
 
+    def _update_field_counter_from_restored_fields(self):
+        """
+        Update the field counter based on restored field IDs to prevent collisions
+        Call this after restoring fields from a project
+        """
+        try:
+            max_counter = 0
+
+            for field in self.all_fields:
+                # Extract counter from field ID (e.g., "text_5" -> 5)
+                field_id = getattr(field, 'id', '')
+
+                # Look for pattern: fieldtype_number
+                import re
+                match = re.search(r'_(\d+)$', field_id)
+                if match:
+                    counter = int(match.group(1))
+                    max_counter = max(max_counter, counter)
+
+            # Set counter to be higher than any existing field
+            self._field_counter = max_counter
+            print(f"✅ Updated field counter to {self._field_counter} based on restored fields")
+
+        except Exception as e:
+            print(f"❌ Error updating field counter: {e}")
+
     def _validate_created_field(self, field: FormField) -> tuple[bool, str]:
         """
         Validate a created field against page boundaries

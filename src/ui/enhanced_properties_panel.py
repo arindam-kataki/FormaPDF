@@ -516,7 +516,7 @@ class EnhancedPropertiesPanel(QWidget):
         #    return ['font', 'border', 'background']
 
         else:
-            return ['font', 'border', 'background']  # Default fallback
+            return ['font']  # Default fallback
 
     def _create_field_specific_properties(self, field: FormField):
 
