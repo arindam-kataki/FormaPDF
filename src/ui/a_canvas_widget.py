@@ -75,6 +75,7 @@ class CanvasWidget(QWidget):
                 self._update_canvas_size()
                 self.current_page = 0
                 self.pageChanged.emit(0)
+                self._document_loaded = True
 
                 # Set initial visible pages - simplified
                 print("🔍 Setting initial visible pages...")
@@ -102,9 +103,51 @@ class CanvasWidget(QWidget):
         self.rendered_pages.clear()
         self.visible_pages.clear()
         self.current_page = 0
+        self._document_loaded = False
         self.update()
 
     def set_zoom(self, zoom_level: float):
+        """SIMPLE: Like original system"""
+        self.zoom_level = zoom_level
+        current_page = self.current_page
+
+        if self.layout_manager:
+            self.layout_manager.set_zoom(zoom_level)
+            self._update_canvas_size()
+            self.rendered_pages.clear()
+
+            # Just navigate to same page (like original)
+            self._navigate_to_page_simple(current_page)
+
+        self.zoomChanged.emit(zoom_level)
+
+    def deprecated_02_set_zoom(self, zoom_level: float):
+        """Set zoom level and update layout - FIXED: Preserve current page"""
+        zoom_level = max(0.1, min(5.0, zoom_level))  # Clamp zoom range
+
+        if abs(self.zoom_level - zoom_level) > 0.01:  # Avoid unnecessary updates
+            print(f"🔍 Setting zoom to {zoom_level:.2f}")
+
+            # FIXED: Preserve current page during zoom operation
+            preserved_page = self._get_actual_current_page()
+            print(f"📄 Preserving page {preserved_page} during zoom")
+
+            self.zoom_level = zoom_level
+
+            if self.layout_manager:
+                self.layout_manager.set_zoom(zoom_level)
+                self._update_canvas_size()
+                self.rendered_pages.clear()  # Clear cache for new zoom
+
+                # FIXED: Restore the preserved page
+                self.current_page = preserved_page
+                print(f"📄 Page preserved: {self.current_page}")
+
+                self.schedule_render()
+
+            self.zoomChanged.emit(zoom_level)
+
+    def deprecated_01_set_zoom(self, zoom_level: float):
         """Set zoom level and update layout"""
         zoom_level = max(0.1, min(5.0, zoom_level))  # Clamp zoom range
 
@@ -157,6 +200,28 @@ class CanvasWidget(QWidget):
         self.set_zoom(zoom)
 
     def set_visible_pages(self, page_indices: List[int], viewport_rect: QRectF):
+        """Set which pages are currently visible - FIXED: No automatic page reset"""
+        # Prevent updates during painting
+        if self.is_painting:
+            return
+
+        print(f"👁️ Setting visible pages: {page_indices}")
+        self.visible_pages = page_indices
+        self.viewport_rect = viewport_rect
+        self.schedule_render()
+
+        # FIXED: Don't automatically reset current page during zoom operations
+        if page_indices:
+            # Only set initial page if we don't have a valid current page
+            if self.current_page < 0 or not hasattr(self, '_document_loaded'):
+                self.current_page = page_indices[0]
+                self.pageChanged.emit(self.current_page)
+                print(f"📄 Initial page set to: {self.current_page}")
+            else:
+                # During normal operation, preserve the current page
+                print(f"📄 Maintaining current page: {self.current_page} (visible: {page_indices})")
+
+    def deprecated_01_set_visible_pages(self, page_indices: List[int], viewport_rect: QRectF):
         """Set which pages are currently visible"""
         # Prevent updates during painting
         if self.is_painting:
@@ -413,3 +478,28 @@ class CanvasWidget(QWidget):
                 # Could emit mouse move signal here if needed
 
         super().mouseMoveEvent(event)
+
+    def _get_actual_current_page(self) -> int:
+        """Get the actual current page from scroll position"""
+        try:
+            # Try to get scroll position from parent scroll area
+            parent = self.parent()
+            while parent:
+                if hasattr(parent, 'verticalScrollBar'):
+                    scroll_y = parent.verticalScrollBar().value()
+                    viewport_height = parent.viewport().height() if hasattr(parent, 'viewport') else 400
+
+                    # Calculate page at center of viewport
+                    center_y = scroll_y + (viewport_height / 2)
+                    actual_page = self.get_page_at_position(center_y)
+
+                    print(f"📍 Actual current page: scroll_y={scroll_y}, center_y={center_y}, page={actual_page}")
+                    return actual_page
+                parent = parent.parent()
+
+            # Fallback to stored current_page
+            return max(0, self.current_page)
+
+        except Exception as e:
+            print(f"⚠️ Error getting actual current page: {e}")
+            return max(0, self.current_page)

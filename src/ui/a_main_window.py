@@ -276,6 +276,11 @@ class PDFMainWindow(QMainWindow):
             QTimer.singleShot(100, lambda: self._restore_zoom_position(old_page, old_scroll_y))
 
     def _on_zoom_slider_changed(self, value):
+        """SIMPLE: Like original system"""
+        zoom_level = value / 100.0
+        self.canvas_widget.set_zoom(zoom_level)  # Just call set_zoom!
+
+    def deprecated_10__on_zoom_slider_changed(self, value):
         """Handle zoom slider - maintain current position"""
         if self.canvas_widget:
             # Save current scroll position and page
@@ -438,9 +443,13 @@ class PDFMainWindow(QMainWindow):
 
         # Update current page tracking
         if visible_pages:
-            new_current_page = visible_pages[0]
-            if new_current_page != self.current_page:
+            new_current_page = visible_pages[0]  # Use first visible page as current
+            old_current_page = getattr(self, 'current_page', -1)
+
+            if new_current_page != old_current_page:
                 self.current_page = new_current_page
+                self.canvas_widget.current_page = new_current_page  # ADD THIS LINE!
+                print(f"📄 MAIN: Page changed to {new_current_page + 1}")
                 self._update_navigation_state()
 
     # Signal handlers from canvas widget
