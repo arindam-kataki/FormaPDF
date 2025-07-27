@@ -265,7 +265,11 @@ class PDFMainWindow(QMainWindow):
             print("📄 Closing document")
 
             # Close document
-            self.document.close()
+            try:
+                self.document.close()
+            except Exception as e:
+                print(f"⚠️ Error closing document: {e}")
+
             self.document = None
 
             # Reset state
@@ -278,11 +282,15 @@ class PDFMainWindow(QMainWindow):
                 self.toolbar_widget.set_document_loaded(False)
 
             # Emit signal to canvas
-            self.documentClosed.emit()
+            try:
+                self.documentClosed.emit()
+            except Exception as e:
+                print(f"⚠️ Error emitting document closed signal: {e}")
 
             # Update UI
             self.setWindowTitle("PDF Voice Editor")
-            self.status_bar.showMessage("Ready")
+            if hasattr(self, 'status_bar'):
+                self.status_bar.showMessage("Ready")
 
     # ======================
     # NAVIGATION METHODS
@@ -463,10 +471,20 @@ class PDFMainWindow(QMainWindow):
 
     def closeEvent(self, event):
         """Handle window close event"""
+        print("🏠 Main window closing")
+
+        # Stop any pending operations first
+        if hasattr(self, 'scroll_timer'):
+            self.scroll_timer.stop()
+
+        # Close document and clear canvas before closing window
         if self.document:
             self.close_document()
 
-        print("🏠 Main window closing")
+        # Clear canvas widget to prevent further operations
+        if self.canvas_widget:
+            self.canvas_widget._clear_document()
+
         event.accept()
 
     def resizeEvent(self, event):

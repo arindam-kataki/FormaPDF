@@ -426,8 +426,39 @@ class CanvasWidget(QWidget):
         zoom_w = (available_width - 40) / page_size.width()
         zoom_h = (available_height - 40) / page_size.height()
         zoom = min(zoom_w, zoom_h)
-        self.set_zoom(zoom)
 
+        self.set_zoom(zoom, maintain_position=False, goto_page_top_with_margin=True)
+
+    def fit_to_page(self, available_width: int, available_height: int):
+        """Simpler fit to page - use first visible page"""
+        if not self.document or not self.layout_manager:
+            return
+
+        # Get currently visible pages
+        scroll_area = self._get_scroll_area()
+        if scroll_area:
+            viewport_top = scroll_area.verticalScrollBar().value()
+            viewport_height = scroll_area.viewport().height()
+            viewport_rect = QRectF(0, viewport_top, scroll_area.viewport().width(), viewport_height)
+
+            visible_pages = self.layout_manager.get_visible_pages(viewport_rect)
+            if visible_pages:
+                target_page = visible_pages[0]  # Use first visible page
+                print(f"📄 Fit to page: Using first visible page {target_page}")
+            else:
+                target_page = self.current_page
+                print(f"📄 Fit to page: No visible pages, using current {target_page}")
+        else:
+            target_page = self.current_page
+
+        # Calculate zoom based on target page
+        page_size = self.document.get_page_size(target_page)
+        zoom_w = (available_width - 40) / page_size.width()
+        zoom_h = (available_height - 40) / page_size.height()
+        zoom = min(zoom_w, zoom_h)
+
+        # Update current page and apply zoom
+        self.current_page = target_page
         self.set_zoom(zoom, maintain_position=False, goto_page_top_with_margin=True)
 
     def set_visible_pages(self, page_indices: List[int], viewport_rect: QRectF):
