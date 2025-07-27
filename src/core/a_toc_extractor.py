@@ -3,7 +3,7 @@ Business logic for TOC extraction and management
 """
 
 from typing import List, Dict, Optional, Any
-from ..models.toc_entry import TOCEntry
+from ..models.a_toc_entry import TOCEntry
 import fitz  # PyMuPDF
 
 
