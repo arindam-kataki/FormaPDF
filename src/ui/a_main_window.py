@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction
 
+from ui.a_toc_integration import TOCIntegration
 from .a_toolbar_widget import ToolbarWidget
 from .a_canvas_widget import CanvasWidget
 from .a_pdf_document import PDFDocument
@@ -70,6 +71,9 @@ class PDFMainWindow(QMainWindow):
         self._create_toolbar()
         self._create_scroll_area()
         self._create_status_bar()
+
+        self.toc_integration = TOCIntegration(self)
+        self.toc_integration.setup_toc_integration()
 
         # Add scroll area to layout
         main_layout.addWidget(self.scroll_area)
@@ -225,6 +229,9 @@ class PDFMainWindow(QMainWindow):
 
         if file_path:
             self.load_document(file_path)
+
+        if self.document:
+            self.toc_integration.load_document_toc(self.document)
 
     @pyqtSlot()
     def save_form_data(self):
