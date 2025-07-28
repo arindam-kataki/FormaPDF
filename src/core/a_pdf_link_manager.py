@@ -245,16 +245,43 @@ class PDFLinkManager(QObject):
         )
 
     def _parse_named_link(self, raw_link: dict, link_id: str, page_num: int, rect: QRectF) -> PDFLink:
-        """Parse named destination link"""
-        name = raw_link.get('name', '')
+        """Parse named destination link - FIXED for actual PDF structure"""
+        # FIXED: Use 'nameddest' key instead of 'name'
+        name = raw_link.get('nameddest', '') or raw_link.get('name', '')
 
-        tooltip = f"Named destination: {name}"
+        # Extract target page (your PDFs already have this resolved!)
+        target_page = raw_link.get('page', None)
+
+        # Extract target coordinates from 'to' Point
+        target_coords = None
+        if 'to' in raw_link:
+            to_point = raw_link['to']
+            if hasattr(to_point, 'x') and hasattr(to_point, 'y'):
+                target_coords = (float(to_point.x), float(to_point.y))
+
+        # Get zoom level if available
+        zoom_level = raw_link.get('zoom', None)
+        if zoom_level == 0.0:
+            zoom_level = None  # 0.0 means no zoom specified
+
+        # Create user-friendly tooltip
+        if target_page is not None:
+            tooltip = f"Go to page {target_page + 1}"
+            if target_coords and target_coords != (0.0, 0.0):
+                tooltip += f" at ({target_coords[0]:.0f}, {target_coords[1]:.0f})"
+            if name:
+                tooltip += f" ('{name}')"
+        else:
+            tooltip = f"Named destination: {name}"
 
         return PDFLink(
             link_id=link_id,
             page_num=page_num,
             rect=rect,
             link_type='named',
+            target_page=target_page,  # Now populated!
+            target_coords=target_coords,  # Now populated!
+            zoom_level=zoom_level,
             tooltip=tooltip
         )
 
@@ -310,9 +337,18 @@ class PDFLinkManager(QObject):
             QDesktopServices.openUrl(QUrl.fromLocalFile(link.file_path))
 
     def _handle_named_link(self, link: PDFLink):
-        """Handle named destination"""
-        print(f"🏷️ Named destination not yet implemented: {link.tooltip}")
-        # Named destinations would need additional resolution logic
+        """Handle named destination - FIXED"""
+        print(f"🏷️ Handling named destination: {link.tooltip}")
+
+        if link.target_page is not None:
+            # Perfect! Your PDFs already have resolved destinations
+            x, y = link.target_coords or (0, 0)
+            print(f"📍 Navigating to page {link.target_page + 1} at ({x}, {y})")
+
+            # Emit the navigation signal (same as goto links)
+            self.internalLinkClicked.emit(link.target_page, x, y)
+        else:
+            print(f"❌ No target page found for named destination")
 
     def get_links_in_area(self, page_num: int, rect: QRectF) -> List[PDFLink]:
         """
