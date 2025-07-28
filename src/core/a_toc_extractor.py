@@ -125,24 +125,29 @@ class TOCExtractor:
             return []
 
     def _parse_destination_safe(self, dest_info) -> tuple:
-        """FIXED safe destination parsing with bounds checking"""
+        """CORRECTED - Convert PyMuPDF's 1-based pages to 0-based"""
         try:
             if isinstance(dest_info, dict):
-                page_num = dest_info.get('page', 0)
-                return max(0, page_num), 'page', (0, 0)
+                raw_page = dest_info.get('page', 0)
+                page_num = max(0, raw_page - 1) if raw_page > 0 else 0
+                return page_num, 'page', (0, 0)
 
             elif isinstance(dest_info, (list, tuple)) and dest_info:
-                page_num = int(dest_info[0]) if dest_info[0] is not None else 0
+                raw_page = int(dest_info[0]) if dest_info[0] is not None else 0
+                page_num = max(0, raw_page - 1) if raw_page > 0 else 0
+
                 coords = (0, 0)
                 if len(dest_info) >= 3:
                     try:
                         coords = (float(dest_info[1] or 0), float(dest_info[2] or 0))
                     except (ValueError, TypeError):
                         pass
-                return max(0, page_num), 'page', coords
+                return page_num, 'page', coords
 
             elif isinstance(dest_info, (int, float)):
-                return max(0, int(dest_info)), 'page', (0, 0)
+                raw_page = int(dest_info)
+                page_num = max(0, raw_page - 1) if raw_page > 0 else 0
+                return page_num, 'page', (0, 0)
 
             else:
                 return 0, 'page', (0, 0)
