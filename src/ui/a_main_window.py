@@ -322,14 +322,14 @@ class PDFMainWindow(QMainWindow):
             self._navigate_to_page(self.current_page + 1)
 
     @pyqtSlot(int)
-    def _on_page_jump(self, page_number: int):
+    def _deprecated_01_on_page_jump(self, page_number: int):
         """Handle page jump request (1-based)"""
         # Convert to 0-based indexing
         target_page = page_number - 1
         if 0 <= target_page < self.total_pages:
             self._navigate_to_page(target_page)
 
-    def _navigate_to_page(self, page_index: int):
+    def _deprecated_01_navigate_to_page(self, page_index: int):
         """Navigate to specific page"""
         if not self.canvas_widget or not self.canvas_widget.layout_manager:
             return
@@ -508,7 +508,7 @@ class PDFMainWindow(QMainWindow):
         if hasattr(self, 'scroll_area') and self.scroll_area:
             self.scroll_area.updateGeometry()
 
-    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+    def deprecated_01_navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
         """
         Navigate to specific page and coordinates from TOC
 
@@ -623,6 +623,207 @@ class PDFMainWindow(QMainWindow):
             import traceback
             traceback.print_exc()
             return False
+
+    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+        """
+        FIXED navigation with proper bounds checking and coordinate handling
+
+        Args:
+            page_num: 0-based page index (TOC standard)
+            x, y: Coordinates in points
+
+        Returns:
+            bool: True if navigation successful, False otherwise
+        """
+        print(f"📍 NAVIGATE TO PAGE FIX:")
+        print(f"   Input page (0-based): {page_num}")
+        print(f"   Coordinates: ({x:.1f}, {y:.1f}) points")
+
+        try:
+            if not self.document:
+                print("❌ No document loaded")
+                return False
+
+            total_pages = self.document.get_page_count()
+
+            # CRITICAL FIX: Bounds checking
+            if page_num < 0 or page_num >= total_pages:
+                print(f"❌ Invalid page: {page_num}, valid range: 0-{total_pages - 1}")
+                # Clamp to valid range
+                page_num = max(0, min(page_num, total_pages - 1))
+                print(f"   → Clamped to page: {page_num}")
+
+            print(f"   Final page (0-based): {page_num}")
+            print(f"   Display page (1-based): {page_num + 1}")
+
+            # Navigate to the page using internal 0-based indexing
+            self._navigate_to_page(page_num)  # This should expect 0-based
+
+            # Update UI to show correct page number (1-based)
+            if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+                self.toolbar_widget.update_current_page(page_num + 1)
+
+            # Update internal tracking
+            self.current_page = page_num
+
+            # Show status message
+            if hasattr(self, 'statusBar'):
+                self.statusBar().showMessage(f"Navigated to page {page_num + 1}", 2000)
+
+            print(f"   ✅ Navigation successful to page {page_num + 1}")
+            return True
+
+        except Exception as e:
+            print(f"❌ Navigation error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _on_page_jump(self, page_number: int):
+        """
+        FIXED page jump handler for UI controls (spinbox, etc.)
+
+        Args:
+            page_number: 1-based page number from UI controls
+        """
+        print(f"🎯 PAGE JUMP FIX:")
+        print(f"   UI page (1-based): {page_number}")
+
+        if not self.document:
+            print("❌ No document loaded")
+            return
+
+        total_pages = self.document.get_page_count()
+
+        # Validate 1-based input
+        if page_number < 1 or page_number > total_pages:
+            print(f"❌ Invalid page jump: {page_number}, valid range: 1-{total_pages}")
+            return
+
+        # Convert 1-based UI input to 0-based internal
+        target_page = page_number - 1
+        print(f"   Internal page (0-based): {target_page}")
+
+        # Navigate using 0-based index
+        self._navigate_to_page(target_page)
+
+        # Update UI tracking
+        self.current_page = target_page
+
+        print(f"   ✅ Jumped to page {page_number}")
+
+    def _navigate_to_page(self, page_index: int):
+        """
+        FIXED core navigation method
+
+        Args:
+            page_index: 0-based page index
+        """
+        if not self.canvas_widget or not hasattr(self.canvas_widget, 'layout_manager'):
+            print("❌ Canvas widget or layout manager not available")
+            return
+
+        try:
+            print(f"📄 Navigating to internal page {page_index} (display: {page_index + 1})")
+
+            # Update current page tracking FIRST
+            self.current_page = page_index
+
+            # Get page Y position and scroll to it
+            if hasattr(self.canvas_widget, 'get_page_y_position'):
+                y_position = self.canvas_widget.get_page_y_position(page_index)
+
+                # Apply top margin if available
+                top_margin = 0
+                if hasattr(self.canvas_widget, 'layout_manager') and self.canvas_widget.layout_manager:
+                    top_margin = getattr(self.canvas_widget.layout_manager, 'PAGE_SPACING_VERTICAL', 0)
+
+                scroll_position = max(0, y_position - top_margin)
+
+                # Scroll to position
+                if hasattr(self, 'scroll_area') and self.scroll_area:
+                    self.scroll_area.verticalScrollBar().setValue(int(scroll_position))
+                    print(f"   Scrolled to position: {scroll_position}")
+
+            # Update toolbar display
+            if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+                self.toolbar_widget.update_current_page(page_index + 1)  # Convert to 1-based for display
+
+            print(f"✅ Successfully navigated to page {page_index + 1}")
+
+        except Exception as e:
+            print(f"❌ Error in _navigate_to_page: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # Additional helper method for debugging
+    def debug_page_navigation(self):
+        """Debug current page state"""
+        print(f"\n🔍 PAGE NAVIGATION DEBUG:")
+        print(f"   Current page (internal): {getattr(self, 'current_page', 'Unknown')}")
+        print(f"   Current page (display): {getattr(self, 'current_page', 0) + 1}")
+
+        if hasattr(self, 'document') and self.document:
+            print(f"   Total pages: {self.document.get_page_count()}")
+        else:
+            print(f"   No document loaded")
+
+        if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+            print(f"   Toolbar shows: {getattr(self.toolbar_widget, 'current_page_display', 'Unknown')}")
+
+        print()
+
+    def navigate_to_page_with_coordinates(self, page_index: int, x: float = 0, y: float = 0):
+        """
+        CORRECTED - Expects 0-based page_index from TOC
+
+        Args:
+            page_index: 0-based page index (DO NOT add +1)
+        """
+        print(f"📍 NAVIGATE (FIXED):")
+        print(f"   Input page_index: {page_index} (0-based)")
+
+        try:
+            if not self.document:
+                return False
+
+            total_pages = self.document.get_page_count()
+            if page_index < 0 or page_index >= total_pages:
+                print(f"❌ Invalid page_index: {page_index}")
+                return False
+
+            print(f"   Navigating to page index: {page_index}")
+            print(f"   Will display as: Page {page_index + 1}")
+
+            # Use page_index directly in navigation
+            self._navigate_to_page(page_index)  # 0-based input expected
+
+            # Update UI display (add +1 only for display)
+            if hasattr(self, 'toolbar_widget'):
+                self.toolbar_widget.update_current_page(page_index + 1)
+
+            self.current_page = page_index
+            return True
+
+        except Exception as e:
+            print(f"❌ Navigation error: {e}")
+            return False
+
+    def _navigate_to_page(self, page_index: int):
+        """
+        Core navigation - expects 0-based page_index
+        """
+        print(f"📄 Core navigation to page_index: {page_index}")
+
+        # Your existing navigation logic here
+        # Make sure it treats page_index as 0-based
+        if hasattr(self, 'canvas_widget'):
+            # Example navigation code
+            y_position = self.canvas_widget.get_page_y_position(page_index)
+            if hasattr(self, 'scroll_area'):
+                self.scroll_area.verticalScrollBar().setValue(int(y_position))
+
+        self.current_page = page_index
 
 def main():
     """Main entry point"""

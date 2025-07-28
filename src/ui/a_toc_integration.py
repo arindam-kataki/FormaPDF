@@ -39,7 +39,45 @@ class TOCIntegration:
 
         print("📖 TOC integration complete")
 
+    def handle_navigation(self, page_num: int, x: float, y: float):
+        """Handle TOC navigation request"""
+        # Delegate to main window navigation method
+        if hasattr(self.main_window, 'navigate_to_page_with_coordinates'):
+            self.main_window.navigate_to_page_with_coordinates(page_num, x, y)
+        elif hasattr(self.main_window, 'jump_to_page'):
+            self.main_window.jump_to_page(page_num + 1)  # Convert to 1-based
+
     def _handle_navigation(self, page_num: int, x: float, y: float):
+        """
+        CORRECTED navigation handler - NO MORE +1 CONVERSION
+
+        Args:
+            page_num: 0-based page index from TOC (this is CORRECT as-is)
+        """
+        print(f"🎯 TOC NAVIGATION (FIXED):")
+        print(f"   TOC page (0-based): {page_num}")
+        print(f"   Should show as Page: {page_num + 1}")  # Only for display
+
+        # Validate bounds
+        if hasattr(self.main_window, 'document') and self.main_window.document:
+            total_pages = self.main_window.document.get_page_count()
+            if page_num < 0 or page_num >= total_pages:
+                print(f"❌ Invalid page: {page_num}")
+                page_num = max(0, min(page_num, total_pages - 1))
+
+        # CRITICAL FIX: Use page_num directly - NO +1 conversion
+        if hasattr(self.main_window, 'navigate_to_page_with_coordinates'):
+            print(f"   → navigate_to_page_with_coordinates({page_num})")
+            self.main_window.navigate_to_page_with_coordinates(page_num, x, y)
+
+        elif hasattr(self.main_window, '_navigate_to_page'):
+            print(f"   → _navigate_to_page({page_num})")
+            self.main_window._navigate_to_page(page_num)
+
+        else:
+            print("   ❌ No navigation method available")
+
+    def deprecated_01_handle_navigation(self, page_num: int, x: float, y: float):
         """Handle TOC navigation request"""
         # Delegate to main window navigation method
         if hasattr(self.main_window, 'navigate_to_page_with_coordinates'):

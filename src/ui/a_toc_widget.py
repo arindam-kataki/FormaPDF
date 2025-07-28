@@ -1,4 +1,5 @@
 from typing import Optional, List
+import time
 
 from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont
@@ -71,12 +72,16 @@ class TOCWidget(QWidget):
             self.status_label.setText("No document loaded")
             return False
 
+        # Start timing
+        start_time = time.time()
+
         # Extract TOC
         self.toc_extractor = TOCExtractor(pdf_document)
         toc_entries = self.toc_extractor.extract_toc()
 
         if not toc_entries:
-            self.status_label.setText("No table of contents found")
+            elapsed_time = time.time() - start_time
+            self.status_label.setText(f"No table of contents found (took {elapsed_time:.3f}s)")
             return False
 
         # Create navigator
@@ -85,9 +90,12 @@ class TOCWidget(QWidget):
         # Populate UI
         self.toc_tree.populate_from_entries(toc_entries)
 
-        # Update status
+        # Calculate timing
+        elapsed_time = time.time() - start_time
+
+        # Update status with count and timing
         entry_count = len(self.toc_navigator.flat_entries)
-        self.status_label.setText(f"{entry_count} entries found")
+        self.status_label.setText(f"{entry_count} entries found (took {elapsed_time:.3f}s)")
 
         return True
 
@@ -112,8 +120,19 @@ class TOCWidget(QWidget):
     def refresh_toc(self):
         """Refresh table of contents"""
         if self.toc_extractor:
+            # Start timing for refresh
+            start_time = time.time()
+
             # Re-extract from same document
             toc_entries = self.toc_extractor.extract_toc()
             if toc_entries:
                 self.toc_navigator = TOCNavigator(toc_entries)
                 self.toc_tree.populate_from_entries(toc_entries)
+
+                # Update status with timing
+                elapsed_time = time.time() - start_time
+                entry_count = len(self.toc_navigator.flat_entries)
+                self.status_label.setText(f"{entry_count} entries found (refreshed in {elapsed_time:.3f}s)")
+            else:
+                elapsed_time = time.time() - start_time
+                self.status_label.setText(f"No table of contents found (refresh took {elapsed_time:.3f}s)")
