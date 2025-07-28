@@ -509,31 +509,33 @@ class PDFMainWindow(QMainWindow):
             self.scroll_area.updateGeometry()
 
     def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
-        """Navigate to specific page and coordinates"""
-        print(f"📖 Navigating to page {page_num + 1} at coordinates ({x}, {y})")
+        """
+        Navigate to specific page and coordinates from TOC
 
-        if hasattr(self, 'canvas_widget') and self.canvas_widget:
-            # Update current page
-            self.canvas_widget.current_page = page_num
+        Args:
+            page_num: 0-based page index (TOC page numbers are 0-based)
+            x: X coordinate on page in points (from left edge)
+            y: Y coordinate on page in points (from bottom edge)
 
-            # Scroll to page if layout manager exists
-            if hasattr(self.canvas_widget, 'layout_manager') and self.canvas_widget.layout_manager:
-                page_rect = self.canvas_widget.layout_manager.get_page_rect(page_num)
-                if page_rect and hasattr(self, 'scroll_area'):
-                    target_y = page_rect.top() + y
-                    v_scrollbar = self.scroll_area.verticalScrollBar()
-                    v_scrollbar.setValue(int(target_y))
-                    print(f"✅ Navigated to page {page_num + 1}")
-                    return True
-
-        print(f"❌ Failed to navigate to page {page_num + 1}")
-        return False
-
-    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
-        """Navigate to specific page and coordinates - FIXED VERSION"""
-        print(f"📖 TOC Navigation: Attempting to go to page {page_num + 1} (0-based: {page_num})")
+        Returns:
+            bool: True if navigation successful, False otherwise
+        """
+        print(f"📖 TOC NAVIGATION START:")
+        print(f"   Requested page: {page_num} (0-based)")
+        print(f"   Document page: {page_num + 1}")
+        print(f"   Coordinates: x={x:.1f}, y={y:.1f} points")
 
         try:
+            # STEP 1: Validate Prerequisites
+            if not self.document:
+                print("❌ No document loaded")
+                return False
+
+            total_pages = self.document.get_page_count()
+            if page_num < 0 or page_num >= total_pages:
+                print(f"❌ Invalid page: {page_num}, total pages: {total_pages}")
+                return False
+
             if not hasattr(self, 'canvas_widget') or not self.canvas_widget:
                 print("❌ No canvas widget available")
                 return False
@@ -542,55 +544,82 @@ class PDFMainWindow(QMainWindow):
                 print("❌ No layout manager available")
                 return False
 
-            # Validate page number
-            total_pages = self.document.get_page_count() if self.document else 0
-            if page_num < 0 or page_num >= total_pages:
-                print(f"❌ Invalid page number: {page_num} (total pages: {total_pages})")
-                return False
+            print(f"✅ Prerequisites validated")
 
-            # Get page rectangle
+            # STEP 2: Get Page Layout Information
             page_rect = self.canvas_widget.layout_manager.get_page_rect(page_num)
             if not page_rect:
                 print(f"❌ Could not get page rectangle for page {page_num}")
                 return False
 
-            # Calculate target scroll position
-            target_y = page_rect.top() + y
+            print(f"📐 Page {page_num} layout:")
+            print(f"   Page rect: x={page_rect.x():.1f}, y={page_rect.y():.1f}")
+            print(f"   Page size: w={page_rect.width():.1f}, h={page_rect.height():.1f}")
 
-            print(f"📖 Page rect top: {page_rect.top()}, y offset: {y}, target_y: {target_y}")
+            # STEP 3: Calculate Target Scroll Position
+            # Convert PDF coordinates (bottom-left origin) to screen coordinates (top-left origin)
+            page_height = page_rect.height()
+            screen_y_offset = page_height - y  # Convert bottom-origin to top-origin
 
-            # Scroll to position
-            if hasattr(self, 'scroll_area') and self.scroll_area:
-                v_scrollbar = self.scroll_area.verticalScrollBar()
-                current_pos = v_scrollbar.value()
+            target_x = page_rect.left() + x
+            target_y = page_rect.top() + screen_y_offset
 
-                print(f"📖 Scrolling from {current_pos} to {int(target_y)}")
-                v_scrollbar.setValue(int(target_y))
+            print(f"📍 Coordinate conversion:")
+            print(f"   PDF Y (from bottom): {y:.1f}")
+            print(f"   Screen Y offset (from top): {screen_y_offset:.1f}")
+            print(f"   Target scroll position: x={target_x:.1f}, y={target_y:.1f}")
 
-                # Update current page
-                old_page = getattr(self.canvas_widget, 'current_page', 0)
-                self.canvas_widget.current_page = page_num
-
-                # Emit page change signal if available
-                if hasattr(self.canvas_widget, 'pageChanged'):
-                    self.canvas_widget.pageChanged.emit(page_num)
-
-                # Update toolbar if present
-                if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
-                    self.toolbar_widget.update_current_page(page_num + 1)  # Convert to 1-based
-
-                # Force canvas update
-                if hasattr(self.canvas_widget, 'update'):
-                    self.canvas_widget.update()
-
-                print(f"✅ Navigation successful: page {old_page + 1} → {page_num + 1}")
-                return True
-            else:
+            # STEP 4: Perform Navigation
+            if not hasattr(self, 'scroll_area') or not self.scroll_area:
                 print("❌ No scroll area available")
                 return False
 
+            # Get scrollbars
+            h_scrollbar = self.scroll_area.horizontalScrollBar()
+            v_scrollbar = self.scroll_area.verticalScrollBar()
+
+            current_x = h_scrollbar.value()
+            current_y = v_scrollbar.value()
+
+            print(f"📜 Scroll navigation:")
+            print(f"   Current position: x={current_x}, y={current_y}")
+            print(f"   Target position: x={int(target_x)}, y={int(target_y)}")
+
+            # Set new scroll positions
+            h_scrollbar.setValue(int(target_x))
+            v_scrollbar.setValue(int(target_y))
+
+            # STEP 5: Update Canvas State
+            old_page = getattr(self.canvas_widget, 'current_page', 0)
+            self.canvas_widget.current_page = page_num  # Keep 0-based - NO +1!
+
+            print(f"📄 Page state update:")
+            print(f"   Old page: {old_page} (0-based) → New page: {page_num} (0-based)")
+
+            # Emit page change signal
+            if hasattr(self.canvas_widget, 'pageChanged'):
+                self.canvas_widget.pageChanged.emit(page_num)  # Emit 0-based
+
+            # STEP 6: Update UI Components
+            # Update toolbar (toolbar expects 1-based for display)
+            if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+                display_page = page_num + 1  # Convert to 1-based for UI display only
+                if hasattr(self.toolbar_widget, 'update_current_page'):
+                    self.toolbar_widget.update_current_page(display_page)
+
+            # Update status bar
+            if hasattr(self, 'status_bar') and self.status_bar:
+                self.status_bar.showMessage(f"Navigated to page {page_num + 1}", 2000)
+
+            # Force canvas repaint
+            if hasattr(self.canvas_widget, 'update'):
+                self.canvas_widget.update()
+
+            print(f"✅ NAVIGATION SUCCESSFUL: page {old_page + 1} → {page_num + 1}")
+            return True
+
         except Exception as e:
-            print(f"❌ Navigation error: {e}")
+            print(f"❌ NAVIGATION ERROR: {e}")
             import traceback
             traceback.print_exc()
             return False
