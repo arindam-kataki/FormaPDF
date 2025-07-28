@@ -1,13 +1,13 @@
-from typing import Optional
+from typing import Optional, List
 
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import pyqtSignal, Qt
 from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QTreeWidgetItem
 
-from core.a_toc_extractor import TOCExtractor
-from core.a_toc_navigator import TOCNavigator
-from models.a_toc_entry import TOCEntry
-from ui.a_toc_tree_widget import TOCTreeWidget
+from ..core.a_toc_extractor import TOCExtractor
+from ..core.a_toc_navigator import TOCNavigator
+from ..models.a_toc_entry import TOCEntry
+from .a_toc_tree_widget import TOCTreeWidget
 
 
 class TOCWidget(QWidget):
@@ -91,9 +91,18 @@ class TOCWidget(QWidget):
 
         return True
 
-    def _on_entry_navigation(self, toc_entry: TOCEntry):
-        """Handle navigation to TOC entry"""
+    def _on_entry_navigation(self, toc_entry):
+        """Handle navigation to TOC entry - DEBUG VERSION"""
         x, y = toc_entry.coordinates
+
+        print(f"📖 TOC NAVIGATION DEBUG:")
+        print(f"   Title: {toc_entry.title}")
+        print(f"   Page: {toc_entry.page} (0-based)")
+        print(f"   Level: {toc_entry.level}")
+        print(f"   Dest Type: {toc_entry.dest_type}")
+        print(f"   Coordinates: {toc_entry.coordinates}")
+        print(f"   Emitting signal: pageNavigationRequested({toc_entry.page}, {x}, {y})")
+
         self.pageNavigationRequested.emit(toc_entry.page, x, y)
 
     def _on_entry_selected(self, toc_entry: TOCEntry):
@@ -109,3 +118,63 @@ class TOCWidget(QWidget):
                 self.toc_navigator = TOCNavigator(toc_entries)
                 self.toc_tree.populate_from_entries(toc_entries)
 
+    def populate_from_entries(self, toc_entries: List[TOCEntry]):
+        """Populate tree with lazy loading - only top level initially"""
+        self.clear()
+
+        # Store full TOC data for lazy loading
+        self.full_toc_entries = toc_entries
+
+        # Only add top-level entries initially
+        for entry in toc_entries:
+            if entry.level == 0:  # Only top-level entries
+                item = self._create_tree_item_lazy(entry)
+                self.addTopLevelItem(item)
+
+        # Connect lazy loading signal
+        self.itemExpanded.connect(self._on_item_expanded)
+
+        print(f"📖 Tree populated with {len([e for e in toc_entries if e.level == 0])} top-level entries (lazy loading)")
+
+    def _create_tree_item_lazy(self, toc_entry: TOCEntry) -> QTreeWidgetItem:
+        """Create tree item with lazy loading support"""
+        item = QTreeWidgetItem([toc_entry.get_display_title()])
+        item.setData(0, Qt.ItemDataRole.UserRole, toc_entry)
+
+        # Style top-level entries
+        if toc_entry.level == 0:
+            font = item.font(0)
+            font.setBold(True)
+            item.setFont(0, font)
+
+        # Add placeholder child if this entry has children
+        if toc_entry.children:
+            placeholder = QTreeWidgetItem(["Loading..."])
+            placeholder.setData(0, Qt.ItemDataRole.UserRole, "placeholder")
+            item.addChild(placeholder)
+
+        return item
+
+    def _on_item_expanded(self, item: QTreeWidgetItem):
+        """Handle item expansion - load children on demand"""
+        toc_entry = item.data(0, Qt.ItemDataRole.UserRole)
+
+        if not isinstance(toc_entry, TOCEntry):
+            return
+
+        # Check if children are already loaded (not placeholders)
+        if item.childCount() > 0:
+            first_child = item.child(0)
+            child_data = first_child.data(0, Qt.ItemDataRole.UserRole)
+
+            # If first child is placeholder, load real children
+            if child_data == "placeholder":
+                # Remove placeholder
+                item.removeChild(first_child)
+
+                # Add real children
+                for child_entry in toc_entry.children:
+                    child_item = self._create_tree_item_lazy(child_entry)
+                    item.addChild(child_item)
+
+                print(f"📖 Loaded {len(toc_entry.children)} children for: {toc_entry.title}")

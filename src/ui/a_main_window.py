@@ -11,11 +11,10 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QAction
 
-from ui.a_toc_integration import TOCIntegration
-from .a_toolbar_widget import ToolbarWidget
-from .a_canvas_widget import CanvasWidget
-from .a_pdf_document import PDFDocument
-
+from src.ui.a_toc_integration import TOCIntegration
+from src.ui.a_toolbar_widget import ToolbarWidget
+from src.ui.a_canvas_widget import CanvasWidget
+from src.ui.a_pdf_document import PDFDocument
 
 class PDFMainWindow(QMainWindow):
     """
@@ -230,9 +229,6 @@ class PDFMainWindow(QMainWindow):
         if file_path:
             self.load_document(file_path)
 
-        if self.document:
-            self.toc_integration.load_document_toc(self.document)
-
     @pyqtSlot()
     def save_form_data(self):
         """Save form data (placeholder)"""
@@ -255,6 +251,16 @@ class PDFMainWindow(QMainWindow):
 
             # Emit signal to canvas
             self.documentLoaded.emit(self.document)
+
+            if hasattr(self, 'toc_integration') and self.toc_integration:
+                try:
+                    success = self.toc_integration.load_document_toc(self.document)
+                    if success:
+                        print("📖 TOC loaded successfully")
+                    else:
+                        print("📖 No TOC found in document")
+                except Exception as e:
+                    print(f"⚠️ Could not load TOC: {e}")
 
             # Update UI
             self.setWindowTitle(f"PDF Voice Editor - {file_path}")
@@ -502,6 +508,92 @@ class PDFMainWindow(QMainWindow):
         if hasattr(self, 'scroll_area') and self.scroll_area:
             self.scroll_area.updateGeometry()
 
+    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+        """Navigate to specific page and coordinates"""
+        print(f"📖 Navigating to page {page_num + 1} at coordinates ({x}, {y})")
+
+        if hasattr(self, 'canvas_widget') and self.canvas_widget:
+            # Update current page
+            self.canvas_widget.current_page = page_num
+
+            # Scroll to page if layout manager exists
+            if hasattr(self.canvas_widget, 'layout_manager') and self.canvas_widget.layout_manager:
+                page_rect = self.canvas_widget.layout_manager.get_page_rect(page_num)
+                if page_rect and hasattr(self, 'scroll_area'):
+                    target_y = page_rect.top() + y
+                    v_scrollbar = self.scroll_area.verticalScrollBar()
+                    v_scrollbar.setValue(int(target_y))
+                    print(f"✅ Navigated to page {page_num + 1}")
+                    return True
+
+        print(f"❌ Failed to navigate to page {page_num + 1}")
+        return False
+
+    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+        """Navigate to specific page and coordinates - FIXED VERSION"""
+        print(f"📖 TOC Navigation: Attempting to go to page {page_num + 1} (0-based: {page_num})")
+
+        try:
+            if not hasattr(self, 'canvas_widget') or not self.canvas_widget:
+                print("❌ No canvas widget available")
+                return False
+
+            if not hasattr(self.canvas_widget, 'layout_manager') or not self.canvas_widget.layout_manager:
+                print("❌ No layout manager available")
+                return False
+
+            # Validate page number
+            total_pages = self.document.get_page_count() if self.document else 0
+            if page_num < 0 or page_num >= total_pages:
+                print(f"❌ Invalid page number: {page_num} (total pages: {total_pages})")
+                return False
+
+            # Get page rectangle
+            page_rect = self.canvas_widget.layout_manager.get_page_rect(page_num)
+            if not page_rect:
+                print(f"❌ Could not get page rectangle for page {page_num}")
+                return False
+
+            # Calculate target scroll position
+            target_y = page_rect.top() + y
+
+            print(f"📖 Page rect top: {page_rect.top()}, y offset: {y}, target_y: {target_y}")
+
+            # Scroll to position
+            if hasattr(self, 'scroll_area') and self.scroll_area:
+                v_scrollbar = self.scroll_area.verticalScrollBar()
+                current_pos = v_scrollbar.value()
+
+                print(f"📖 Scrolling from {current_pos} to {int(target_y)}")
+                v_scrollbar.setValue(int(target_y))
+
+                # Update current page
+                old_page = getattr(self.canvas_widget, 'current_page', 0)
+                self.canvas_widget.current_page = page_num
+
+                # Emit page change signal if available
+                if hasattr(self.canvas_widget, 'pageChanged'):
+                    self.canvas_widget.pageChanged.emit(page_num)
+
+                # Update toolbar if present
+                if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+                    self.toolbar_widget.update_current_page(page_num + 1)  # Convert to 1-based
+
+                # Force canvas update
+                if hasattr(self.canvas_widget, 'update'):
+                    self.canvas_widget.update()
+
+                print(f"✅ Navigation successful: page {old_page + 1} → {page_num + 1}")
+                return True
+            else:
+                print("❌ No scroll area available")
+                return False
+
+        except Exception as e:
+            print(f"❌ Navigation error: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
 def main():
     """Main entry point"""

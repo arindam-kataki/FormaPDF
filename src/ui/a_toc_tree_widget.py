@@ -11,8 +11,6 @@ from PyQt6.QtCore import Qt, pyqtSignal, QPoint
 from PyQt6.QtGui import QFont, QAction
 
 from ..models.a_toc_entry import TOCEntry
-from ..core.a_toc_extractor import TOCExtractor
-from ..core.a_toc_navigator import  TOCNavigator
 
 class TOCTreeWidget(QTreeWidget):
     """

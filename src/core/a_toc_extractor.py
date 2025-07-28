@@ -76,10 +76,13 @@ class TOCExtractor:
             print(f"Error extracting TOC: {e}")
             return []
 
-    def _parse_destination(self, dest_info: Dict) -> tuple:
-        """Parse destination information from PyMuPDF"""
+    def _parse_destination(self, dest_info) -> tuple:
+        """Parse destination information from PyMuPDF - FIXED VERSION"""
         try:
+            print(f"🔍 Parsing destination: {dest_info} (type: {type(dest_info)})")
+
             if isinstance(dest_info, dict):
+                # Dictionary format
                 page_num = dest_info.get('page', 0)
                 dest_type = dest_info.get('to', '').split()[0] if dest_info.get('to') else 'page'
 
@@ -95,12 +98,41 @@ class TOCExtractor:
                 else:
                     coordinates = (0, 0)
 
+                print(f"📍 Dict format: page={page_num}, type={dest_type}, coords={coordinates}")
                 return page_num, dest_type, coordinates
 
-            elif isinstance(dest_info, (list, tuple)) and len(dest_info) >= 1:
-                return int(dest_info[0]), 'page', (0, 0)
+            elif isinstance(dest_info, (list, tuple)):
+                # List/tuple format: [page, x, y, zoom] or [page]
+                if len(dest_info) >= 1:
+                    page_num = int(dest_info[0]) if dest_info[0] is not None else 0
+
+                    # Extract coordinates if available
+                    if len(dest_info) >= 3:
+                        try:
+                            x = float(dest_info[1]) if dest_info[1] is not None else 0
+                            y = float(dest_info[2]) if dest_info[2] is not None else 0
+                            coordinates = (x, y)
+                        except (ValueError, TypeError):
+                            coordinates = (0, 0)
+                    else:
+                        coordinates = (0, 0)
+
+                    print(f"📍 List format: page={page_num}, coords={coordinates}")
+                    return page_num, 'page', coordinates
+                else:
+                    print("📍 Empty list, defaulting to page 0")
+                    return 0, 'page', (0, 0)
+
+            elif isinstance(dest_info, (int, float)):
+                # Simple page number
+                page_num = int(dest_info)
+                print(f"📍 Simple format: page={page_num}")
+                return page_num, 'page', (0, 0)
+
             else:
+                print(f"📍 Unknown format, defaulting to page 0")
                 return 0, 'page', (0, 0)
 
-        except Exception:
+        except Exception as e:
+            print(f"❌ Error parsing destination: {e}")
             return 0, 'page', (0, 0)

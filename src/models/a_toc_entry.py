@@ -40,8 +40,14 @@ class TOCEntry:
         child.level = self.level + 1
 
     def get_display_title(self) -> str:
-        """Get formatted title for display"""
-        return f"{self.title} (page {self.page + 1})"
+        """Get formatted title for display with page info"""
+        # Add level indicator for nested entries
+        level_prefix = "  " * self.level if self.level > 0 else ""
+
+        # Add child count for parent entries
+        child_info = f" ({len(self.children)} items)" if self.children else ""
+
+        return f"{level_prefix}{self.title} → p.{self.page + 1}{child_info}"
 
     def __str__(self):
         indent = "  " * self.level
