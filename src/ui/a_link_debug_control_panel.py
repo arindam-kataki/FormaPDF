@@ -72,6 +72,8 @@ class LinkDebugControlPanel(QWidget):
         show_cache_btn.clicked.connect(self._show_cache_status)
         cache_layout.addWidget(show_cache_btn)
 
+        self.add_enhanced_test_buttons(layout)
+
         layout.addLayout(cache_layout)
 
         # === STATISTICS DISPLAY ===
@@ -232,3 +234,106 @@ class LinkDebugControlPanel(QWidget):
     def update_page_range(self, max_pages: int):
         """Update the page range when document loads"""
         self.page_spinbox.setMaximum(max_pages)
+
+    def _test_all_pages_for_links(self):
+        """Test all pages to find which ones have links"""
+        if not self.link_integration.link_manager:
+            self._log("❌ No link manager available")
+            return
+
+        if not hasattr(self.link_integration.link_manager,
+                       'pdf_document') or not self.link_integration.link_manager.pdf_document:
+            self._log("❌ No PDF document loaded")
+            return
+
+        document = self.link_integration.link_manager.pdf_document
+        total_pages = document.get_page_count()
+
+        self._log(f"=== Testing all {total_pages} pages for links ===")
+
+        pages_with_links = []
+        total_links_found = 0
+
+        for page_num in range(total_pages):
+            try:
+                # Force refresh to get accurate count
+                links = self.link_integration.link_manager.get_page_links(page_num, force_refresh=True)
+                link_count = len(links)
+
+                if link_count > 0:
+                    pages_with_links.append((page_num + 1, link_count))  # Convert to 1-based
+                    total_links_found += link_count
+
+                    self._log(f"📄 Page {page_num + 1}: {link_count} links")
+
+                    # Show first few links
+                    for i, link in enumerate(links[:3]):
+                        self._log(f"   {i + 1}. {link.link_type}: {link.tooltip}")
+                    if len(links) > 3:
+                        self._log(f"   ... and {len(links) - 3} more")
+                else:
+                    self._log(f"📄 Page {page_num + 1}: No links")
+
+            except Exception as e:
+                self._log(f"❌ Error testing page {page_num + 1}: {e}")
+
+        self._log("=== SUMMARY ===")
+        if pages_with_links:
+            self._log(f"✅ Found links on {len(pages_with_links)} pages:")
+            for page_num, count in pages_with_links:
+                self._log(f"   Page {page_num}: {count} links")
+            self._log(f"📊 Total links in document: {total_links_found}")
+
+            # Auto-test the first page with links
+            if pages_with_links:
+                test_page = pages_with_links[0][0] - 1  # Convert back to 0-based
+                self._log(f"🧪 Auto-testing page {test_page + 1} with {pages_with_links[0][1]} links...")
+                self.page_spinbox.setValue(test_page + 1)
+                self._force_load_page()
+        else:
+            self._log("❌ No links found in entire document")
+
+    def _test_specific_pages(self):
+        """Test specific pages that are more likely to have links"""
+        test_pages = [0, 1, 2]  # Usually first few pages have links
+
+        self._log("=== Testing specific pages for links ===")
+
+        for page_num in test_pages:
+            try:
+                links = self.link_integration.link_manager.get_page_links(page_num, force_refresh=True)
+                self._log(f"📄 Page {page_num + 1}: {len(links)} links")
+
+                if links:
+                    self._log(f"🎯 Testing page {page_num + 1} with visual overlays...")
+                    self.page_spinbox.setValue(page_num + 1)
+                    self._force_load_page()
+                    break  # Stop at first page with links
+
+            except Exception as e:
+                self._log(f"❌ Error testing page {page_num + 1}: {e}")
+
+    # Add this button to your debug panel init_ui method:
+    def add_enhanced_test_buttons(self):
+        """Add enhanced testing buttons"""
+
+        # Add to your layout
+        test_all_btn = QPushButton("🔍 Test All Pages")
+        test_all_btn.clicked.connect(self._test_all_pages_for_links)
+        layout.addWidget(test_all_btn)
+
+        test_specific_btn = QPushButton("🎯 Test Common Pages")
+        test_specific_btn.clicked.connect(self._test_specific_pages)
+        layout.addWidget(test_specific_btn)
+
+    def add_enhanced_test_buttons(self, layout):
+        """Add enhanced testing buttons - FIXED VERSION"""
+
+        # Add to the passed layout
+        test_all_btn = QPushButton("🔍 Test All Pages")
+        test_all_btn.clicked.connect(self._test_all_pages_for_links)
+        layout.addWidget(test_all_btn)
+
+        test_specific_btn = QPushButton("🎯 Test Common Pages")
+        test_specific_btn.clicked.connect(self._test_specific_pages)
+        layout.addWidget(test_specific_btn)

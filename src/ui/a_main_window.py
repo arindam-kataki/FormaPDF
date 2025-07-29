@@ -16,6 +16,7 @@ from src.ui.a_toolbar_widget import ToolbarWidget
 from src.ui.a_canvas_widget import CanvasWidget
 from src.ui.a_pdf_document import PDFDocument
 from src.ui.a_pdf_link_integration import PDFLinkIntegration
+from ui.a_link_debug_control_panel import LinkDebugControlPanel
 from ui.a_pdf_link_control_panel import PDFLinkControlPanel
 from ui.a_pdf_link_menu_integration import PDFLinkMenuIntegration
 
@@ -34,6 +35,8 @@ class PDFMainWindow(QMainWindow):
         super().__init__()
 
         # Core components
+        self.link_menu_integration = None
+        self.link_debug_panel = None
         self.document = None
         self.scroll_area = None
         self.canvas_widget = None
@@ -82,6 +85,7 @@ class PDFMainWindow(QMainWindow):
         self.toc_integration.setup_toc_integration()
 
         self.setup_link_system()
+        self.setup_link_debug_panel()
 
         # Add scroll area to layout
         main_layout.addWidget(self.scroll_area)
@@ -176,29 +180,48 @@ class PDFMainWindow(QMainWindow):
         self.status_bar.showMessage("Ready")
 
     def setup_link_system(self):
+        """Set up the link system"""
+        print("🔗 Setting up link system...")
 
-        """Initialize the PDF link system"""
-        try:
-            print("🔗 Setting up PDF link system...")
+        # Create link integration
+        self.link_integration = PDFLinkIntegration(self)
 
-            # Create link integration
-            self.link_integration = PDFLinkIntegration(self)
+        # CRITICAL: Integrate with canvas immediately after creation
+        if self.canvas_widget:
+            print("🔗 Integrating links with canvas...")
+            self.link_integration.integrate_with_canvas(self.canvas_widget)
+            print("✅ Link-canvas integration complete")
+        else:
+            print("❌ WARNING: No canvas widget available for link integration")
 
-            # Create control panel
-            self.link_control_panel = PDFLinkControlPanel(self.link_integration)
+        # Create link control panel
+        self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
 
-            # Add to UI if there's a properties area
-            self.add_link_control_to_ui()
+        # Add to UI (you can adjust this based on your layout)
+        self._add_link_control_dock()
 
-            # Add menu items
-            PDFLinkMenuIntegration.add_link_menu_items(self, self.link_integration)
+        print("✅ Link system setup complete")
 
-            print("✅ PDF link system initialized")
+    # Also add this method to ensure canvas integration happens:
+    def _integrate_links_with_canvas(self):
+        """Ensure links are properly integrated with canvas"""
+        if self.link_integration and self.canvas_widget:
+            if self.link_integration.overlay_manager is None:
+                print("🔧 Fixing missing overlay manager...")
+                self.link_integration.integrate_with_canvas(self.canvas_widget)
+                print("✅ Overlay manager created")
 
-        except Exception as e:
-            print(f"❌ Error setting up link system: {e}")
-            import traceback
-            traceback.print_exc()
+            # Connect page change signals if not already connected
+            if hasattr(self.canvas_widget, 'pageChanged'):
+                # Disconnect first to avoid duplicates
+                try:
+                    self.canvas_widget.pageChanged.disconnect(self.link_integration._on_page_changed)
+                except:
+                    pass
+                # Reconnect
+                self.canvas_widget.pageChanged.connect(self.link_integration._on_page_changed)
+
+            print("🔗 Canvas-link integration verified")
 
     def _connect_signals(self):
         """Connect all signals between components"""
@@ -338,32 +361,34 @@ class PDFMainWindow(QMainWindow):
                 except Exception as e:
                     print(f"⚠️ Could not load TOC: {e}")
 
-            # CRITICAL FIX: Link integration with immediate trigger
-            if hasattr(self, 'link_integration') and self.link_integration:
-                print("🔗 Setting up links for new document...")
+                    # FIXED: Link integration
+                    if hasattr(self, 'link_integration') and self.link_integration:
+                        print("🔗 Setting up links for new document...")
 
-                # Set document in link manager
-                self.link_integration.set_pdf_document(self.document)
+                        # CRITICAL: Ensure canvas integration is set up
+                        self._integrate_links_with_canvas()
 
-                # Integrate with canvas
-                #self._integrate_links_with_canvas()
+                        # Set document in link manager
+                        self.link_integration.set_pdf_document(self.document)
 
-                # CRITICAL: Force immediate link update for page 0
-                if self.link_integration.overlay_manager:
-                    print(f"🔗 Force updating links for page {self.current_page}")
-                    self.link_integration.overlay_manager.update_page_links(
-                        self.current_page,
-                        self.current_zoom
-                    )
+                        # Force immediate link update for page 0
+                        if self.link_integration.overlay_manager:
+                            print(f"🔗 Force updating links for page {self.current_page}")
+                            self.link_integration.overlay_manager.update_page_links(
+                                self.current_page,
+                                self.current_zoom
+                            )
 
-                    # Ensure overlay manager is visible and positioned correctly
-                    overlay_mgr = self.link_integration.overlay_manager
-                    if self.canvas_widget:
-                        overlay_mgr.setGeometry(self.canvas_widget.rect())
-                        overlay_mgr.show()
-                        overlay_mgr.raise_()  # Bring to front
+                            # Ensure overlay manager is visible and positioned correctly
+                            overlay_mgr = self.link_integration.overlay_manager
+                            if self.canvas_widget:
+                                overlay_mgr.setGeometry(self.canvas_widget.rect())
+                                overlay_mgr.show()
+                                overlay_mgr.raise_()  # Bring to front
 
-                    print(f"✅ Link overlays created: {len(overlay_mgr.link_overlays)}")
+                            print("✅ Link overlays set up for page 0")
+                        else:
+                            print("❌ ERROR: overlay_manager still None after integration attempt")
 
             #self.debug_link_system_comprehensive()
             #self.debug_specific_pdf_links()
@@ -951,6 +976,30 @@ class PDFMainWindow(QMainWindow):
                 self.scroll_area.verticalScrollBar().setValue(int(y_position))
 
         self.current_page = page_index
+
+    def setup_link_debug_panel(self):
+        """Add link debug panel to UI"""
+        if hasattr(self, 'link_integration') and self.link_integration:
+            # Create debug panel
+            self.link_debug_panel = LinkDebugControlPanel(self.link_integration)
+
+            # Add to your UI layout (adjust based on your layout structure)
+            # Option 1: Add to sidebar
+            if hasattr(self, 'sidebar_layout'):
+                self.sidebar_layout.addWidget(self.link_debug_panel)
+
+            # Option 2: Add to properties panel
+            elif hasattr(self, 'properties_panel'):
+                self.properties_panel.addWidget(self.link_debug_panel)
+
+            # Option 3: Create as separate dock widget
+            else:
+                from PyQt6.QtWidgets import QDockWidget
+                dock = QDockWidget("Link Debug", self)
+                dock.setWidget(self.link_debug_panel)
+                self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+
+            print("🐛 Link debug panel added to UI")
 
 def main():
     """Main entry point"""
