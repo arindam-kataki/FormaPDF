@@ -118,7 +118,7 @@ class PDFLinkOverlayManager(QWidget):
         if self.link_manager:
             self.link_manager.linkClicked.connect(self.linkClicked)
 
-    def update_page_links(self, page_num: int, zoom_level: float = 1.0):
+    def deprecated_01_update_page_links(self, page_num: int, zoom_level: float = 1.0):
         """
         Update link overlays for a specific page
 
@@ -126,7 +126,7 @@ class PDFLinkOverlayManager(QWidget):
             page_num: 0-based page number
             zoom_level: Current zoom level
         """
-        return
+
         if not self.link_manager:
             return
 
@@ -229,6 +229,194 @@ class PDFLinkOverlayManager(QWidget):
 
         return stats
 
+    def update_page_links(self, page_num: int, zoom_level: float = 1.0):
+        """
+        Update link overlays for a specific page - WITH DEBUG
+        """
+        print(f"🔍 DEBUG: update_page_links called - page={page_num}, zoom={zoom_level:.2f}")
+
+        if not self.link_manager:
+            print("❌ DEBUG: No link_manager available")
+            return
+
+        # Check if we actually have a document
+        if not hasattr(self.link_manager, 'pdf_document') or not self.link_manager.pdf_document:
+            print("❌ DEBUG: No PDF document in link_manager")
+            return
+
+        print(f"📎 DEBUG: Updating link overlays for page {page_num + 1} at zoom {zoom_level:.2f}")
+
+        # Clear existing overlays
+        self.clear_overlays()
+
+        # Get links for the page - THIS IS WHERE LAZY LOADING HAPPENS
+        try:
+            links = self.link_manager.get_page_links(page_num)
+            print(f"📊 DEBUG: Found {len(links)} raw links on page {page_num + 1}")
+
+            if not links:
+                print("⚠️ DEBUG: No links found - check if PDF has links or if parsing failed")
+                # Let's also check if the page exists
+                page_count = self.link_manager.pdf_document.get_page_count()
+                print(f"📄 DEBUG: Document has {page_count} pages, requesting page {page_num + 1}")
+                return
+
+        except Exception as e:
+            print(f"❌ DEBUG: Error getting page links: {e}")
+            return
+
+        # Scale links for current zoom - THIS IS CRITICAL FOR DISPLAY
+        try:
+            scaled_links = self.link_manager.scale_links_for_zoom(page_num, zoom_level)
+            print(f"📐 DEBUG: Scaled to {len(scaled_links)} links for zoom {zoom_level:.2f}")
+        except Exception as e:
+            print(f"❌ DEBUG: Error scaling links: {e}")
+            scaled_links = links
+
+        # Create overlay widgets for each link
+        overlay_count = 0
+        for i, link in enumerate(scaled_links):
+            try:
+                print(
+                    f"🎯 DEBUG: Creating overlay {i + 1} - {link.link_type} at ({link.rect.x():.0f}, {link.rect.y():.0f})")
+
+                overlay = LinkOverlayWidget(link, self)
+                overlay.linkClicked.connect(self._on_link_overlay_clicked)
+
+                # CRITICAL: Make sure overlay is visible and positioned
+                overlay.show()
+                overlay.raise_()  # Bring to front
+
+                self.link_overlays.append(overlay)
+                overlay_count += 1
+
+            except Exception as e:
+                print(f"❌ DEBUG: Error creating overlay {i + 1}: {e}")
+
+        self.current_page = page_num
+        self.current_zoom = zoom_level
+
+        print(f"✅ DEBUG: Successfully created {overlay_count} link overlays")
+
+        # VISUAL DEBUG: Add colored rectangles to see overlay positions
+        self._add_debug_visual_indicators()
+
+    def _add_debug_visual_indicators(self):
+        """Add visual debug indicators - REMOVE AFTER TESTING"""
+        print(f"🎨 DEBUG: Adding visual indicators for {len(self.link_overlays)} overlays")
+
+        for i, overlay in enumerate(self.link_overlays):
+            # Make overlay background semi-transparent colored for debugging
+            overlay.setStyleSheet(f"""
+                QWidget {{
+                    background-color: rgba(255, 0, 0, 50);
+                    border: 2px solid red;
+                }}
+            """)
+            print(f"🎨 DEBUG: Overlay {i + 1} styled at geometry {overlay.geometry()}")
+
+    # Step 2: Fix the early return in PDFLinkOverlayManager
+
+    def update_page_links(self, page_num: int, zoom_level: float = 1.0):
+        """
+        Update link overlays for a specific page - FIXED VERSION
+        """
+        if not self.link_manager:
+            print("❌ No link_manager available")
+            return
+
+        print(f"📎 Updating link overlays for page {page_num + 1} at zoom {zoom_level:.2f}")
+
+        # Clear existing overlays
+        self.clear_overlays()
+
+        # REMOVED THE EARLY RETURN THAT WAS PREVENTING LINK LOADING!
+        # return  # <-- THIS WAS THE PROBLEM!
+
+        # Get scaled links for the page
+        links = self.link_manager.scale_links_for_zoom(page_num, zoom_level)
+
+        if not links:
+            print(f"⚠️ No links found on page {page_num + 1}")
+            return
+
+        # Create overlay widgets for each link
+        for link in links:
+            overlay = LinkOverlayWidget(link, self)
+            overlay.linkClicked.connect(self._on_link_overlay_clicked)
+            overlay.show()
+            self.link_overlays.append(overlay)
+
+        self.current_page = page_num
+        self.current_zoom = zoom_level
+
+        print(f"📎 Created {len(self.link_overlays)} link overlays")
+
+    # Step 2b: Also optimize the lazy loading in PDFLinkManager
+
+    def get_page_links(self, page_num: int, force_refresh: bool = False) -> List[PDFLink]:
+        """
+        Get links for a specific page with OPTIMIZED lazy loading
+        """
+        print(f"🔍 Getting links for page {page_num + 1} (force_refresh={force_refresh})")
+
+        # Check cache first (this is your lazy loading!)
+        if not force_refresh and page_num in self.page_links_cache:
+            cached_links = self.page_links_cache[page_num]
+            print(f"💾 Using cached {len(cached_links)} links for page {page_num + 1}")
+            return cached_links
+
+        # Only parse if not in cache - THIS IS THE LAZY LOADING
+        print(f"🔄 Parsing links for page {page_num + 1} (not in cache)")
+
+        if not self.pdf_document:
+            print("❌ No PDF document available")
+            return []
+
+        try:
+            # Get raw links from PDF
+            page_links = self._parse_page_links(page_num)
+
+            # Cache the results (this is your optimization!)
+            self.page_links_cache[page_num] = page_links
+
+            print(f"✅ Parsed and cached {len(page_links)} links for page {page_num + 1}")
+            return page_links
+
+        except Exception as e:
+            print(f"❌ Error parsing links for page {page_num + 1}: {e}")
+            return []
+
+    def _parse_page_links(self, page_num: int) -> List[PDFLink]:
+        """
+        Parse links from a specific page - ONLY CALLED WHEN NEEDED
+        """
+        if not self.pdf_document:
+            return []
+
+        try:
+            # This is where the actual work happens - only when lazy loading triggers
+            print(f"🔍 Actually parsing PDF page {page_num + 1} for links...")
+
+            # Get the PyMuPDF page
+            pdf_page = self.pdf_document.pdf_doc[page_num]  # Adjust based on your document structure
+            raw_links = pdf_page.get_links()
+
+            print(f"📋 Found {len(raw_links)} raw links on page {page_num + 1}")
+
+            # Parse each raw link
+            parsed_links = []
+            for raw_link in raw_links:
+                parsed_link = self._parse_raw_link(raw_link, page_num)
+                if parsed_link:
+                    parsed_links.append(parsed_link)
+
+            print(f"✅ Successfully parsed {len(parsed_links)} links")
+            return parsed_links
+
+        except Exception as e:
+            print(f"❌ Error parsing page {page_num + 1}: {e}")
+            return []
 
 class PDFLinkDebugOverlay(QWidget):
     """
