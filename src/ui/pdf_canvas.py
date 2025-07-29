@@ -974,7 +974,7 @@ class PDFCanvas(QLabel):
             current_page = self.pdf_canvas.get_current_page_from_scroll(scroll_y)
             self.pdf_canvas.current_page = current_page
 
-            print(f"📜 Scroll update: zoom={zoom_level:.1f}x, pages={start_page}-{end_page}")
+            print(f"📜 Scroll update: zoom={zoom_level:.1f}x, pages={start_page}-{end_page}, current={current_page}")
 
             # Render controls for visible area with zoom consideration
             self.pdf_canvas.draw_controls_and_overlay(start_page, end_page, viewport_rect)

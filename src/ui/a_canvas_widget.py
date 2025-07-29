@@ -557,7 +557,10 @@ class CanvasWidget(QWidget):
 
     def get_current_page_from_scroll(self, scroll_y: float) -> int:
         """Get current page based on scroll position (from reference)"""
-        return self.get_page_at_position(scroll_y + 100)  # Add offset for better detection
+        """Get current page based on scroll position - FIXED"""
+        viewport_height = self.scroll_area.viewport().height()
+        center_y = scroll_y + (viewport_height / 2)
+        return self.get_page_at_position(center_y)
 
     def get_canvas_size(self) -> tuple:
         """Get total canvas size needed (from reference)"""
