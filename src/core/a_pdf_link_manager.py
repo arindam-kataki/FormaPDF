@@ -48,9 +48,34 @@ class PDFLinkManager(QObject):
 
     def set_pdf_document(self, pdf_document):
         """Set the PDF document and clear cache"""
+        print(f"📋 PDFLinkManager.set_pdf_document called with: {type(pdf_document)}")
+        print(f"📋 pdf_document is None: {pdf_document is None}")
+
+        if pdf_document is not None:
+            print(f"📋 Document attributes: {[attr for attr in dir(pdf_document) if not attr.startswith('_')][:10]}")
+            if hasattr(pdf_document, 'get_page_count'):
+                try:
+                    page_count = pdf_document.get_page_count()
+                    print(f"📋 Document page count: {page_count}")
+                except Exception as e:
+                    print(f"❌ Error getting page count: {e}")
+
+        # Set the document
         self.pdf_document = pdf_document
+
+        # Verify it was set
+        print(f"📋 self.pdf_document after assignment: {self.pdf_document is not None}")
+        print(f"📋 self.pdf_document type: {type(self.pdf_document)}")
+
         self.clear_cache()
-        print(f"📎 PDFLinkManager: Document set")
+        print(f"📎 PDFLinkManager: Document set complete")
+
+    def debug_document_status(self):
+        """Debug method to check document status"""
+        print(f"=== PDFLinkManager Document Status ===")
+        print(f"pdf_document exists: {hasattr(self, 'pdf_document')}")
+        print(f"pdf_document is None: {getattr(self, 'pdf_document', 'MISSING') is None}")
+        print(f"pdf_document type: {type(getattr(self, 'pdf_document', None))}")
 
     def clear_cache(self):
         """Clear all cached links"""
@@ -437,3 +462,22 @@ class PDFLinkManager(QObject):
             scaled_links.append(scaled_link)
 
         return scaled_links
+
+    def get_page_links(self, page_num: int, force_refresh: bool = False) -> List[PDFLink]:
+        """
+        Get links for a specific page (wrapper for extract_page_links)
+
+        Args:
+            page_num: 0-based page number
+            force_refresh: Whether to force refresh the cache
+
+        Returns:
+            List of PDFLink objects
+        """
+        if force_refresh and page_num in self.links_cache:
+            # Clear cache for this page if force refresh requested
+            del self.links_cache[page_num]
+            print(f"🧹 Cleared cache for page {page_num + 1}")
+
+        # Use existing extract_page_links method
+        return self.extract_page_links(page_num)
