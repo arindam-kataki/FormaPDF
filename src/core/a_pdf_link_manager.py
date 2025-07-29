@@ -130,6 +130,14 @@ class PDFLinkManager(QObject):
                 raw_link['from'].height
             )
 
+            return PDFLink(
+                link_id=link_id,
+                page_num=page_num,
+                rect=rect,
+                link_type="unknown",
+                tooltip=f"Link {self.link_counter}"
+            )
+
             # Determine link type and parse type-specific data
             link_kind = raw_link.get('kind', 0)
 

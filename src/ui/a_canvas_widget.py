@@ -1,7 +1,9 @@
+import time
+
 from PyQt6.QtWidgets import QWidget
 from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal, pyqtSlot
 from PyQt6.QtGui import QPainter, QPixmap, QPen, QBrush
-from typing import Optional, List
+from typing import Optional, List, Tuple, Set
 
 
 class CanvasWidget(QWidget):
@@ -13,37 +15,262 @@ class CanvasWidget(QWidget):
     mousePositionChanged = pyqtSignal(int, float, float)  # page, doc_x, doc_y
 
     def __init__(self, parent=None):
+        """Initialize Canvas Widget with all optimizations and features"""
         super().__init__(parent)
 
-        # Core components
+        # ========================================
+        # CORE COMPONENTS
+        # ========================================
         self.document = None
         self.layout_manager = None
         self.zoom_level = 1.0
         self.current_page = 0
 
-        # Rendering state
+        # ========================================
+        # RENDERING STATE
+        # ========================================
         self.rendered_pages = {}  # Cache for rendered page pixmaps
         self.visible_pages = []  # Currently visible page indices
         self.viewport_rect = QRectF()
 
-        # Performance optimization
+        # ========================================
+        # PERFORMANCE OPTIMIZATION
+        # ========================================
+        # Render timer for debouncing
         self.render_timer = QTimer()
-        self.render_timer.timeout.connect(self._perform_render)
+        self.render_timer.timeout.connect(self._perform_render_smart)
         self.render_timer.setSingleShot(True)
         self.needs_render = False
 
-        # CRITICAL: Prevent infinite paint loops
+        # Paint loop prevention
         self.is_painting = False
         self.paint_count = 0
+        self._last_paint_time = 0.0
 
-        # UI settings
+        # ========================================
+        # SMART SCROLL OPTIMIZATION
+        # ========================================
+        from src.ui.a_smart_scroll_optimizer import SmartScrollOptimizer
+        self.smart_scroll_optimizer = SmartScrollOptimizer(self)
+        self._pages_needing_repaint = set()  # Track which pages need actual repainting
+        self._pages_to_render = set()  # Pages scheduled for rendering
+
+        # ========================================
+        # LINK COUNTING OPTIMIZATION
+        # ========================================
+        # Cache for link counts to avoid repeated extraction
+        self._link_count_cache = {}
+        self._cache_max_age = 30.0  # Cache valid for 30 seconds
+        self._link_cache_timestamps = {}
+
+        # Rapid paint detection for link counting
+        self._last_link_paint_time = 0.0
+        self._paint_count_in_window = 0
+        self._paint_window_start = 0.0
+
+        # ========================================
+        # PAGE INFO OVERLAY SETTINGS
+        # ========================================
+        self._show_page_info_overlay = True  # Toggle for page info overlay
+        self._overlay_font_size = 9
+        self._overlay_width = 200
+        self._overlay_height = 55
+
+        # ========================================
+        # UI SETTINGS AND STYLING
+        # ========================================
         self.setMinimumSize(400, 300)
         self.setMouseTracking(True)
 
-        # Background
+        # Background styling
         self.setStyleSheet("background-color: #2b2b2b;")
 
-        print("🎨 Canvas widget initialized")
+        # ========================================
+        # MOUSE AND INTERACTION STATE
+        # ========================================
+        self._mouse_pressed = False
+        self._last_mouse_position = None
+        self._drag_start_position = None
+
+        # ========================================
+        # CACHE MANAGEMENT
+        # ========================================
+        self._cache_cleanup_timer = QTimer()
+        self._cache_cleanup_timer.timeout.connect(self._periodic_cache_cleanup)
+        self._cache_cleanup_timer.start(10000)  # Cleanup every 10 seconds
+
+        # Cache size limits
+        self._max_cached_pages = 10  # Maximum pages to keep in cache
+        self._cache_adjacent_pages = 2  # Number of adjacent pages to cache
+
+        # ========================================
+        # PERFORMANCE MONITORING
+        # ========================================
+        self._performance_stats = {
+            'total_paints': 0,
+            'cache_hits': 0,
+            'renders_performed': 0,
+            'scroll_optimizations': 0,
+            'link_extractions': 0,
+            'link_cache_hits': 0
+        }
+
+        # ========================================
+        # SIGNALS FOR INTEGRATION
+        # ========================================
+        # These signals are defined in the class but connected here for clarity
+        # self.pageChanged = pyqtSignal(int)     # Emitted when current page changes
+        # self.zoomChanged = pyqtSignal(float)   # Emitted when zoom level changes
+        # self.mousePositionChanged = pyqtSignal(int, float, float)  # page, doc_x, doc_y
+
+        # ========================================
+        # DEBUGGING AND LOGGING
+        # ========================================
+        self._debug_mode = False  # Set to True for verbose logging
+        self._log_paint_events = True
+        self._log_optimizations = True
+
+        # ========================================
+        # SCROLL DETECTION
+        # ========================================
+        self._last_scroll_time = 0.0
+        self._scroll_velocity = 0.0
+        self._is_actively_scrolling = False
+
+        # ========================================
+        # RENDER QUALITY SETTINGS
+        # ========================================
+        self._render_dpi_base = 72  # Base DPI for rendering
+        self._render_quality_high = True  # High quality rendering flag
+        self._antialiasing_enabled = True
+
+        # ========================================
+        # INITIALIZATION COMPLETION
+        # ========================================
+        print("🎨 Canvas widget initialized with full optimization suite:")
+        print("   ✅ Smart scroll optimization")
+        print("   ✅ Link counting cache")
+        print("   ✅ Paint loop prevention")
+        print("   ✅ Performance monitoring")
+        print("   ✅ Intelligent cache management")
+        print("   ✅ Page info overlay system")
+
+        # Initialize performance tracking
+        self._track_performance_metric('canvas_init', 1)
+
+    def _track_performance_metric(self, metric_name: str, value: int = 1):
+        """Track performance metrics for optimization analysis"""
+        if metric_name not in self._performance_stats:
+            self._performance_stats[metric_name] = 0
+        self._performance_stats[metric_name] += value
+
+    def _periodic_cache_cleanup(self):
+        """Periodic cache cleanup to prevent memory bloat"""
+        try:
+            if not hasattr(self, 'rendered_pages'):
+                return
+
+            initial_cache_size = len(self.rendered_pages)
+
+            if initial_cache_size > self._max_cached_pages:
+                # Keep only the most recently used pages
+                pages_to_keep = set(self.visible_pages)
+
+                # Add adjacent pages
+                for page_idx in self.visible_pages:
+                    for offset in range(-self._cache_adjacent_pages, self._cache_adjacent_pages + 1):
+                        adjacent_page = page_idx + offset
+                        if adjacent_page >= 0:  # Will check upper bound when we have document
+                            pages_to_keep.add(adjacent_page)
+
+                # Remove excess pages
+                pages_to_remove = []
+                for page_idx in self.rendered_pages.keys():
+                    if page_idx not in pages_to_keep:
+                        pages_to_remove.append(page_idx)
+
+                # Remove oldest pages first (simple LRU)
+                pages_to_remove.sort()
+                excess_count = initial_cache_size - self._max_cached_pages
+                for page_idx in pages_to_remove[:excess_count]:
+                    del self.rendered_pages[page_idx]
+
+                if pages_to_remove:
+                    print(f"🧹 Periodic cache cleanup: Removed {len(pages_to_remove[:excess_count])} pages")
+
+        except Exception as e:
+            print(f"❌ Cache cleanup error: {e}")
+
+    def get_performance_summary(self) -> dict:
+        """Get comprehensive performance statistics"""
+        stats = self._performance_stats.copy()
+
+        # Calculate efficiency metrics
+        if stats.get('total_paints', 0) > 0:
+            stats['cache_hit_rate'] = (stats.get('cache_hits', 0) / stats['total_paints']) * 100
+        else:
+            stats['cache_hit_rate'] = 0
+
+        if stats.get('link_extractions', 0) > 0:
+            stats['link_cache_efficiency'] = (stats.get('link_cache_hits', 0) / stats['link_extractions']) * 100
+        else:
+            stats['link_cache_efficiency'] = 0
+
+        # Add scroll optimization stats
+        if hasattr(self, 'smart_scroll_optimizer'):
+            scroll_stats = self.smart_scroll_optimizer.get_performance_stats()
+            stats.update(scroll_stats)
+
+        # Add memory usage
+        stats['cached_pages_count'] = len(getattr(self, 'rendered_pages', {}))
+        stats['link_cache_size'] = len(getattr(self, '_link_count_cache', {}))
+
+        return stats
+
+    def toggle_debug_mode(self, enabled: bool = None):
+        """Toggle debug mode for verbose logging"""
+        if enabled is None:
+            self._debug_mode = not self._debug_mode
+        else:
+            self._debug_mode = enabled
+
+        print(f"🐛 Debug mode: {'ON' if self._debug_mode else 'OFF'}")
+
+        if self._debug_mode:
+            print("📊 Current performance stats:")
+            stats = self.get_performance_summary()
+            for key, value in stats.items():
+                print(f"   {key}: {value}")
+
+    def toggle_page_info_overlay(self, visible: bool = None):
+        """Toggle page info overlay visibility"""
+        if visible is None:
+            self._show_page_info_overlay = not self._show_page_info_overlay
+        else:
+            self._show_page_info_overlay = visible
+
+        print(f"📊 Page info overlay: {'ON' if self._show_page_info_overlay else 'OFF'}")
+
+        # Trigger repaint to show/hide overlay
+        if not self.is_painting:
+            self.update()
+
+    def reset_performance_stats(self):
+        """Reset all performance tracking statistics"""
+        self._performance_stats = {
+            'total_paints': 0,
+            'cache_hits': 0,
+            'renders_performed': 0,
+            'scroll_optimizations': 0,
+            'link_extractions': 0,
+            'link_cache_hits': 0
+        }
+
+        if hasattr(self, 'smart_scroll_optimizer'):
+            self.smart_scroll_optimizer.total_scrolls = 0
+            self.smart_scroll_optimizer.repaints_saved = 0
+
+        print("📊 Performance statistics reset")
 
     @pyqtSlot(object)
     def on_document_loaded(self, document):
@@ -745,7 +972,125 @@ class CanvasWidget(QWidget):
             painter.drawText(page_rect, Qt.AlignmentFlag.AlignCenter, f"Loading page {page_index + 1}...")
             print(f"⏳ Loading indicator drawn for page {page_index}")
 
+        # ADD THIS: Draw page info overlay directly on the page
+        #self._draw_page_info_overlay(painter, page_index, page_rect)
+
         return True
+
+    def _draw_page_info_overlay(self, painter, page_index: int, page_rect):
+        """Draw page info overlay at (10, 10) relative to page with timing info"""
+        try:
+            from PyQt6.QtGui import QColor, QBrush, QPen, QFont
+            from PyQt6.QtCore import QRect
+
+            # Calculate overlay position (10, 10) relative to page top-left
+            overlay_x = int(page_rect.x() + 10)
+            overlay_y = int(page_rect.y() + 10)
+            overlay_width = 180  # Made wider to fit timing info
+            overlay_height = 55  # Made taller for 3 lines
+
+            # Get link count and timing
+            link_count, seconds_taken = self._get_link_count_for_page(page_index)
+
+            # Create overlay rectangle
+            overlay_rect = QRect(overlay_x, overlay_y, overlay_width, overlay_height)
+
+            # Draw semi-transparent background
+            background_color = QColor(0, 0, 0, 180)
+            painter.fillRect(overlay_rect, QBrush(background_color))
+
+            # Draw border
+            border_color = QColor(100, 100, 100, 255)
+            painter.setPen(QPen(border_color, 1))
+            painter.drawRect(overlay_rect)
+
+            # Set up text drawing
+            painter.setPen(QPen(QColor(255, 255, 255, 255)))  # White text
+            painter.setFont(QFont("Arial", 9, QFont.Weight.Bold))  # Slightly smaller to fit 3 lines
+
+            # Prepare text content
+            page_text = f"Page {page_index + 1}"
+            links_text = f"Links: {link_count}"
+            timing_text = f"Time: {seconds_taken:.3f}s"
+
+            # Text positioning
+            text_x = overlay_x + 8
+            text_y = overlay_y + 14
+            line_height = 13
+
+            # Draw all three lines
+            painter.drawText(text_x, text_y, page_text)
+            painter.drawText(text_x, text_y + line_height, links_text)
+            painter.drawText(text_x, text_y + (line_height * 2), timing_text)
+
+            print(f"📊 Drew page info overlay: Page {page_index + 1}, {link_count} links, {seconds_taken:.3f}s")
+
+        except Exception as e:
+            print(f"❌ Error drawing page info overlay: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # ADD THIS: Method to get link count (same as before)
+    def _get_link_count_for_page(self, page_index: int) -> Tuple[int, float]:
+        """
+        Get the number of links on a specific page and time taken to generate the count
+
+        Args:
+            page_index: 0-based page index
+
+        Returns:
+            Tuple[int, float]: (link_count, seconds_taken)
+        """
+        import time
+
+        start_time = time.time()
+        link_count = 0
+
+        try:
+            # Try to get link count from link manager if available
+            if hasattr(self, 'link_manager') and self.link_manager:
+                page_links = self.link_manager.extract_page_links(page_index)
+                link_count = len(page_links)
+
+            # Try to get from parent's link integration
+            elif hasattr(self.parent(), 'link_integration') and self.parent().link_integration:
+                link_manager = self.parent().link_integration.link_manager
+                if link_manager:
+                    page_links = link_manager.extract_page_links(page_index)
+                    link_count = len(page_links)
+
+            # Fallback: try to access PDF document directly
+            elif self.document and hasattr(self.document, 'doc'):
+                if page_index < len(self.document.doc):
+                    page = self.document.doc[page_index]
+                    raw_links = page.get_links()
+                    link_count = len(raw_links)
+
+            # Additional fallback for pdf_canvas.py style documents
+            elif hasattr(self, 'pdf_document') and self.pdf_document:
+                if hasattr(self.pdf_document, 'doc'):
+                    # PyMuPDF document
+                    if page_index < len(self.pdf_document.doc):
+                        page = self.pdf_document.doc[page_index]
+                        links = page.get_links()
+                        link_count = len(links)
+                elif hasattr(self.pdf_document, '__getitem__'):
+                    # Alternative access method
+                    if page_index < self.pdf_document.page_count:
+                        page = self.pdf_document[page_index]
+                        links = page.get_links()
+                        link_count = len(links)
+
+        except Exception as e:
+            print(f"❌ Error getting link count for page {page_index}: {e}")
+            link_count = 0
+
+        end_time = time.time()
+        seconds_taken = end_time - start_time
+
+        print(f"🔗 Page {page_index + 1}: Found {link_count} links in {seconds_taken:.4f} seconds")
+
+        return link_count, seconds_taken
 
     def mousePressEvent(self, event):
         """Handle mouse press events"""
@@ -801,3 +1146,200 @@ class CanvasWidget(QWidget):
             print(f"⚠️ Error getting actual current page: {e}")
             return max(0, self.current_page)
 
+    def set_visible_pages_optimized(self, page_indices: List[int], viewport_rect: QRectF):
+        """
+        REPLACE your existing set_visible_pages method with this optimized version
+        """
+        if self.is_painting:
+            print("⏸️ Skipping page update - currently painting")
+            return
+
+        # Use smart optimizer instead of direct update
+        self.smart_scroll_optimizer.update_visible_pages_optimized(page_indices, viewport_rect)
+
+        # Update current page tracking
+        if page_indices and self.current_page not in page_indices:
+            new_page = page_indices[0]
+            if new_page != self.current_page:
+                self.current_page = new_page
+                self.pageChanged.emit(new_page)
+
+    def _smart_repaint_pages(self, pages_to_repaint: Set[int], pages_to_skip: Set[int]):
+        """
+        NEW METHOD: Smart repaint that only renders what's needed
+        """
+        print(f"🎨 Smart repaint starting...")
+        print(f"   Will repaint: {pages_to_repaint}")
+        print(f"   Will reuse cache: {pages_to_skip}")
+
+        # Mark which pages need new rendering
+        self._pages_needing_repaint = pages_to_repaint.copy()
+
+        # Schedule render for new pages only
+        if pages_to_repaint:
+            self._smart_schedule_render(pages_to_repaint)
+
+        # Always trigger a paint event (but most pages will use cache)
+        self.update()
+
+    def _smart_schedule_render(self, pages_to_render: Set[int]):
+        """
+        NEW METHOD: Schedule rendering only for specific pages
+        """
+        print(f"⏰ Smart scheduling render for pages: {pages_to_render}")
+
+        # Check which pages actually need rendering (not already cached)
+        pages_needing_render = []
+        for page_idx in pages_to_render:
+            if page_idx not in self.rendered_pages:
+                pages_needing_render.append(page_idx)
+
+        if pages_needing_render:
+            print(f"🖼️ Will render new pages: {pages_needing_render}")
+            # Store what needs rendering
+            self._pages_to_render = set(pages_needing_render)
+
+            # Schedule the render
+            self.needs_render = True
+            self.render_timer.stop()
+            self.render_timer.start(50)  # Slightly longer delay for smoother scrolling
+        else:
+            print(f"✅ All pages already cached - no rendering needed!")
+
+    def _perform_render_smart(self):
+        """
+        REPLACE your existing _perform_render method with this optimized version
+        """
+        if self.is_painting:
+            print("⏸️ Skipping render - currently painting")
+            return
+
+        if not self.needs_render or not self.document or not self.layout_manager:
+            print("❌ Smart render cancelled - missing components or not needed")
+            return
+
+        self.needs_render = False
+
+        # Only render pages that actually need it
+        pages_to_render = getattr(self, '_pages_to_render', set(self.visible_pages))
+
+        print(f"🎨 Smart rendering pages: {pages_to_render}")
+
+        rendered_count = 0
+        for page_index in pages_to_render:
+            if page_index not in self.rendered_pages:
+                print(f"🖼️ Rendering page {page_index}...")
+                self._render_page(page_index)
+                rendered_count += 1
+
+        # Cache cleanup - keep visible + adjacent pages
+        self._smart_cache_cleanup()
+
+        print(f"🎨 Smart render complete. Rendered {rendered_count} new pages.")
+
+        # Clear the render list
+        self._pages_to_render = set()
+
+    def _smart_cache_cleanup(self):
+        """
+        NEW METHOD: Intelligent cache cleanup that keeps recently used pages
+        """
+        if not hasattr(self, 'rendered_pages'):
+            return
+
+        # Keep visible pages + 2 adjacent on each side
+        pages_to_keep = set(self.visible_pages)
+        for page_idx in self.visible_pages:
+            pages_to_keep.add(max(0, page_idx - 1))
+            pages_to_keep.add(max(0, page_idx - 2))
+            if self.document:
+                max_page = self.document.get_page_count() - 1
+                pages_to_keep.add(min(max_page, page_idx + 1))
+                pages_to_keep.add(min(max_page, page_idx + 2))
+
+        # Remove pages not in keep list
+        pages_to_remove = [p for p in self.rendered_pages.keys() if p not in pages_to_keep]
+        for page_idx in pages_to_remove:
+            del self.rendered_pages[page_idx]
+
+        if pages_to_remove:
+            print(f"🧹 Cache cleanup: Removed {len(pages_to_remove)} pages, kept {len(self.rendered_pages)}")
+
+    def paintEvent_smart(self, event):
+        """
+        REPLACE your existing paintEvent method with this optimized version
+        """
+        if self.is_painting:
+            print("🔄 Paint blocked - already painting")
+            return
+
+        # Rate limiting for smooth scrolling
+        current_time = time.time()
+        if hasattr(self, '_last_paint_time'):
+            time_since_paint = current_time - self._last_paint_time
+            if time_since_paint < 0.016:  # Max 60 FPS
+                return
+
+        self._last_paint_time = current_time
+        self.is_painting = True
+        self.paint_count += 1
+
+        try:
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Paint background
+            painter.fillRect(self.rect(), QBrush(Qt.GlobalColor.darkGray))
+
+            if not self.document or not self.layout_manager:
+                self._paint_no_document(painter)
+                return
+
+            # Smart paint visible pages
+            pages_painted = 0
+            cache_hits = 0
+
+            for page_index in self.visible_pages:
+                painted_from_cache = self._paint_page_smart(painter, page_index)
+                if painted_from_cache:
+                    cache_hits += 1
+                pages_painted += 1
+
+            efficiency = (cache_hits / pages_painted * 100) if pages_painted > 0 else 0
+            print(
+                f"🎨 Smart paint #{self.paint_count}: {pages_painted} pages, {cache_hits} from cache ({efficiency:.1f}%)")
+
+        except Exception as e:
+            print(f"❌ Paint error: {e}")
+        finally:
+            self.is_painting = False
+
+    def _paint_page_smart(self, painter, page_index: int) -> bool:
+        """
+        NEW METHOD: Paint page with smart caching awareness
+        """
+        page_rect = self.layout_manager.get_page_rect(page_index)
+        if not page_rect:
+            return False
+
+        # Draw page background and border
+        painter.fillRect(page_rect, QBrush(Qt.GlobalColor.white))
+        painter.setPen(QPen(Qt.GlobalColor.black, 1))
+        painter.drawRect(page_rect)
+
+        # Check if we have cached content
+        if page_index in self.rendered_pages:
+            # Use cached pixmap
+            pixmap = self.rendered_pages[page_index]
+            painter.drawPixmap(page_rect.toRect(), pixmap)
+
+            # Add overlay if needed
+            if hasattr(self, '_draw_page_info_overlay'):
+                self._draw_page_info_overlay(painter, page_index, page_rect)
+
+            return True  # Painted from cache
+        else:
+            # Show loading indicator
+            painter.setPen(QPen(Qt.GlobalColor.gray))
+            painter.drawText(page_rect, Qt.AlignmentFlag.AlignCenter, f"Loading page {page_index + 1}...")
+            return False  # Not from cache

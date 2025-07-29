@@ -126,6 +126,7 @@ class PDFLinkOverlayManager(QWidget):
             page_num: 0-based page number
             zoom_level: Current zoom level
         """
+        return
         if not self.link_manager:
             return
 
