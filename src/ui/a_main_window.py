@@ -440,27 +440,27 @@ class PDFMainWindow(QMainWindow):
                         else:
                             print("❌ ERROR: overlay_manager still None after integration attempt")
 
-                    # Add link-specific loading
-                    if hasattr(self, 'document') and hasattr(self, 'link_integration') and self.link_integration:
-                        print("🔗 Setting up links for new document...")
+            # Add link-specific loading
+            if hasattr(self, 'document') and hasattr(self, 'link_integration') and self.link_integration:
+                print("🔗 Setting up links for new document...")
 
-                        # Set document in link system
-                        self.link_integration.set_pdf_document(self.document, file_path)
+                # Set document in link system
+                self.link_integration.set_pdf_document(self.document, file_path)
 
-                        # Update link control panel
-                        if hasattr(self, 'link_control_panel') and self.link_control_panel:
-                            self.link_control_panel.set_document(self.document, file_path)
-                            self.link_control_panel.apply_settings()
+                # Update link control panel
+                if hasattr(self, 'link_control_panel') and self.link_control_panel:
+                    self.link_control_panel.set_document(self.document, file_path)
+                    self.link_control_panel.apply_settings()
 
-                        # Integrate with canvas if available
-                        if hasattr(self, 'canvas_widget'):
-                            self.integrate_links_with_canvas()
+                # Integrate with canvas if available
+                if hasattr(self, 'canvas_widget'):
+                    self.integrate_links_with_canvas()
 
-                        # Update links for current page
-                        if hasattr(self, 'current_page'):
-                            self._on_page_changed_links(self.current_page)
+                # Update links for current page
+                if hasattr(self, 'current_page'):
+                    self._on_page_changed_links(self.current_page)
 
-                        print(f"✅ Links loaded for document: {file_path}")
+                print(f"✅ Links loaded for document: {file_path}")
 
             # Update UI
             self.setWindowTitle(f"PDF Voice Editor - {file_path}")
