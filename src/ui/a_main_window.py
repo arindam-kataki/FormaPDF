@@ -4,17 +4,25 @@ Main window for PDF Voice Editor using new toolbar widget
 """
 
 import sys
+import webbrowser
+
 from PyQt6.QtWidgets import (
     QApplication, QMainWindow, QScrollArea, QVBoxLayout,
-    QWidget, QFileDialog, QMenuBar, QStatusBar, QMessageBox, QDockWidget
+    QWidget, QFileDialog, QMenuBar, QStatusBar, QMessageBox, QDockWidget, QDialog
 )
-from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal, pyqtSlot
-from PyQt6.QtGui import QAction
+from PyQt6.QtCore import Qt, QTimer, QRectF, pyqtSignal, pyqtSlot, QUrl
+from PyQt6.QtGui import QAction, QDesktopServices
 
 from src.ui.a_toc_integration import TOCIntegration
 from src.ui.a_toolbar_widget import ToolbarWidget
 from src.ui.a_canvas_widget import CanvasWidget
 from src.ui.a_pdf_document import PDFDocument
+from ui.a_pdf_link_control_panel import PDFLinkControlPanel, PDFLinkVoiceIntegration
+from ui.a_pdf_link_integration import ExternalLinkConfirmDialog
+from ui.a_pdf_link_manager import PDFLink
+from ui.a_link_debug_control_panel import LinkDebugControlPanel
+from ui.a_pdf_link_overlay_manager import PDFLinkIntegration
+
 
 class PDFMainWindow(QMainWindow):
     """
@@ -79,7 +87,7 @@ class PDFMainWindow(QMainWindow):
         self.toc_integration = TOCIntegration(self)
         self.toc_integration.setup_toc_integration()
 
-        self.setup_link_system()
+        self._setup_link_system()
         self.setup_link_debug_panel()
 
         # Add scroll area to layout
@@ -174,46 +182,96 @@ class PDFMainWindow(QMainWindow):
         self.setStatusBar(self.status_bar)
         self.status_bar.showMessage("Ready")
 
-    def setup_link_system(self):
-        """Set up the link system"""
-        print("🔗 Setting up link system...")
+    def _setup_link_system(self):
+        """Setup the complete PDF link system"""
+        print("🔗 Setting up PDF link system...")
 
-        # CRITICAL: Integrate with canvas immediately after creation
-        if self.canvas_widget:
-            print("🔗 Integrating links with canvas...")
-            #self.link_integration.integrate_with_canvas(self.canvas_widget)
-            print("✅ Link-canvas integration complete")
-        else:
-            print("❌ WARNING: No canvas widget available for link integration")
+        # Create link integration
+        self.link_integration = PDFLinkIntegration(self)
 
-        # Create link control panel
-        #self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
+        # Connect main signals
+        self.link_integration.linkNavigationRequested.connect(self._handle_link_navigation)
+        self.link_integration.externalLinkRequested.connect(self._handle_external_link_request)
+        self.link_integration.linkStatusChanged.connect(self._update_link_status)
 
-        # Add to UI (you can adjust this based on your layout)
+        # Create and setup link control panel
+        self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
+
+        # Connect control panel signals
+        self.link_control_panel.linkActivated.connect(self._handle_link_activation)
+        self.link_control_panel.linkHighlighted.connect(self._handle_link_highlight)
+        self.link_control_panel.overlayVisibilityChanged.connect(self._handle_overlay_visibility)
+        self.link_control_panel.pageNavigationRequested.connect(self._handle_page_navigation)
+
+        # Add control panel to UI as dock widget
         self._add_link_control_dock()
 
-        print("✅ Link system setup complete")
+        print("✅ PDF link system setup complete")
 
-    # Also add this method to ensure canvas integration happens:
-    def _integrate_links_with_canvas(self):
-        """Ensure links are properly integrated with canvas"""
-        if self.link_integration and self.canvas_widget:
-            if self.link_integration.overlay_manager is None:
-                print("🔧 Fixing missing overlay manager...")
-                self.link_integration.integrate_with_canvas(self.canvas_widget)
-                print("✅ Overlay manager created")
+    def _add_link_control_dock(self):
+        """Add link control panel as dockable widget"""
+        try:
+            # Create dock widget
+            dock = QDockWidget("PDF Links", self)
+            dock.setWidget(self.link_control_panel)
+            dock.setFeatures(
+                QDockWidget.DockWidgetFeature.DockWidgetMovable |
+                QDockWidget.DockWidgetFeature.DockWidgetFloatable
+            )
 
-            # Connect page change signals if not already connected
+            # Add to right side (adjust as needed for your layout)
+            self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
+
+            print("📎 Link control panel added as dock widget")
+
+        except Exception as e:
+            print(f"⚠️ Could not add link control dock: {e}")
+
+    def _update_link_status(self, status_message: str):
+        """Update status bar with link information"""
+        if hasattr(self, 'status_bar') and self.status_bar:
+            self.status_bar.showMessage(status_message, 2000)
+        else:
+            print(f"🔗 Link Status: {status_message}")
+
+    def _setup_voice_integration(self):
+        """Setup voice control for link functionality"""
+        # Create voice integration
+        self.link_voice_integration = PDFLinkVoiceIntegration(self.link_control_panel)
+
+        # If you have existing voice control system, integrate with it
+        # self.voice_handler.add_command_handler(self.link_voice_integration.handle_voice_command)
+
+        print("🎤 Link voice integration setup complete")
+
+    def integrate_links_with_canvas(self):
+        """Integrate links with the canvas widget"""
+        if hasattr(self, 'canvas_widget') and self.link_integration:
+            print("🔗 Integrating links with canvas...")
+
+            # Integrate with canvas
+            self.link_integration.integrate_with_canvas(self.canvas_widget)
+
+            # Connect canvas signals for link updates
             if hasattr(self.canvas_widget, 'pageChanged'):
-                # Disconnect first to avoid duplicates
-                try:
-                    self.canvas_widget.pageChanged.disconnect(self.link_integration._on_page_changed)
-                except:
-                    pass
-                # Reconnect
-                self.canvas_widget.pageChanged.connect(self.link_integration._on_page_changed)
+                self.canvas_widget.pageChanged.connect(self._on_page_changed_links)
 
-            print("🔗 Canvas-link integration verified")
+            if hasattr(self.canvas_widget, 'zoomChanged'):
+                self.canvas_widget.zoomChanged.connect(self._on_zoom_changed_links)
+
+            print("✅ Link-canvas integration complete")
+
+    def _update_links_for_current_page(self):
+        """Update link overlays for current page"""
+        if self.link_integration and hasattr(self, 'current_page'):
+            current_page = getattr(self, 'current_page', 0)
+            current_zoom = getattr(self, 'current_zoom', 1.0)
+
+            # Update link overlays
+            self.link_integration.update_page_view(current_page, current_zoom)
+
+            # Update control panel
+            self.link_control_panel.set_current_page(current_page)
 
     def _connect_signals(self):
         """Connect all signals between components"""
@@ -382,8 +440,27 @@ class PDFMainWindow(QMainWindow):
                         else:
                             print("❌ ERROR: overlay_manager still None after integration attempt")
 
-            #self.debug_link_system_comprehensive()
-            #self.debug_specific_pdf_links()
+                    # Add link-specific loading
+                    if hasattr(self, 'document') and hasattr(self, 'link_integration') and self.link_integration:
+                        print("🔗 Setting up links for new document...")
+
+                        # Set document in link system
+                        self.link_integration.set_pdf_document(self.document, file_path)
+
+                        # Update link control panel
+                        if hasattr(self, 'link_control_panel') and self.link_control_panel:
+                            self.link_control_panel.set_document(self.document, file_path)
+                            self.link_control_panel.apply_settings()
+
+                        # Integrate with canvas if available
+                        if hasattr(self, 'canvas_widget'):
+                            self.integrate_links_with_canvas()
+
+                        # Update links for current page
+                        if hasattr(self, 'current_page'):
+                            self._on_page_changed_links(self.current_page)
+
+                        print(f"✅ Links loaded for document: {file_path}")
 
             # Update UI
             self.setWindowTitle(f"PDF Voice Editor - {file_path}")
@@ -992,6 +1069,120 @@ class PDFMainWindow(QMainWindow):
                 self.addDockWidget(Qt.DockWidgetArea.RightDockWidgetArea, dock)
 
             print("🐛 Link debug panel added to UI")
+
+    # ======================
+    # LINK EVENT HANDLERS
+    # ======================
+
+    @pyqtSlot(int, float, float)
+    def _handle_link_navigation(self, page_index: int, x: float, y: float):
+        """Handle internal link navigation"""
+        try:
+            print(f"📄 Navigating to page {page_index + 1} at ({x:.1f}, {y:.1f})")
+
+            # Navigate to page (use your existing navigation method)
+            if hasattr(self, 'navigate_to_page'):
+                self.navigate_to_page(page_index)
+            elif hasattr(self, '_on_page_jump'):
+                self._on_page_jump(page_index + 1)  # Convert to 1-based
+
+            # Scroll to specific coordinates if supported
+            if hasattr(self, 'scroll_to_coordinates'):
+                self.scroll_to_coordinates(x, y)
+
+            # Update status
+            self.status_bar.showMessage(f"Navigated to page {page_index + 1}", 3000)
+
+        except Exception as e:
+            print(f"❌ Error handling link navigation: {e}")
+
+    @pyqtSlot(str)
+    def _handle_external_link_request(self, url: str):
+        """Handle external URL link request"""
+        try:
+            # Show confirmation dialog
+            dialog = ExternalLinkConfirmDialog(url, self)
+
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                # Open URL
+                success = QDesktopServices.openUrl(QUrl(url))
+
+                if success:
+                    self.status_bar.showMessage(f"Opened external link: {url}", 3000)
+                    print(f"🌐 Opened external URL: {url}")
+                else:
+                    # Fallback to webbrowser
+                    webbrowser.open(url)
+                    self.status_bar.showMessage(f"Opened external link (fallback): {url}", 3000)
+            else:
+                self.status_bar.showMessage("External link cancelled", 2000)
+
+        except Exception as e:
+            print(f"❌ Error handling external link: {e}")
+            QMessageBox.warning(self, "Link Error", f"Failed to open external link:\n{str(e)}")
+
+    @pyqtSlot(object)
+    def _handle_link_activation(self, pdf_link: PDFLink):
+        """Handle link activation from control panel"""
+        try:
+            print(f"🔗 Activating link: {pdf_link.description}")
+
+            # Let the link manager handle the click
+            if self.link_integration and self.link_integration.link_manager:
+                success = self.link_integration.link_manager.handle_link_click(pdf_link)
+
+                if success:
+                    self.status_bar.showMessage(f"Activated: {pdf_link.description}", 3000)
+                else:
+                    self.status_bar.showMessage(f"Failed to activate link", 2000)
+
+        except Exception as e:
+            print(f"❌ Error activating link: {e}")
+
+    @pyqtSlot(object)
+    def _handle_link_highlight(self, pdf_link: PDFLink):
+        """Handle link highlight from control panel"""
+        try:
+            # Highlight the link in overlay manager
+            if self.link_integration and self.link_integration.overlay_manager:
+                self.link_integration.overlay_manager.highlight_link(pdf_link)
+
+            # Update status with link info
+            self.status_bar.showMessage(f"Link: {pdf_link.description}")
+
+        except Exception as e:
+            print(f"❌ Error highlighting link: {e}")
+
+    @pyqtSlot(bool)
+    def _handle_overlay_visibility(self, visible: bool):
+        """Handle overlay visibility change"""
+        try:
+            if self.link_integration:
+                self.link_integration.set_links_visible(visible)
+
+            status_msg = "Link overlays shown" if visible else "Link overlays hidden"
+            self.status_bar.showMessage(status_msg, 2000)
+
+        except Exception as e:
+            print(f"❌ Error handling overlay visibility: {e}")
+
+    @pyqtSlot(int)
+    def _handle_page_navigation(self, page_index: int):
+        """Handle page navigation from control panel"""
+        try:
+            # Navigate using existing method
+            if hasattr(self, 'navigate_to_page'):
+                self.navigate_to_page(page_index)
+            elif hasattr(self, '_on_page_jump'):
+                self._on_page_jump(page_index + 1)  # Convert to 1-based
+
+        except Exception as e:
+            print(f"❌ Error handling page navigation: {e}")
+
+    @pyqtSlot(str)
+    def _update_link_status(self, status_message: str):
+        """Update status bar with link information"""
+        self.status_bar.showMessage(status_message, 2000)
 
 def main():
     """Main entry point"""
