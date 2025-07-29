@@ -104,31 +104,12 @@ class CanvasWidget(QWidget):
         self._cache_adjacent_pages = 2  # Number of adjacent pages to cache
 
         # ========================================
-        # PERFORMANCE MONITORING
-        # ========================================
-        self._performance_stats = {
-            'total_paints': 0,
-            'cache_hits': 0,
-            'renders_performed': 0,
-            'scroll_optimizations': 0,
-            'link_extractions': 0,
-            'link_cache_hits': 0
-        }
-
-        # ========================================
         # SIGNALS FOR INTEGRATION
         # ========================================
         # These signals are defined in the class but connected here for clarity
         # self.pageChanged = pyqtSignal(int)     # Emitted when current page changes
         # self.zoomChanged = pyqtSignal(float)   # Emitted when zoom level changes
         # self.mousePositionChanged = pyqtSignal(int, float, float)  # page, doc_x, doc_y
-
-        # ========================================
-        # DEBUGGING AND LOGGING
-        # ========================================
-        self._debug_mode = False  # Set to True for verbose logging
-        self._log_paint_events = True
-        self._log_optimizations = True
 
         # ========================================
         # SCROLL DETECTION
@@ -154,15 +135,6 @@ class CanvasWidget(QWidget):
         print("   ✅ Performance monitoring")
         print("   ✅ Intelligent cache management")
         print("   ✅ Page info overlay system")
-
-        # Initialize performance tracking
-        self._track_performance_metric('canvas_init', 1)
-
-    def _track_performance_metric(self, metric_name: str, value: int = 1):
-        """Track performance metrics for optimization analysis"""
-        if metric_name not in self._performance_stats:
-            self._performance_stats[metric_name] = 0
-        self._performance_stats[metric_name] += value
 
     def _periodic_cache_cleanup(self):
         """Periodic cache cleanup to prevent memory bloat"""
@@ -200,77 +172,6 @@ class CanvasWidget(QWidget):
 
         except Exception as e:
             print(f"❌ Cache cleanup error: {e}")
-
-    def get_performance_summary(self) -> dict:
-        """Get comprehensive performance statistics"""
-        stats = self._performance_stats.copy()
-
-        # Calculate efficiency metrics
-        if stats.get('total_paints', 0) > 0:
-            stats['cache_hit_rate'] = (stats.get('cache_hits', 0) / stats['total_paints']) * 100
-        else:
-            stats['cache_hit_rate'] = 0
-
-        if stats.get('link_extractions', 0) > 0:
-            stats['link_cache_efficiency'] = (stats.get('link_cache_hits', 0) / stats['link_extractions']) * 100
-        else:
-            stats['link_cache_efficiency'] = 0
-
-        # Add scroll optimization stats
-        if hasattr(self, 'smart_scroll_optimizer'):
-            scroll_stats = self.smart_scroll_optimizer.get_performance_stats()
-            stats.update(scroll_stats)
-
-        # Add memory usage
-        stats['cached_pages_count'] = len(getattr(self, 'rendered_pages', {}))
-        stats['link_cache_size'] = len(getattr(self, '_link_count_cache', {}))
-
-        return stats
-
-    def toggle_debug_mode(self, enabled: bool = None):
-        """Toggle debug mode for verbose logging"""
-        if enabled is None:
-            self._debug_mode = not self._debug_mode
-        else:
-            self._debug_mode = enabled
-
-        print(f"🐛 Debug mode: {'ON' if self._debug_mode else 'OFF'}")
-
-        if self._debug_mode:
-            print("📊 Current performance stats:")
-            stats = self.get_performance_summary()
-            for key, value in stats.items():
-                print(f"   {key}: {value}")
-
-    def toggle_page_info_overlay(self, visible: bool = None):
-        """Toggle page info overlay visibility"""
-        if visible is None:
-            self._show_page_info_overlay = not self._show_page_info_overlay
-        else:
-            self._show_page_info_overlay = visible
-
-        print(f"📊 Page info overlay: {'ON' if self._show_page_info_overlay else 'OFF'}")
-
-        # Trigger repaint to show/hide overlay
-        if not self.is_painting:
-            self.update()
-
-    def reset_performance_stats(self):
-        """Reset all performance tracking statistics"""
-        self._performance_stats = {
-            'total_paints': 0,
-            'cache_hits': 0,
-            'renders_performed': 0,
-            'scroll_optimizations': 0,
-            'link_extractions': 0,
-            'link_cache_hits': 0
-        }
-
-        if hasattr(self, 'smart_scroll_optimizer'):
-            self.smart_scroll_optimizer.total_scrolls = 0
-            self.smart_scroll_optimizer.repaints_saved = 0
-
-        print("📊 Performance statistics reset")
 
     @pyqtSlot(object)
     def on_document_loaded(self, document):
@@ -469,104 +370,6 @@ class CanvasWidget(QWidget):
             print("✅ Zoom complete")
             self.zoomChanged.emit(zoom_level)
 
-    def deprecated_01_set_zoom(self, zoom_level: float):
-        """Set zoom level while maintaining visual reference point"""
-        zoom_level = max(0.1, min(5.0, zoom_level))
-
-        if abs(self.zoom_level - zoom_level) > 0.01:
-            print(f"🔍 Setting zoom to {zoom_level:.2f}")
-
-            # STEP 1: Stop timer to prevent conflicts
-            self.render_timer.stop()
-            self.needs_render = False
-
-            # STEP 2: Capture current visual state BEFORE zoom
-            old_zoom = self.zoom_level
-            scroll_area = self._get_scroll_area()
-
-            if scroll_area and self.layout_manager:
-                # Current canvas dimensions
-                old_canvas_width, old_canvas_height = self.layout_manager.get_canvas_size()
-
-                # Current scroll position (top-left of viewport)
-                current_scroll_x = scroll_area.horizontalScrollBar().value()
-                current_scroll_y = scroll_area.verticalScrollBar().value()
-
-                # Current viewport size
-                viewport_width = scroll_area.viewport().width()
-                viewport_height = scroll_area.viewport().height()
-
-                # Calculate proportional position within canvas
-                # Edge case: if canvas smaller than viewport, ratio could be > 1
-                x_ratio = current_scroll_x / max(old_canvas_width, viewport_width) if old_canvas_width > 0 else 0
-                y_ratio = current_scroll_y / max(old_canvas_height, viewport_height) if old_canvas_height > 0 else 0
-
-                print(f"📐 BEFORE zoom: canvas=({old_canvas_width}x{old_canvas_height}), "
-                      f"scroll=({current_scroll_x},{current_scroll_y}), "
-                      f"ratios=({x_ratio:.3f},{y_ratio:.3f})")
-
-            # STEP 3: Update zoom level and layout
-            self.zoom_level = zoom_level
-
-            if self.layout_manager:
-                self.layout_manager.set_zoom(zoom_level)
-                self._update_canvas_size()
-
-                # Get NEW canvas dimensions after zoom
-                new_canvas_width, new_canvas_height = self.layout_manager.get_canvas_size()
-
-            # STEP 4: Calculate new scroll position to maintain ratios
-            if scroll_area and self.layout_manager:
-                # Apply same ratios to new canvas size
-                # Edge case handling: ensure canvas is at least as big as viewport
-                effective_canvas_width = max(new_canvas_width, viewport_width)
-                effective_canvas_height = max(new_canvas_height, viewport_height)
-
-                new_scroll_x = x_ratio * effective_canvas_width
-                new_scroll_y = y_ratio * effective_canvas_height
-
-                # Clamp to valid scroll range
-                max_scroll_x = max(0, new_canvas_width - viewport_width)
-                max_scroll_y = max(0, new_canvas_height - viewport_height)
-
-                new_scroll_x = max(0, min(new_scroll_x, max_scroll_x))
-                new_scroll_y = max(0, min(new_scroll_y, max_scroll_y))
-
-                print(f"📐 AFTER zoom: canvas=({new_canvas_width}x{new_canvas_height}), "
-                      f"new_scroll=({new_scroll_x:.1f},{new_scroll_y:.1f})")
-
-                # Apply new scroll position
-                scroll_area.horizontalScrollBar().setValue(int(new_scroll_x))
-                scroll_area.verticalScrollBar().setValue(int(new_scroll_y))
-
-            # STEP 5: Clear old cache and recalculate visible pages
-            self.rendered_pages.clear()
-
-            # Recalculate what's visible at new zoom and scroll position
-            if scroll_area and self.layout_manager:
-                final_scroll_x = scroll_area.horizontalScrollBar().value()
-                final_scroll_y = scroll_area.verticalScrollBar().value()
-
-                viewport_rect = QRectF(
-                    final_scroll_x,
-                    final_scroll_y,
-                    viewport_width,
-                    viewport_height
-                )
-
-                visible_pages = self.layout_manager.get_visible_pages(viewport_rect)
-                self.visible_pages = visible_pages
-                print(f"🔍 Visible pages after proportional zoom: {visible_pages}")
-
-            # STEP 6: Render visible pages at new zoom
-            if self.visible_pages and not self.is_painting:
-                for page_index in self.visible_pages:
-                    if 0 <= page_index < self.document.get_page_count():
-                        print(f"🖼️ Rendering page {page_index} for zoom change...")
-                        self._render_page(page_index)
-
-            print("✅ Proportional zoom complete")
-            self.zoomChanged.emit(zoom_level)
 
     def _get_scroll_area(self):
         """Get the scroll area containing this canvas"""
@@ -576,48 +379,6 @@ class CanvasWidget(QWidget):
                 return parent
             parent = parent.parent()
         return None
-
-    def deprecated_02_set_zoom(self, zoom_level: float):
-        """Set zoom level and update layout - FIXED: Preserve current page"""
-        zoom_level = max(0.1, min(5.0, zoom_level))  # Clamp zoom range
-
-        if abs(self.zoom_level - zoom_level) > 0.01:  # Avoid unnecessary updates
-            print(f"🔍 Setting zoom to {zoom_level:.2f}")
-
-            # FIXED: Preserve current page during zoom operation
-            preserved_page = self._get_actual_current_page()
-            print(f"📄 Preserving page {preserved_page} during zoom")
-
-            self.zoom_level = zoom_level
-
-            if self.layout_manager:
-                self.layout_manager.set_zoom(zoom_level)
-                self._update_canvas_size()
-                self.rendered_pages.clear()  # Clear cache for new zoom
-
-                # FIXED: Restore the preserved page
-                self.current_page = preserved_page
-                print(f"📄 Page preserved: {self.current_page}")
-
-                self.schedule_render()
-
-            self.zoomChanged.emit(zoom_level)
-
-    def deprecated_01_set_zoom(self, zoom_level: float):
-        """Set zoom level and update layout"""
-        zoom_level = max(0.1, min(5.0, zoom_level))  # Clamp zoom range
-
-        if abs(self.zoom_level - zoom_level) > 0.01:  # Avoid unnecessary updates
-            print(f"🔍 Setting zoom to {zoom_level:.2f}")
-            self.zoom_level = zoom_level
-
-            if self.layout_manager:
-                self.layout_manager.set_zoom(zoom_level)
-                self._update_canvas_size()
-                self.rendered_pages.clear()  # Clear cache for new zoom
-                self.schedule_render()
-
-            self.zoomChanged.emit(zoom_level)
 
     def get_zoom(self) -> float:
         """Get current zoom level"""
@@ -643,18 +404,6 @@ class CanvasWidget(QWidget):
         page_size = self.document.get_page_size(0)
         zoom = (available_width - 40) / page_size.width()  # 40px margin
         self.set_zoom(zoom)
-
-    def fit_to_page(self, available_width: int, available_height: int):
-        """Fit entire page to window"""
-        if not self.document:
-            return
-
-        page_size = self.document.get_page_size(0)
-        zoom_w = (available_width - 40) / page_size.width()
-        zoom_h = (available_height - 40) / page_size.height()
-        zoom = min(zoom_w, zoom_h)
-
-        self.set_zoom(zoom, maintain_position=False, goto_page_top_with_margin=True)
 
     def fit_to_page(self, available_width: int, available_height: int):
         """Simpler fit to page - use first visible page"""
@@ -707,24 +456,6 @@ class CanvasWidget(QWidget):
                 if new_page != self.current_page:
                     self.current_page = new_page
                     self.pageChanged.emit(new_page)
-
-    def deprecated_01_set_visible_pages(self, page_indices: List[int], viewport_rect: QRectF):
-        """Set which pages are currently visible"""
-        # Prevent updates during painting
-        if self.is_painting:
-            return
-
-        print(f"👁️ Setting visible pages: {page_indices}")
-        self.visible_pages = page_indices
-        self.viewport_rect = viewport_rect
-        self.schedule_render()
-
-        # Update current page if needed
-        if page_indices and self.current_page not in page_indices:
-            new_page = page_indices[0]  # Use first visible page
-            if new_page != self.current_page:
-                self.current_page = new_page
-                self.pageChanged.emit(new_page)
 
     def get_page_at_position(self, y_position: float) -> int:
         """Get page index at Y position"""
@@ -786,83 +517,6 @@ class CanvasWidget(QWidget):
             if page_rect and page_rect.contains(canvas_x, canvas_y):
                 return i
         return None
-
-    def schedule_render(self):
-        """Schedule a render update (with debouncing)"""
-        if self.is_painting:  # Don't schedule during painting
-            return
-
-        print("⏰ Scheduling render...")
-        self.needs_render = True
-        self.render_timer.stop()
-        self.render_timer.start(100)  # Increased delay to 100ms
-
-    def _perform_render(self):
-        """Perform the actual rendering - normal operation"""
-        if self.is_painting:
-            print("⏸️ Skipping render - currently painting")
-            return
-
-        print("🎨 Performing render...")
-        if not self.needs_render or not self.document or not self.layout_manager:
-            print("❌ Render cancelled - missing components")
-            return
-
-        self.needs_render = False
-        print(f"🎨 Rendering pages: {self.visible_pages}")
-
-        # Simple logic - render visible pages that aren't cached
-        for page_index in self.visible_pages:
-            if page_index not in self.rendered_pages:
-                print(f"🖼️ Rendering page {page_index}...")
-                self._render_page(page_index)
-
-        # Normal cache cleanup
-        pages_to_keep = set(self.visible_pages)
-        for page_idx in self.visible_pages:
-            pages_to_keep.add(max(0, page_idx - 1))
-            pages_to_keep.add(min(self.document.get_page_count() - 1, page_idx + 1))
-
-        pages_to_remove = [p for p in self.rendered_pages.keys() if p not in pages_to_keep]
-        for page_idx in pages_to_remove:
-            del self.rendered_pages[page_idx]
-
-        print(f"🎨 Render complete. Cached pages: {list(self.rendered_pages.keys())}")
-
-        if not self.is_painting:
-            self.update()
-
-        print("🎨 Performing render...")
-        if not self.needs_render or not self.document or not self.layout_manager:
-            print("❌ Render cancelled - missing components")
-            return
-
-        self.needs_render = False
-
-        print(f"🎨 Rendering pages: {self.visible_pages}")
-
-        # Render visible pages that aren't cached
-        for page_index in self.visible_pages:
-            if page_index not in self.rendered_pages:
-                print(f"🖼️ Rendering page {page_index}...")
-                self._render_page(page_index)
-
-        # Clean up cache - keep only visible pages + 2 adjacent
-        pages_to_keep = set(self.visible_pages)
-        for page_idx in self.visible_pages:
-            pages_to_keep.add(max(0, page_idx - 1))
-            pages_to_keep.add(min(self.document.get_page_count() - 1, page_idx + 1))
-
-        # Remove pages not in keep list
-        pages_to_remove = [p for p in self.rendered_pages.keys() if p not in pages_to_keep]
-        for page_idx in pages_to_remove:
-            del self.rendered_pages[page_idx]
-
-        print(f"🎨 Render complete. Cached pages: {list(self.rendered_pages.keys())}")
-
-        # Only call update if not currently painting
-        if not self.is_painting:
-            self.update()  # Trigger paint event
 
     def _render_page(self, page_index: int):
         """Render a single page"""
@@ -1265,54 +919,6 @@ class CanvasWidget(QWidget):
         if pages_to_remove:
             print(f"🧹 Cache cleanup: Removed {len(pages_to_remove)} pages, kept {len(self.rendered_pages)}")
 
-    def paintEvent_smart(self, event):
-        """
-        REPLACE your existing paintEvent method with this optimized version
-        """
-        if self.is_painting:
-            print("🔄 Paint blocked - already painting")
-            return
-
-        # Rate limiting for smooth scrolling
-        current_time = time.time()
-        if hasattr(self, '_last_paint_time'):
-            time_since_paint = current_time - self._last_paint_time
-            if time_since_paint < 0.016:  # Max 60 FPS
-                return
-
-        self._last_paint_time = current_time
-        self.is_painting = True
-        self.paint_count += 1
-
-        try:
-            painter = QPainter(self)
-            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-            # Paint background
-            painter.fillRect(self.rect(), QBrush(Qt.GlobalColor.darkGray))
-
-            if not self.document or not self.layout_manager:
-                self._paint_no_document(painter)
-                return
-
-            # Smart paint visible pages
-            pages_painted = 0
-            cache_hits = 0
-
-            for page_index in self.visible_pages:
-                painted_from_cache = self._paint_page_smart(painter, page_index)
-                if painted_from_cache:
-                    cache_hits += 1
-                pages_painted += 1
-
-            efficiency = (cache_hits / pages_painted * 100) if pages_painted > 0 else 0
-            print(
-                f"🎨 Smart paint #{self.paint_count}: {pages_painted} pages, {cache_hits} from cache ({efficiency:.1f}%)")
-
-        except Exception as e:
-            print(f"❌ Paint error: {e}")
-        finally:
-            self.is_painting = False
 
     def _paint_page_smart(self, painter, page_index: int) -> bool:
         """
