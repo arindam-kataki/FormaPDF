@@ -552,7 +552,7 @@ class PDFMainWindow(QMainWindow):
             visible_pages = self.canvas_widget.get_visible_pages_in_viewport(viewport_rect)
 
             # Update canvas viewport
-            self.canvas_widget.set_visible_pages(visible_pages, viewport_rect)
+            self.canvas_widget.set_visible_pages_optimized(visible_pages, viewport_rect)
 
         except Exception as e:
             print(f"⚠️ Error in scroll update: {e}")
