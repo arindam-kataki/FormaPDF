@@ -614,7 +614,7 @@ class PDFMainWindow(QMainWindow):
         if hasattr(self, 'scroll_area') and self.scroll_area:
             self.scroll_area.updateGeometry()
 
-    def deprecated_01_navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+    def _navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
         """
         Navigate to specific page and coordinates from TOC
 
@@ -730,7 +730,7 @@ class PDFMainWindow(QMainWindow):
             traceback.print_exc()
             return False
 
-    def navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
+    def _navigate_to_page_with_coordinates(self, page_num: int, x: float = 0, y: float = 0):
         """
         FIXED navigation with proper bounds checking and coordinate handling
 
