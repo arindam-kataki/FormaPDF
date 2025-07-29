@@ -15,11 +15,6 @@ from src.ui.a_toc_integration import TOCIntegration
 from src.ui.a_toolbar_widget import ToolbarWidget
 from src.ui.a_canvas_widget import CanvasWidget
 from src.ui.a_pdf_document import PDFDocument
-from src.ui.a_pdf_link_integration import PDFLinkIntegration
-from ui.a_link_debug_control_panel import LinkDebugControlPanel
-from ui.a_pdf_link_control_panel import PDFLinkControlPanel
-from ui.a_pdf_link_menu_integration import PDFLinkMenuIntegration
-
 
 class PDFMainWindow(QMainWindow):
     """
@@ -183,19 +178,16 @@ class PDFMainWindow(QMainWindow):
         """Set up the link system"""
         print("🔗 Setting up link system...")
 
-        # Create link integration
-        self.link_integration = PDFLinkIntegration(self)
-
         # CRITICAL: Integrate with canvas immediately after creation
         if self.canvas_widget:
             print("🔗 Integrating links with canvas...")
-            self.link_integration.integrate_with_canvas(self.canvas_widget)
+            #self.link_integration.integrate_with_canvas(self.canvas_widget)
             print("✅ Link-canvas integration complete")
         else:
             print("❌ WARNING: No canvas widget available for link integration")
 
         # Create link control panel
-        self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
+        #self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
 
         # Add to UI (you can adjust this based on your layout)
         self._add_link_control_dock()

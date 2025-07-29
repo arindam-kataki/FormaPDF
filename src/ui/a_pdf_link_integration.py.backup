@@ -6,25 +6,21 @@ Location: src/ui/pdf_link_integration.py
 
 from typing import Optional
 from PyQt6.QtCore import QObject, pyqtSlot
-from PyQt6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel, QCheckBox
-from src.core.a_pdf_link_manager import PDFLinkManager, PDFLink
-from a_pdf_link_overlay import PDFLinkOverlayManager
+
+from core.a_pdf_link_manager import PDFLink
 
 
 class PDFLinkIntegration(QObject):
-    """
-    Integration helper that connects the link system to the main PDF viewer
-    """
-    
     def __init__(self, main_window, parent=None):
         super().__init__(parent)
         self.main_window = main_window
+
+        # Import here instead of at module level
+        from src.core.a_pdf_link_manager import PDFLinkManager
         self.link_manager = PDFLinkManager(self)
-        self.overlay_manager = None
-        
-        # Setup connections
+        self.overlay_manager = None  # Skip overlay manager for now
+
         self._setup_connections()
-        
         print("📎 PDFLinkIntegration initialized")
     
     def _setup_connections(self):
@@ -48,7 +44,6 @@ class PDFLinkIntegration(QObject):
         print("📎 Integrating links with PDF canvas")
         
         # Create overlay manager as child of canvas
-        self.overlay_manager = PDFLinkOverlayManager(canvas_widget)
         self.overlay_manager.set_link_manager(self.link_manager)
         
         # Position overlay manager to cover the entire canvas
@@ -141,3 +136,17 @@ class PDFLinkIntegration(QObject):
         if self.overlay_manager:
             return self.overlay_manager.get_link_statistics()
         return {'total': 0, 'by_type': {}}
+
+    def _on_page_changed(self, page_num: int):
+        """Handle page change event with minimal data"""
+        if self.overlay_manager:
+            zoom_level = 1.0
+            if hasattr(self.main_window, 'current_zoom'):
+                zoom_level = self.main_window.current_zoom
+
+            # Use minimal update method
+            if hasattr(self.overlay_manager, 'update_page_links_minimal'):
+                self.overlay_manager.update_page_links_minimal(page_num, zoom_level)
+            else:
+                # Fallback to original method
+                self.overlay_manager.update_page_links(page_num, zoom_level)
