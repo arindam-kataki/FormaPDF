@@ -21,8 +21,8 @@ from ui.a_pdf_link_control_panel import PDFLinkControlPanel, PDFLinkVoiceIntegra
 from ui.a_pdf_link_integration import ExternalLinkConfirmDialog
 from ui.a_pdf_link_manager import PDFLink
 from ui.a_link_debug_control_panel import LinkDebugControlPanel
-from ui.a_pdf_link_overlay_manager import PDFLinkIntegration
-
+#from ui.a_pdf_link_overlay_manager import PDFLinkIntegration
+from ui.a_raw_link_overlay_manager import RawLinkIntegration
 
 class PDFMainWindow(QMainWindow):
     """
@@ -183,11 +183,43 @@ class PDFMainWindow(QMainWindow):
         self.status_bar.showMessage("Ready")
 
     def _setup_link_system(self):
+        """Setup the ultra-fast raw PDF link system"""
+        print("🚀 Setting up ultra-fast raw PDF link system...")
+
+        try:
+            # Create RAW link integration (ultra-fast)
+            self.link_integration = RawLinkIntegration(self)
+
+            # Connect main signals (same as before)
+            self.link_integration.linkNavigationRequested.connect(self._handle_link_navigation)
+            self.link_integration.externalLinkRequested.connect(self._handle_external_link_request)
+            self.link_integration.linkStatusChanged.connect(self._update_link_status)
+
+            # Create and setup link control panel (same as before)
+            self.link_control_panel = PDFLinkControlPanel(self.link_integration, self)
+
+            # Connect control panel signals (same as before)
+            self.link_control_panel.linkActivated.connect(self._handle_link_activation)
+            self.link_control_panel.linkHighlighted.connect(self._handle_link_highlight)
+            self.link_control_panel.overlayVisibilityChanged.connect(self._handle_overlay_visibility)
+            self.link_control_panel.pageNavigationRequested.connect(self._handle_page_navigation)
+
+            # Add control panel to UI as dock widget (same as before)
+            self._add_link_control_dock()
+
+            print("✅ Ultra-fast raw PDF link system setup complete")
+
+        except Exception as e:
+            print(f"❌ Error setting up raw link system: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _setup_link_system_full(self):
         """Setup the complete PDF link system"""
         print("🔗 Setting up PDF link system...")
 
         # Create link integration
-        self.link_integration = PDFLinkIntegration(self)
+        self.link_integration = None #PDFLinkIntegration(self)
 
         # Connect main signals
         self.link_integration.linkNavigationRequested.connect(self._handle_link_navigation)
@@ -686,6 +718,8 @@ class PDFMainWindow(QMainWindow):
             self.toolbar_widget.update_current_page(page_index + 1)  # Convert to 1-based
 
         print(f"📄 Page changed to: {page_index + 1}")
+
+
 
     @pyqtSlot(float)
     def _on_zoom_changed(self, zoom_level: float):

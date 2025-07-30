@@ -12,6 +12,10 @@ class PDFDocument:
         self.file_path = file_path
         self._page_cache = {}  # Cache for page objects
 
+    def __len__(self) -> int:
+        """Return page count for len() compatibility"""
+        return self.get_page_count()
+
     def get_page_count(self) -> int:
         """Return total number of pages"""
         return len(self.doc)

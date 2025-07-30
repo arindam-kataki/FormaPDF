@@ -501,6 +501,37 @@ class PDFLinkControlPanel(QWidget):
         self._schedule_update()
 
     def _update_current_page_links(self):
+        """Update links display for current page - UPDATED for raw links"""
+        self.current_page_list.clear_links()
+
+        if self.link_integration and hasattr(self.link_integration, 'link_manager'):
+            # Get raw links instead of PDFLink objects
+            if hasattr(self.link_integration.link_manager, 'get_raw_page_links'):
+                # New raw link manager
+                raw_links = self.link_integration.link_manager.get_raw_page_links(self.current_page)
+
+                # Convert raw links to display format
+                links = []
+                for i, raw_link in enumerate(raw_links):
+                    # Create minimal display object
+                    display_link = self._create_display_link_from_raw(raw_link, self.current_page, i)
+                    if display_link:
+                        links.append(display_link)
+                        self.current_page_list.add_link(display_link)
+
+                self.current_links = links
+            else:
+                # Fallback to old method
+                links = self.link_integration.get_page_links(self.current_page)
+                self.current_links = links
+
+                for link in links:
+                    self.current_page_list.add_link(link)
+
+            # Update stats
+            self._update_stats()
+
+    def _update_current_page_links_full(self):
         """Update links display for current page"""
         self.current_page_list.clear_links()
 
@@ -513,6 +544,54 @@ class PDFLinkControlPanel(QWidget):
 
             # Update stats
             self._update_stats()
+
+    def _create_display_link_from_raw(self, raw_link: dict, page_index: int, link_index: int):
+        """Create a minimal display object from raw link data"""
+        try:
+            from .a_pdf_link_manager import PDFLink, LinkType
+            from PyQt6.QtCore import QRectF
+
+            # Extract bounds
+            link_rect = raw_link.get('from', None)
+            if link_rect:
+                bounds = QRectF(link_rect.x0, link_rect.y0, link_rect.width, link_rect.height)
+            else:
+                bounds = QRectF(0, 0, 0, 0)
+
+            # Get basic type
+            link_kind = raw_link.get('kind', 0)
+            type_map = {
+                1: LinkType.GOTO,
+                2: LinkType.URI,
+                3: LinkType.LAUNCH,
+                4: LinkType.GOTOR,
+                5: LinkType.NAMED
+            }
+            link_type = type_map.get(link_kind, LinkType.UNKNOWN)
+
+            # Create basic description
+            if link_kind == 1:  # GOTO
+                description = f"Go to page {raw_link.get('page', 0) + 1}"
+            elif link_kind == 2:  # URI
+                uri = raw_link.get('uri', '')
+                description = f"External URL: {uri[:50]}{'...' if len(uri) > 50 else ''}"
+            else:
+                description = f"{link_type.value.title()} link"
+
+            # Create minimal PDFLink for display compatibility
+            return PDFLink(
+                id=f"raw_link_{page_index}_{link_index}",
+                link_type=link_type,
+                bounds=bounds,
+                page_index=page_index,
+                description=description,
+                target={'_raw_data': raw_link, '_parsed': False},
+                raw_link=raw_link
+            )
+
+        except Exception as e:
+            print(f"❌ Error creating display link: {e}")
+            return None
 
     def _update_all_links(self):
         """Update display of all document links"""

@@ -1,6 +1,7 @@
 """
-PDF Link Manager - Complete Python Implementation
+PDF Link Manager - Complete Python Implementation (FIXED for PDFDocument)
 Handles all PDF hyperlink extraction, parsing, and management using PyMuPDF
+Compatible with custom PDFDocument class that has get_page_count() method
 """
 
 import fitz  # PyMuPDF
@@ -16,12 +17,12 @@ from PyQt6.QtCore import QObject, pyqtSignal, QRectF, QPointF
 
 class LinkType(Enum):
     """PDF link types"""
-    GOTO = "goto"  # Internal page navigation
-    URI = "uri"  # External URL
-    LAUNCH = "launch"  # Launch file
-    GOTOR = "gotor"  # External document
-    NAMED = "named"  # Named destination
-    UNKNOWN = "unknown"  # Unknown type
+    GOTO = "goto"          # Internal page navigation
+    URI = "uri"            # External URL
+    LAUNCH = "launch"      # Launch file
+    GOTOR = "gotor"        # External document
+    NAMED = "named"        # Named destination
+    UNKNOWN = "unknown"    # Unknown type
 
 
 @dataclass
@@ -54,6 +55,7 @@ class PDFLinkManager(QObject):
     """
     Manages PDF hyperlink extraction, parsing, and navigation
     Integrates with PyMuPDF and provides Qt signals for UI updates
+    FIXED to work with custom PDFDocument class
     """
 
     # Signals
@@ -67,7 +69,7 @@ class PDFLinkManager(QObject):
         super().__init__(parent)
 
         # Core state
-        self.pdf_document = None  # fitz.Document
+        self.pdf_document = None  # Custom PDFDocument or fitz.Document
         self.document_path = ""
         self.page_links_cache = {}  # Cache for extracted links
         self.named_destinations = {}  # Cache for named destinations
@@ -84,7 +86,7 @@ class PDFLinkManager(QObject):
         print("🔗 PDFLinkManager initialized")
 
     def set_pdf_document(self, pdf_document, document_path: str = ""):
-        """Set the PDF document for link extraction"""
+        """Set the PDF document for link extraction - FIXED for custom PDFDocument"""
         try:
             self.pdf_document = pdf_document
             self.document_path = document_path
@@ -97,14 +99,40 @@ class PDFLinkManager(QObject):
             if pdf_document:
                 self._extract_named_destinations()
                 print(f"🔗 PDF document set: {document_path}")
-                print(f"📖 Document has {len(pdf_document)} pages")
+
+                # Get page count - handle both PyMuPDF docs and custom PDFDocument objects
+                if hasattr(pdf_document, 'get_page_count'):
+                    page_count = pdf_document.get_page_count()
+                elif hasattr(pdf_document, 'doc') and pdf_document.doc:
+                    page_count = len(pdf_document.doc)
+                else:
+                    page_count = len(pdf_document) if hasattr(pdf_document, '__len__') else 0
+
+                print(f"📖 Document has {page_count} pages")
 
         except Exception as e:
             print(f"❌ Error setting PDF document: {e}")
 
     def extract_page_links(self, page_index: int) -> List[PDFLink]:
-        """Extract all links from a specific page"""
-        if not self.pdf_document or page_index < 0 or page_index >= len(self.pdf_document):
+        """Extract all links from a specific page - FIXED for custom PDFDocument"""
+        # Get the actual PyMuPDF document object
+
+        import time
+        start_time = time.perf_counter()
+
+        fitz_doc = None
+        if hasattr(self.pdf_document, 'doc'):
+            fitz_doc = self.pdf_document.doc  # Custom PDFDocument class
+        elif hasattr(self.pdf_document, '__getitem__'):
+            fitz_doc = self.pdf_document  # Direct PyMuPDF document
+
+        if not fitz_doc:
+            print(f"❌ Cannot access PyMuPDF document for page {page_index}")
+            return []
+
+        # Validate page index
+        if page_index < 0 or page_index >= len(fitz_doc):
+            print(f"❌ Invalid page index: {page_index} (document has {len(fitz_doc)} pages)")
             return []
 
         # Check cache first
@@ -112,12 +140,15 @@ class PDFLinkManager(QObject):
             return self.page_links_cache[page_index]
 
         try:
-            page = self.pdf_document[page_index]
+            extraction_start = time.perf_counter()
+            page = fitz_doc[page_index]
             raw_links = page.get_links()
+            extraction_time = time.perf_counter() - extraction_start
 
             pdf_links = []
+            parsing_start = time.perf_counter()
             for i, raw_link in enumerate(raw_links):
-                pdf_link = self._parse_raw_link(raw_link, page_index, i)
+                pdf_link = self._parse_raw_link_minimal(raw_link, page_index, i)
                 if pdf_link:
                     pdf_links.append(pdf_link)
 
@@ -126,16 +157,64 @@ class PDFLinkManager(QObject):
                 self._manage_cache_size()
                 self.page_links_cache[page_index] = pdf_links
 
+            parsing_time = time.perf_counter() - parsing_start
+            total_time = time.perf_counter() - start_time
+
             print(f"🔗 Page {page_index + 1}: Extracted {len(pdf_links)} links")
 
             # Emit signal
             self.linkExtractionCompleted.emit(page_index, pdf_links)
+
+            parse_full = False
+
+            mode = "FULL" if parse_full else "MINIMAL"
+            print(f"🔗 Page {page_index + 1}: {len(pdf_links)} links ({mode})")
+            print(f"   📊 Extraction: {extraction_time * 1000:.2f}ms")
+            print(f"   🔧 Parsing: {parsing_time * 1000:.2f}ms")
+            print(f"   ⏱️ Total: {total_time * 1000:.2f}ms")
+            print(
+                f"   🚀 Per link: {(parsing_time / len(pdf_links) * 1000):.2f}ms" if pdf_links else "   🚀 Per link: 0ms")
 
             return pdf_links
 
         except Exception as e:
             print(f"❌ Error extracting links from page {page_index}: {e}")
             return []
+
+    def _parse_raw_link_minimal(self, raw_link: dict, page_index: int, link_index: int) -> PDFLink:
+        """Ultra-fast parsing - bounds and reference only"""
+
+        # Extract bounds (only thing needed for overlays)
+        try:
+            link_rect = raw_link['from']
+        except KeyError:
+            link_rect = fitz.Rect(0, 0, 0, 0)
+        bounds = QRectF(link_rect.x0, link_rect.y0, link_rect.width, link_rect.height)
+
+        # Generate ID
+        link_id = f"link_{page_index}_{link_index}"
+
+        # Just store the raw reference - no processing at all
+        return PDFLink(
+            id=link_id,
+            link_type=LinkType.UNKNOWN,  # Don't even detect type
+            bounds=bounds,
+            page_index=page_index,
+            description="Link",  # Generic description
+            target={'_raw_data': raw_link, '_parsed': False},
+            raw_link=raw_link
+        )
+
+    def _get_basic_link_type(self, link_kind: int) -> LinkType:
+        """Fast link type detection"""
+        type_map = {
+            fitz.LINK_GOTO: LinkType.GOTO,
+            fitz.LINK_URI: LinkType.URI,
+            fitz.LINK_LAUNCH: LinkType.LAUNCH,
+            fitz.LINK_GOTOR: LinkType.GOTOR,
+            fitz.LINK_NAMED: LinkType.NAMED
+        }
+        return type_map.get(link_kind, LinkType.UNKNOWN)
 
     def _parse_raw_link(self, raw_link: dict, page_index: int, link_index: int) -> Optional[PDFLink]:
         """Parse raw PyMuPDF link data into PDFLink object"""
@@ -298,14 +377,22 @@ class PDFLinkManager(QObject):
         )
 
     def _extract_named_destinations(self):
-        """Extract all named destinations from the document"""
-        if not self.pdf_document:
+        """Extract all named destinations from the document - FIXED for custom PDFDocument"""
+        # Get the actual PyMuPDF document object
+        fitz_doc = None
+        if hasattr(self.pdf_document, 'doc'):
+            fitz_doc = self.pdf_document.doc  # Custom PDFDocument class
+        elif hasattr(self.pdf_document, '__getitem__'):
+            fitz_doc = self.pdf_document  # Direct PyMuPDF document
+
+        if not fitz_doc:
+            print("⚠️ Cannot access PyMuPDF document for named destinations")
             return
 
         try:
             # Method 1: Try to get named destinations directly
-            if hasattr(self.pdf_document, 'get_toc'):
-                toc = self.pdf_document.get_toc()
+            if hasattr(fitz_doc, 'get_toc'):
+                toc = fitz_doc.get_toc()
                 for item in toc:
                     if len(item) >= 3:
                         title, page, dest = item[0], item[1], item[2] if len(item) > 2 else None
@@ -321,14 +408,21 @@ class PDFLinkManager(QObject):
             print(f"⚠️ Could not extract named destinations: {e}")
 
     def _resolve_named_destination(self, name: str) -> Optional[Dict[str, Any]]:
-        """Resolve a named destination to page and coordinates"""
+        """Resolve a named destination to page and coordinates - FIXED for custom PDFDocument"""
         if name in self.named_destinations:
             return self.named_destinations[name]
 
+        # Get the actual PyMuPDF document object
+        fitz_doc = None
+        if hasattr(self.pdf_document, 'doc'):
+            fitz_doc = self.pdf_document.doc  # Custom PDFDocument class
+        elif hasattr(self.pdf_document, '__getitem__'):
+            fitz_doc = self.pdf_document  # Direct PyMuPDF document
+
         # Try document resolution if available
-        if self.pdf_document and hasattr(self.pdf_document, 'resolve_dest'):
+        if fitz_doc and hasattr(fitz_doc, 'resolve_dest'):
             try:
-                dest = self.pdf_document.resolve_dest(name)
+                dest = fitz_doc.resolve_dest(name)
                 if dest:
                     resolved = {
                         'page': dest.get('page', 0),
@@ -347,7 +441,7 @@ class PDFLinkManager(QObject):
         """Manage link cache size to prevent memory issues"""
         if len(self.page_links_cache) > self.max_cache_size:
             # Remove oldest entries (simple FIFO)
-            keys_to_remove = list(self.page_links_cache.keys())[:-self.max_cache_size // 2]
+            keys_to_remove = list(self.page_links_cache.keys())[:-self.max_cache_size//2]
             for key in keys_to_remove:
                 del self.page_links_cache[key]
 
@@ -375,19 +469,27 @@ class PDFLinkManager(QObject):
             return False
 
     def _handle_goto_link(self, pdf_link: PDFLink) -> bool:
-        """Handle internal page navigation"""
+        """Handle internal page navigation - FIXED for custom PDFDocument"""
         target = pdf_link.target
         page = target.get('page', 0)
         x = target.get('x', 72.0)
         y = target.get('y', 720.0)
 
-        # Validate page number
-        if self.pdf_document and 0 <= page < len(self.pdf_document):
+        # Validate page number - handle both document types
+        max_pages = 0
+        if hasattr(self.pdf_document, 'get_page_count'):
+            max_pages = self.pdf_document.get_page_count()
+        elif hasattr(self.pdf_document, 'doc') and self.pdf_document.doc:
+            max_pages = len(self.pdf_document.doc)
+        elif self.pdf_document and hasattr(self.pdf_document, '__len__'):
+            max_pages = len(self.pdf_document)
+
+        if 0 <= page < max_pages:
             self.navigationRequested.emit(page, x, y)
             print(f"📄 Navigating to page {page + 1} at ({x:.1f}, {y:.1f})")
             return True
         else:
-            print(f"❌ Invalid page number: {page}")
+            print(f"❌ Invalid page number: {page} (max: {max_pages})")
             return False
 
     def _handle_uri_link(self, pdf_link: PDFLink) -> bool:
@@ -501,18 +603,27 @@ class PDFLinkManager(QObject):
 
         # Allow common document types
         safe_extensions = ['.pdf', '.txt', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
-                           '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg']
+                          '.png', '.jpg', '.jpeg', '.gif', '.bmp', '.svg']
 
         return file_ext in safe_extensions
 
     def get_all_page_links(self) -> Dict[int, List[PDFLink]]:
-        """Get links for all pages (cached or extract)"""
+        """Get links for all pages (cached or extract) - FIXED for custom PDFDocument"""
         all_links = {}
 
-        if not self.pdf_document:
+        # Get page count - handle both document types
+        page_count = 0
+        if hasattr(self.pdf_document, 'get_page_count'):
+            page_count = self.pdf_document.get_page_count()
+        elif hasattr(self.pdf_document, 'doc') and self.pdf_document.doc:
+            page_count = len(self.pdf_document.doc)
+        elif self.pdf_document and hasattr(self.pdf_document, '__len__'):
+            page_count = len(self.pdf_document)
+
+        if page_count == 0:
             return all_links
 
-        for page_index in range(len(self.pdf_document)):
+        for page_index in range(page_count):
             all_links[page_index] = self.extract_page_links(page_index)
 
         return all_links
@@ -536,11 +647,10 @@ class PDFLinkManager(QObject):
 if __name__ == '__main__':
     import sys
 
-
     def test_link_manager():
         """Test the link manager with a sample PDF"""
         if len(sys.argv) != 2:
-            print("Usage: python pdf_link_manager.py <pdf_file>")
+            print("Usage: python a_pdf_link_manager.py <pdf_file>")
             return
 
         pdf_path = sys.argv[1]
@@ -569,6 +679,5 @@ if __name__ == '__main__':
 
         except Exception as e:
             print(f"❌ Error: {e}")
-
 
     test_link_manager()
