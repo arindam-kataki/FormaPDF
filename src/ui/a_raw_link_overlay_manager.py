@@ -91,6 +91,31 @@ class RawLinkOverlay(QLabel):
         self.rawLinkHovered.emit(self.raw_link, self.page_index, self.link_index)
         super().enterEvent(event)
 
+    def _setup_appearance(self):
+        """Setup visual appearance - cursor only, no hover effects"""
+        try:
+            # Just set the cursor, no visual styling
+            self.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+
+            # Make the overlay invisible but still capture mouse events
+            self.setStyleSheet("QLabel { background-color: transparent; border: none; }")
+
+            # Enable mouse tracking
+            self.setMouseTracking(True)
+
+        except Exception as e:
+            print(f"❌ Error setting overlay appearance: {e}")
+
+    # Also simplify the mouse events:
+
+    def enterEvent(self, event):
+        """Handle mouse enter - signal only"""
+        self.rawLinkHovered.emit(self.raw_link, self.page_index, self.link_index)
+        # Don't call super() to avoid any default hover handling
+
+    def leaveEvent(self, event):
+        """Handle mouse leave - no action needed"""
+        pass
 
 class RawLinkOverlayManager(QObject):
     """
@@ -396,6 +421,7 @@ class RawLinkIntegration(QObject):
     linkNavigationRequested = pyqtSignal(int, float, float)  # page, x, y
     externalLinkRequested = pyqtSignal(str)  # url
     linkStatusChanged = pyqtSignal(str)  # status message
+    linkExtractionCompleted = pyqtSignal(int, list)
 
     def __init__(self, parent=None):
         super().__init__(parent)

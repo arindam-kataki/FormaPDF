@@ -1105,6 +1105,11 @@ class PDFMainWindow(QMainWindow):
             print("🐛 Link debug panel added to UI")
 
     # ======================
+    # LINK METHODS
+    # ======================
+
+
+    # ======================
     # LINK EVENT HANDLERS
     # ======================
 

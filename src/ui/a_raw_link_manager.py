@@ -90,26 +90,40 @@ class RawLinkManager(QObject):
             print(f"❌ Error setting PDF document: {e}")
 
     def get_raw_page_links(self, page_index: int) -> List[dict]:
-        """Get raw links for page - ultra-fast, zero parsing"""
-
+        """Get raw links for a page (cached or extracted) - FIXED for PDFDocument"""
         # Check cache first
         if page_index in self.raw_links_cache:
-            return self.raw_links_cache[page_index]
+            cached_links = self.raw_links_cache[page_index]
+            print(f"🔗 Page {page_index + 1}: {len(cached_links)} raw links (cached)")
+            return cached_links
 
-        start_time = time.perf_counter()
+        if not self.pdf_document:
+            print(f"❌ No PDF document loaded")
+            return []
 
         try:
-            # Get PyMuPDF document
+            start_time = time.perf_counter()
+
+            # ✅ FIXED: Get the actual PyMuPDF document object
             fitz_doc = None
             if hasattr(self.pdf_document, 'doc'):
-                fitz_doc = self.pdf_document.doc
+                fitz_doc = self.pdf_document.doc  # Custom PDFDocument class
             elif hasattr(self.pdf_document, '__getitem__'):
-                fitz_doc = self.pdf_document
-
-            if not fitz_doc or page_index < 0 or page_index >= len(fitz_doc):
+                fitz_doc = self.pdf_document  # Direct PyMuPDF document
+            else:
+                print(f"❌ Cannot access PyMuPDF document - unknown document type")
                 return []
 
-            # Extract raw links directly - no processing
+            if not fitz_doc:
+                print(f"❌ Cannot access PyMuPDF document for page {page_index}")
+                return []
+
+            # Validate page index
+            if page_index < 0 or page_index >= len(fitz_doc):
+                print(f"❌ Invalid page index: {page_index} (document has {len(fitz_doc)} pages)")
+                return []
+
+            # ✅ FIXED: Use fitz_doc instead of self.pdf_document
             page = fitz_doc[page_index]
             raw_links = page.get_links()
 
@@ -124,14 +138,41 @@ class RawLinkManager(QObject):
 
             print(f"🔗 Page {page_index + 1}: {len(raw_links)} raw links - {extraction_time * 1000:.2f}ms")
 
-            # Emit signal
+            # ✅ ADD THIS: Emit signal for control panel
             self.rawLinksExtracted.emit(page_index, raw_links)
 
             return raw_links
 
         except Exception as e:
             print(f"❌ Error getting raw links for page {page_index}: {e}")
+            import traceback
+            traceback.print_exc()  # This will help debug the exact error
             return []
+
+    # 5. OPTIONAL: Add this method for better debug integration
+    def get_link_stats(self) -> Dict[str, Any]:
+        """Get comprehensive link statistics"""
+        stats = self.get_performance_stats()
+        cache_info = self.get_cache_info()
+
+        return {
+            **stats,
+            **cache_info,
+            'extraction_count': len(self.timing_stats['raw_extraction_times']),
+            'parse_count': len(self.timing_stats['parse_on_click_times']),
+            'cache_hit_ratio': self._calculate_cache_hit_ratio()
+        }
+
+    def _calculate_cache_hit_ratio(self) -> float:
+        """Calculate cache hit ratio"""
+        # This is a simple estimation
+        total_requests = len(self.timing_stats['raw_extraction_times'])
+        if total_requests == 0:
+            return 0.0
+
+        # Estimate cache hits (this is approximate)
+        cache_hits = max(0, total_requests - len(self.raw_links_cache))
+        return cache_hits / total_requests if total_requests > 0 else 0.0
 
     def get_link_bounds(self, raw_link: dict) -> QRectF:
         """Extract bounds from raw link - ultra-fast"""
@@ -431,6 +472,23 @@ class RawLinkManager(QObject):
 
         print("=" * 50)
 
+    def get_cache_info(self) -> Dict[str, Any]:
+        """Get information about current cache state"""
+        total_cached_links = 0
+        for page_links in self.raw_links_cache.values():
+            total_cached_links += len(page_links)
+
+        return {
+            'cached_pages': len(self.raw_links_cache),
+            'total_cached_links': total_cached_links,
+            'named_destinations': 0,
+            'max_cache_size': self.max_cache_size,
+            'parsed_cache_size': len(self.parsed_cache)
+        }
+
+    def extract_page_links(self, page_index: int) -> List[dict]:
+        """Extract page links - compatibility method"""
+        return self.get_raw_page_links(page_index)
 
 # Example usage
 if __name__ == '__main__':

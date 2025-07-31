@@ -414,6 +414,9 @@ class CanvasWidget(QWidget):
 
             print(f"🎨 Paint complete. Pages painted: {pages_painted}")
 
+            # NEW: Draw overlays after page rendering
+            self.draw_link_overlays()
+
         finally:
             # ALWAYS reset painting flag
             self.is_painting = False
@@ -635,3 +638,30 @@ class CanvasWidget(QWidget):
                 # Could emit mouse move signal here if needed
 
         super().mouseMoveEvent(event)
+
+    # ========================================
+    # LINK OVERLAYS
+    # ========================================
+
+    def draw_link_overlays(self):
+        """Draw/update link overlays for visible pages"""
+        try:
+            # Get link integration from main window
+            main_window = self.window()
+            if not hasattr(main_window, 'link_integration') or not main_window.link_integration:
+                return
+
+            link_integration = main_window.link_integration
+            if not link_integration.overlay_manager:
+                return
+
+            # Update overlay manager with current state
+            print(f"🎨 Drawing link overlays for pages {self.visible_pages} at zoom {self.zoom_level}")
+            link_integration.overlay_manager.update_page_links(
+                self.current_page,
+                self.zoom_level,
+                self.visible_pages
+            )
+
+        except Exception as e:
+            print(f"❌ Error drawing link overlays: {e}")
