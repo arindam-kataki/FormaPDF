@@ -291,6 +291,10 @@ class PDFMainWindow(QMainWindow):
             if hasattr(self.canvas_widget, 'zoomChanged'):
                 self.canvas_widget.zoomChanged.connect(self._on_zoom_changed_links)
 
+            if hasattr(self, 'scroll_area') and self.scroll_area:
+                scrollbar = self.scroll_area.verticalScrollBar()
+                scrollbar.valueChanged.connect(self._on_scroll_changed_links)
+
             print("✅ Link-canvas integration complete")
 
     def _update_links_for_current_page(self):
@@ -391,6 +395,26 @@ class PDFMainWindow(QMainWindow):
         """Update link overlays when zoom changes"""
         if self.link_integration and self.link_integration.overlay_manager:
             self.link_integration.overlay_manager.update_page_links(self.current_page, zoom_level)
+
+    def _on_scroll_changed_links(self):
+        """Handle scroll change for link overlays"""
+        if self.link_integration and self.link_integration.overlay_manager and self.canvas_widget:
+            # Get current visible pages from canvas
+            visible_pages = getattr(self.canvas_widget, 'visible_pages', [])
+            current_page = getattr(self.canvas_widget, 'current_page', 0)
+            zoom_level = getattr(self.canvas_widget, 'zoom_level', 1.0)
+
+            # Only update if visible pages actually changed
+            if hasattr(self, '_last_visible_pages'):
+                if self._last_visible_pages == visible_pages:
+                    return  # No change, skip update
+
+            self._last_visible_pages = visible_pages.copy()
+
+            print(f"🔗 Scroll changed - updating overlays for visible pages {visible_pages}")
+            self.link_integration.overlay_manager.update_page_links(
+                current_page, zoom_level, visible_pages
+            )
 
     # ======================
     # FILE OPERATIONS

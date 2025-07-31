@@ -80,6 +80,14 @@ class CanvasWidget(QWidget):
         self._last_mouse_position = None
         self._drag_start_position = None
 
+        # ========================================
+        # PAGE AND OVERLAY PAINTING
+        # ========================================
+
+        self.previously_visible_pages = set()
+        self.scroll_direction = 0  # -1 = up, 1 = down, 0 = none
+        self.last_scroll_position = 0
+
         print("🎨 Canvas widget initialized")
 
     # ========================================
@@ -199,6 +207,29 @@ class CanvasWidget(QWidget):
     # ========================================
     # SMART RENDERING WITH QUEUE (FIXED)
     # ========================================
+
+    def _determine_pages_to_paint(self, current_visible: set) -> set:
+        """Determine which pages actually need painting"""
+
+        # First paint - paint all
+        if not self.previously_visible_pages:
+            print(f"🎨 Initial paint - all pages: {list(current_visible)}")
+            return current_visible
+
+        # Find newly visible pages
+        newly_visible = current_visible - self.previously_visible_pages
+
+        # Find pages that left view
+        no_longer_visible = self.previously_visible_pages - current_visible
+
+        if newly_visible:
+            print(f"🎨 Smart paint - new pages: {list(newly_visible)}")
+            if no_longer_visible:
+                print(f"🎨 Smart paint - dropped pages: {list(no_longer_visible)}")
+            return newly_visible
+        else:
+            print(f"🎨 Smart paint - no new pages, skipping paint")
+            return set()  # No painting needed!
 
     def set_visible_pages_optimized(self, page_indices: List[int], viewport_rect: QRectF):
         """Smart rendering with inline optimization logic - FIXED timer"""
@@ -413,10 +444,7 @@ class CanvasWidget(QWidget):
                     pages_painted += 1
 
             print(f"🎨 Paint complete. Pages painted: {pages_painted}")
-
-            # NEW: Draw overlays after page rendering
-            self.draw_link_overlays()
-
+    
         finally:
             # ALWAYS reset painting flag
             self.is_painting = False
