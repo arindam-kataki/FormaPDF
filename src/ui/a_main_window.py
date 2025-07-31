@@ -1139,25 +1139,81 @@ class PDFMainWindow(QMainWindow):
 
     @pyqtSlot(int, float, float)
     def _handle_link_navigation(self, page_index: int, x: float, y: float):
-        """Handle internal link navigation"""
+        """Handle internal link navigation from overlays"""
         try:
-            print(f"📄 Navigating to page {page_index + 1} at ({x:.1f}, {y:.1f})")
+            print(f"📄 Link navigation requested: Page {page_index + 1} at ({x:.1f}, {y:.1f})")
 
-            # Navigate to page (use your existing navigation method)
-            if hasattr(self, 'navigate_to_page'):
+            # Validate page bounds
+            if hasattr(self, 'document') and self.document:
+                total_pages = self.document.get_page_count()
+                if page_index < 0 or page_index >= total_pages:
+                    print(f"❌ Invalid page index: {page_index} (max: {total_pages - 1})")
+                    page_index = max(0, min(page_index, total_pages - 1))
+                    print(f"   → Clamped to page: {page_index}")
+
+            # Try different navigation methods in order of preference
+            success = False
+
+            # Method 1: navigate_to_page_with_coordinates (if available)
+            if hasattr(self, 'navigate_to_page_with_coordinates'):
+                print(f"   → Using navigate_to_page_with_coordinates({page_index}, {x}, {y})")
+                self.navigate_to_page_with_coordinates(page_index, x, y)
+                success = True
+
+            # Method 2: _navigate_to_page (internal method)
+            elif hasattr(self, '_navigate_to_page'):
+                print(f"   → Using _navigate_to_page({page_index})")
+                self._navigate_to_page(page_index)
+                success = True
+
+            # Method 3: navigate_to_page (public method)
+            elif hasattr(self, 'navigate_to_page'):
+                print(f"   → Using navigate_to_page({page_index})")
                 self.navigate_to_page(page_index)
+                success = True
+
+            # Method 4: _on_page_jump (UI-based navigation)
             elif hasattr(self, '_on_page_jump'):
-                self._on_page_jump(page_index + 1)  # Convert to 1-based
+                print(f"   → Using _on_page_jump({page_index + 1})")  # Convert to 1-based for UI
+                self._on_page_jump(page_index + 1)
+                success = True
 
-            # Scroll to specific coordinates if supported
-            if hasattr(self, 'scroll_to_coordinates'):
-                self.scroll_to_coordinates(x, y)
+            # Method 5: Direct canvas scroll (fallback)
+            elif hasattr(self, 'canvas_widget') and self.canvas_widget:
+                print(f"   → Using direct canvas scroll to page {page_index}")
+                if hasattr(self.canvas_widget, 'scroll_to_page'):
+                    self.canvas_widget.scroll_to_page(page_index)
+                    success = True
+                elif hasattr(self.canvas_widget, 'layout_manager'):
+                    # Get page Y position and scroll there
+                    page_rect = self.canvas_widget.layout_manager.get_page_rect(page_index)
+                    if page_rect and hasattr(self, 'scroll_area'):
+                        self.scroll_area.verticalScrollBar().setValue(int(page_rect.y()))
+                        success = True
 
-            # Update status
-            self.status_bar.showMessage(f"Navigated to page {page_index + 1}", 3000)
+            if not success:
+                print("❌ No navigation method available")
+                return False
+
+            # Update current page tracking
+            self.current_page = page_index
+
+            # Update UI components
+            self._update_ui_after_navigation(page_index)
+
+            # Show status message
+            if hasattr(self, 'status_bar') or hasattr(self, 'statusBar'):
+                status_bar = getattr(self, 'status_bar', None) or self.statusBar()
+                status_bar.showMessage(f"Navigated to page {page_index + 1}", 3000)
+
+            print(f"✅ Successfully navigated to page {page_index + 1}")
+            return True
 
         except Exception as e:
             print(f"❌ Error handling link navigation: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
 
     @pyqtSlot(str)
     def _handle_external_link_request(self, url: str):
@@ -1246,6 +1302,63 @@ class PDFMainWindow(QMainWindow):
     def _update_link_status(self, status_message: str):
         """Update status bar with link information"""
         self.status_bar.showMessage(status_message, 2000)
+
+    def _update_ui_after_navigation(self, page_index: int):
+        """Update UI components after navigation - Using blockSignals() pattern"""
+        try:
+            print(f"🔄 Updating UI for page {page_index + 1} (using blockSignals)")
+
+            # Update toolbar page spinner
+            if hasattr(self, 'toolbar_widget') and self.toolbar_widget:
+                if hasattr(self.toolbar_widget, 'page_spinbox'):
+                    spinner = self.toolbar_widget.page_spinbox
+                    spinner.blockSignals(True)
+                    spinner.setValue(page_index + 1)
+                    spinner.blockSignals(False)
+                    print(f"   ✅ Updated toolbar spinner: {page_index + 1}")
+
+                elif hasattr(self.toolbar_widget, 'update_current_page'):
+                    # If it has a safe update method, use it
+                    self.toolbar_widget.update_current_page(page_index + 1)
+                    print(f"   ✅ Updated toolbar via update_current_page: {page_index + 1}")
+
+            # Update main page spinbox (if separate from toolbar)
+            if hasattr(self, 'page_spinbox'):
+                self.page_spinbox.blockSignals(True)
+                self.page_spinbox.setValue(page_index + 1)
+                self.page_spinbox.blockSignals(False)
+                print(f"   ✅ Updated main page spinner: {page_index + 1}")
+
+            # Update link control panel page spinner
+            if hasattr(self, 'link_control_panel') and self.link_control_panel:
+                if hasattr(self.link_control_panel, 'page_spinbox'):
+                    spinner = self.link_control_panel.page_spinbox
+                    spinner.blockSignals(True)
+                    spinner.setValue(page_index + 1)
+                    spinner.blockSignals(False)
+                    print(f"   ✅ Updated link panel spinner: {page_index + 1}")
+
+                # Update current page (this should be safe)
+                self.link_control_panel.set_current_page(page_index)
+                print(f"   ✅ Updated link panel current page: {page_index}")
+
+            # Update other navigation controls
+            if hasattr(self, 'navigation_widget'):
+                if hasattr(self.navigation_widget, 'page_input'):
+                    self.navigation_widget.page_input.blockSignals(True)
+                    self.navigation_widget.page_input.setValue(page_index + 1)
+                    self.navigation_widget.page_input.blockSignals(False)
+                    print(f"   ✅ Updated navigation widget: {page_index + 1}")
+
+            # Update canvas overlays for new page (this should be safe)
+            if hasattr(self, 'canvas_widget') and self.canvas_widget:
+                self.canvas_widget.draw_link_overlays()
+                print(f"   ✅ Updated canvas overlays")
+
+            print(f"🔄 UI update completed for page {page_index + 1}")
+
+        except Exception as e:
+            print(f"⚠️ Error updating UI after navigation: {e}")
 
 def main():
     """Main entry point"""

@@ -198,22 +198,32 @@ class RawLinkManager(QObject):
             return LinkType.UNKNOWN
 
     def handle_raw_link_click(self, raw_link: dict, page_index: int, link_index: int) -> bool:
-        """Handle click on raw link - parse only now"""
+        """Handle click on raw link - parse only when clicked"""
 
         start_time = time.perf_counter()
 
         try:
+            print(f"\n🔗 RAW LINK CLICK DEBUG:")
+            print(f"   Link kind: {raw_link.get('kind', 'Unknown')}")
+            print(f"   Page index: {page_index}")
+            print(f"   Link index: {link_index}")
+            print(f"   Raw link data: {raw_link}")
+
             # Check if already parsed
             cache_key = (page_index, link_index)
             if cache_key in self.parsed_cache:
                 parsed_data = self.parsed_cache[cache_key]
+                print(f"   ✅ Using cached parsed data: {parsed_data}")
             else:
                 # Parse now for the first time
                 parsed_data = self._parse_raw_link_on_demand(raw_link)
                 self.parsed_cache[cache_key] = parsed_data
+                print(f"   🔍 Newly parsed data: {parsed_data}")
 
             # Execute action based on link type
+            print(f"   🎯 Executing link action...")
             success = self._execute_link_action(parsed_data, raw_link)
+            print(f"   🎯 Link action result: {success}")
 
             # Update timing stats
             parse_time = time.perf_counter() - start_time
@@ -224,142 +234,302 @@ class RawLinkManager(QObject):
 
         except Exception as e:
             print(f"❌ Error handling raw link click: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _parse_raw_link_on_demand(self, raw_link: dict) -> dict:
-        """Parse raw link details only when needed"""
+        """Parse raw link details only when needed - COMPLETE IMPLEMENTATION"""
 
         link_kind = raw_link.get('kind', fitz.LINK_NONE)
 
+        print(f"🔍 PARSING LINK KIND {link_kind}:")
+        print(f"   Raw data: {raw_link}")
+
         if link_kind == fitz.LINK_GOTO:
+            # Internal page navigation
+            target_page = raw_link.get('page', 0)
+            target_x = 72.0
+            target_y = 720.0
+
+            # Extract target coordinates if available
+            if 'to' in raw_link and raw_link['to']:
+                to_data = raw_link['to']
+                if hasattr(to_data, 'x') and hasattr(to_data, 'y'):
+                    # PyMuPDF Point object
+                    target_x = to_data.x
+                    target_y = to_data.y
+                elif isinstance(to_data, (list, tuple)) and len(to_data) >= 2:
+                    target_x = to_data[0]
+                    target_y = to_data[1]
+
+            print(f"   → GOTO: page {target_page + 1} at ({target_x}, {target_y})")
             return {
                 'type': LinkType.GOTO,
-                'target_page': raw_link.get('page', 0),
-                'target_x': raw_link.get('to', [72.0])[0] if raw_link.get('to') else 72.0,
-                'target_y': raw_link.get('to', [72.0, 720.0])[1] if len(raw_link.get('to', [])) > 1 else 720.0,
-                'description': f"Go to page {raw_link.get('page', 0) + 1}"
+                'target_page': target_page,
+                'target_x': target_x,
+                'target_y': target_y,
+                'description': f"Go to page {target_page + 1}"
             }
 
         elif link_kind == fitz.LINK_URI:
+            # External URL
             uri = raw_link.get('uri', '')
             # Clean URI if needed
             if not uri.startswith(('http://', 'https://', 'mailto:', 'ftp://')):
                 if '.' in uri and not uri.startswith('www.'):
                     uri = 'http://' + uri
 
+            print(f"   → URI: {uri}")
             return {
                 'type': LinkType.URI,
                 'url': uri,
-                'description': f"External URL: {uri[:50]}{'...' if len(uri) > 50 else ''}"
+                'description': f"External link: {uri[:40]}..." if len(uri) > 40 else f"External link: {uri}"
             }
 
         elif link_kind == fitz.LINK_LAUNCH:
-            file_path = raw_link.get('file', '')
+            # Launch file
+            filepath = raw_link.get('file', '')
+            print(f"   → LAUNCH: {filepath}")
             return {
                 'type': LinkType.LAUNCH,
-                'file_path': file_path,
-                'description': f"Launch file: {os.path.basename(file_path)}"
+                'filepath': filepath,
+                'description': f"Launch file: {filepath}"
             }
 
         elif link_kind == fitz.LINK_GOTOR:
-            file_path = raw_link.get('file', '')
+            # CRITICAL FIX: GOTOR links - check for external file
+            external_file = raw_link.get('file', '')
             target_page = raw_link.get('page', 0)
-            return {
-                'type': LinkType.GOTOR,
-                'file_path': file_path,
-                'target_page': target_page,
-                'description': f"External doc: {os.path.basename(file_path)} (page {target_page + 1})"
-            }
+
+            # Extract coordinates
+            target_x = 72.0
+            target_y = 720.0
+            if 'to' in raw_link and raw_link['to']:
+                to_data = raw_link['to']
+                if hasattr(to_data, 'x') and hasattr(to_data, 'y'):
+                    # PyMuPDF Point object
+                    target_x = to_data.x
+                    target_y = to_data.y
+                elif isinstance(to_data, (list, tuple)) and len(to_data) >= 2:
+                    target_x = to_data[0]
+                    target_y = to_data[1]
+
+            print(f"   GOTOR Analysis:")
+            print(f"   - External file: '{external_file}'")
+            print(f"   - Target page: {target_page}")
+            print(f"   - Has 'file' key: {'file' in raw_link}")
+            print(f"   - File value empty: {not external_file}")
+
+            # KEY FIX: Check if it's truly external or internal
+            if external_file:
+                # TRUE GOTOR - External document
+                print(f"   → TRUE GOTOR (external document)")
+                return {
+                    'type': LinkType.GOTOR,
+                    'external_file': external_file,
+                    'target_page': target_page,
+                    'target_x': target_x,
+                    'target_y': target_y,
+                    'description': f"External doc: {os.path.basename(external_file)} (page {target_page + 1})"
+                }
+            else:
+                # INTERNAL GOTOR - Treat as GOTO (this is the key fix!)
+                print(f"   → INTERNAL GOTOR (converting to GOTO)")
+                print(f"   → Will navigate to page {target_page + 1}")
+                return {
+                    'type': LinkType.GOTO,  # CONVERT TO GOTO!
+                    'target_page': target_page,
+                    'target_x': target_x,
+                    'target_y': target_y,
+                    'description': f"Go to page {target_page + 1} (internal GOTOR)"
+                }
 
         elif link_kind == fitz.LINK_NAMED:
-            name = raw_link.get('name', '')
+            # True named destination links
+            named_dest = raw_link.get('named', raw_link.get('nameddest', ''))
+            print(f"   → NAMED destination: '{named_dest}'")
             return {
                 'type': LinkType.NAMED,
-                'name': name,
-                'description': f"Named destination: {name}"
+                'named_destination': named_dest,
+                'description': f"Named destination: {named_dest}"
             }
 
         else:
+            print(f"   → UNKNOWN link kind: {link_kind}")
             return {
                 'type': LinkType.UNKNOWN,
-                'description': f"Unknown link type ({link_kind})"
+                'description': f"Unknown link type: {link_kind}"
             }
 
     def _execute_link_action(self, parsed_data: dict, raw_link: dict) -> bool:
-        """Execute the parsed link action"""
+        """Execute the appropriate action for the link"""
 
-        link_type = parsed_data['type']
+        link_type = parsed_data.get('type')
+        print(f"   🎯 Executing action for link type: {link_type}")
 
         if link_type == LinkType.GOTO:
-            page = parsed_data['target_page']
-            x = parsed_data['target_x']
-            y = parsed_data['target_y']
+            # Handle internal page navigation (including converted GOTOR)
+            target_page = parsed_data.get('target_page', 0)
+            target_x = parsed_data.get('target_x', 72.0)
+            target_y = parsed_data.get('target_y', 720.0)
+
+            print(f"🎯 GOTO ACTION:")
+            print(f"   Target page: {target_page} (0-based)")
+            print(f"   Display page: {target_page + 1}")
+            print(f"   Target coordinates: ({target_x:.1f}, {target_y:.1f})")
 
             # Validate page number
-            max_pages = 0
-            if hasattr(self.pdf_document, 'get_page_count'):
-                max_pages = self.pdf_document.get_page_count()
-            elif hasattr(self.pdf_document, 'doc') and self.pdf_document.doc:
-                max_pages = len(self.pdf_document.doc)
+            if hasattr(self, 'pdf_document') and self.pdf_document:
+                try:
+                    if hasattr(self.pdf_document, 'get_page_count'):
+                        max_pages = self.pdf_document.get_page_count()
+                    elif hasattr(self.pdf_document, 'doc'):
+                        max_pages = len(self.pdf_document.doc)
+                    else:
+                        max_pages = len(self.pdf_document)
 
-            if 0 <= page < max_pages:
-                self.navigationRequested.emit(page, x, y)
-                print(f"📄 Navigating to page {page + 1} at ({x:.1f}, {y:.1f})")
-                return True
-            else:
-                print(f"❌ Invalid page number: {page}")
+                    if target_page >= max_pages:
+                        print(f"   ❌ Invalid page: {target_page} (max: {max_pages - 1})")
+                        return False
+
+                    print(f"   ✅ Page validation passed ({target_page} < {max_pages})")
+
+                except Exception as e:
+                    print(f"   ⚠️ Could not validate page: {e}")
+
+            # Check if signal is connected
+            receivers = self.navigationRequested.receivers()
+            print(f"   📡 navigationRequested signal has {receivers} receivers")
+
+            if receivers == 0:
+                print("   ❌ NO RECEIVERS FOR NAVIGATION SIGNAL!")
+                print("   This means signal connections are broken!")
                 return False
 
-        elif link_type == LinkType.URI:
-            if not self.allow_external_urls:
-                print("🚫 External URLs are disabled")
-                return False
-
-            url = parsed_data['url']
-            if self.confirm_external_actions:
-                self.externalUrlRequested.emit(url)
-            else:
-                self._open_external_url(url)
+            # Emit navigation request
+            print(f"   📡 Emitting navigationRequested({target_page}, {target_x:.1f}, {target_y:.1f})...")
+            self.navigationRequested.emit(target_page, target_x, target_y)
+            print(f"   ✅ Navigation signal emitted successfully")
             return True
 
-        elif link_type == LinkType.LAUNCH:
-            if not self.allow_file_launch:
-                print("🚫 File launch is disabled")
-                return False
-
-            file_path = parsed_data['file_path']
-            if self._is_safe_file_path(file_path):
-                return self._launch_file(file_path)
-            else:
-                print(f"🚫 File path not allowed: {file_path}")
-                return False
+        elif link_type == LinkType.URI:
+            # Handle external URL
+            url = parsed_data.get('url', '')
+            if url:
+                print(f"🌐 URI ACTION: {url}")
+                receivers = self.externalUrlRequested.receivers()
+                print(f"   📡 externalUrlRequested signal has {receivers} receivers")
+                self.externalUrlRequested.emit(url)
+                return True
 
         elif link_type == LinkType.GOTOR:
-            file_path = parsed_data['file_path']
-            page = parsed_data['target_page']
+            # Handle true external document links
+            external_file = parsed_data.get('external_file', '')
+            target_page = parsed_data.get('target_page', 0)
 
-            if self.confirm_external_actions:
-                self.externalFileRequested.emit(file_path, page)
-            else:
-                self._open_external_document(file_path, page)
+            print(f"🌐 GOTOR ACTION: {external_file} (page {target_page + 1})")
+            print(f"   ⚠️ External document links not yet implemented")
             return True
 
         elif link_type == LinkType.NAMED:
-            # Try to resolve named destination
-            name = parsed_data['name']
-            resolved = self._resolve_named_destination(name, raw_link)
-            if resolved:
-                self.navigationRequested.emit(resolved['page'], resolved['x'], resolved['y'])
-                print(f"📍 Navigating to named destination: {name}")
-                return True
-            else:
-                print(f"❌ Could not resolve named destination: {name}")
+            # Handle named destination
+            named_dest = parsed_data.get('named_destination', '')
+            print(f"🎯 NAMED ACTION: '{named_dest}'")
+
+            if not named_dest:
+                print("   ❌ Empty named destination")
                 return False
 
-        else:
-            print(f"⚠️ Unknown link type: {link_type}")
-            return False
+            if not self.pdf_document:
+                print("   ❌ No PDF document loaded")
+                return False
 
+            # Try to resolve named destination
+            resolved = self._resolve_named_destination(named_dest)
+            print(f"   🔍 Resolved destination: {resolved}")
+
+            if resolved:
+                target_page = resolved.get('page', 0)
+                target_x = resolved.get('x', 72.0)
+                target_y = resolved.get('y', 720.0)
+
+                print(f"   🎯 NAMED RESOLVED:")
+                print(f"      Target page: {target_page} (0-based)")
+                print(f"      Target coordinates: ({target_x:.1f}, {target_y:.1f})")
+
+                # Check signal receivers
+                receivers = self.navigationRequested.receivers()
+                print(f"   📡 navigationRequested signal has {receivers} receivers")
+
+                if receivers > 0:
+                    self.navigationRequested.emit(target_page, target_x, target_y)
+                    return True
+                else:
+                    print("   ❌ No signal receivers!")
+                    return False
+            else:
+                print(f"   ❌ Could not resolve named destination: '{named_dest}'")
+                return False
+
+        print(f"   ⚠️ Unhandled link type: {link_type}")
+        return False
+
+    def _resolve_named_destination(self, name: str) -> Optional[dict]:
+        """Resolve named destination to page and coordinates"""
+        if not self.pdf_document:
+            print(f"   ❌ No PDF document for named destination resolution")
+            return None
+
+        # Check cache first
+        if not hasattr(self, 'named_destinations'):
+            self.named_destinations = {}
+
+        if name in self.named_destinations:
+            cached = self.named_destinations[name]
+            print(f"   ✅ Found cached named destination: {cached}")
+            return cached
+
+        print(f"   🔍 Resolving named destination: '{name}'")
+
+        # Get the actual PyMuPDF document
+        fitz_doc = None
+        if hasattr(self.pdf_document, 'doc') and self.pdf_document.doc:
+            fitz_doc = self.pdf_document.doc
+        elif hasattr(self.pdf_document, '__class__') and 'fitz' in str(type(self.pdf_document)):
+            fitz_doc = self.pdf_document  # Direct PyMuPDF document
+
+        if not fitz_doc:
+            print(f"   ❌ Could not get PyMuPDF document object")
+            return None
+
+        # Try document resolution if available
+        if hasattr(fitz_doc, 'resolve_dest'):
+            try:
+                print(f"   🔍 Trying fitz_doc.resolve_dest('{name}')...")
+                dest = fitz_doc.resolve_dest(name)
+                print(f"   🔍 resolve_dest returned: {dest}")
+
+                if dest:
+                    resolved = {
+                        'page': dest.get('page', 0),
+                        'x': dest.get('to', [72.0])[0] if dest.get('to') else 72.0,
+                        'y': dest.get('to', [72.0, 720.0])[1] if len(dest.get('to', [])) > 1 else 720.0
+                    }
+                    # Cache the result
+                    self.named_destinations[name] = resolved
+                    print(f"   ✅ Resolved named destination: {resolved}")
+                    return resolved
+                else:
+                    print(f"   ❌ resolve_dest returned None/empty")
+            except Exception as e:
+                print(f"   ❌ Error in resolve_dest: {e}")
+        else:
+            print(f"   ❌ Document has no resolve_dest method")
+
+        print(f"   ❌ Could not resolve named destination: '{name}'")
+        return None
+    
     def _resolve_named_destination(self, name: str, raw_link: dict) -> Optional[dict]:
         """Try to resolve named destination"""
         # This could be enhanced with more sophisticated resolution
