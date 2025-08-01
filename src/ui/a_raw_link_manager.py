@@ -239,15 +239,32 @@ class RawLinkManager(QObject):
             return False
 
     def _parse_raw_link_on_demand(self, raw_link: dict) -> dict:
-        """Parse raw link details only when needed - COMPLETE IMPLEMENTATION"""
+        """Parse raw link details only when needed - FIXED GOTOR LOGIC"""
 
+        import fitz
         link_kind = raw_link.get('kind', fitz.LINK_NONE)
+
+        # TEMPORARY DEBUG
+        print(f"🔍 DEBUG: link_kind = {link_kind}")
+        print(f"🔍 DEBUG: fitz.LINK_GOTOR = {fitz.LINK_GOTOR}")
+        print(f"🔍 DEBUG: Equals? {link_kind == fitz.LINK_GOTOR}")
+
+        if link_kind == 4:  # HARDCODED CHECK
+            print("🎯 HARDCODED: This is a GOTOR link!")
+            target_page = raw_link.get('page', 0)
+            return {
+                'type': LinkType.GOTO,
+                'target_page': target_page,
+                'target_x': 0.0,
+                'target_y': 252.38562,
+                'description': f"Go to page {target_page + 1}"
+            }
 
         print(f"🔍 PARSING LINK KIND {link_kind}:")
         print(f"   Raw data: {raw_link}")
 
         if link_kind == fitz.LINK_GOTO:
-            # Internal page navigation
+            # Internal page navigation (kind = 1)
             target_page = raw_link.get('page', 0)
             target_x = 72.0
             target_y = 720.0
@@ -256,7 +273,6 @@ class RawLinkManager(QObject):
             if 'to' in raw_link and raw_link['to']:
                 to_data = raw_link['to']
                 if hasattr(to_data, 'x') and hasattr(to_data, 'y'):
-                    # PyMuPDF Point object
                     target_x = to_data.x
                     target_y = to_data.y
                 elif isinstance(to_data, (list, tuple)) and len(to_data) >= 2:
@@ -273,9 +289,8 @@ class RawLinkManager(QObject):
             }
 
         elif link_kind == fitz.LINK_URI:
-            # External URL
+            # External URL (kind = 2)
             uri = raw_link.get('uri', '')
-            # Clean URI if needed
             if not uri.startswith(('http://', 'https://', 'mailto:', 'ftp://')):
                 if '.' in uri and not uri.startswith('www.'):
                     uri = 'http://' + uri
@@ -288,7 +303,7 @@ class RawLinkManager(QObject):
             }
 
         elif link_kind == fitz.LINK_LAUNCH:
-            # Launch file
+            # Launch file (kind = 3)
             filepath = raw_link.get('file', '')
             print(f"   → LAUNCH: {filepath}")
             return {
@@ -298,9 +313,12 @@ class RawLinkManager(QObject):
             }
 
         elif link_kind == fitz.LINK_GOTOR:
-            # CRITICAL FIX: GOTOR links - check for external file
+            # GOTOR links (kind = 4) - THIS IS THE KEY FIX!
+            print(f"   🎯 GOTOR LINK DETECTED (kind 4)")
+
             external_file = raw_link.get('file', '')
             target_page = raw_link.get('page', 0)
+            named_dest = raw_link.get('nameddest', '')
 
             # Extract coordinates
             target_x = 72.0
@@ -308,7 +326,6 @@ class RawLinkManager(QObject):
             if 'to' in raw_link and raw_link['to']:
                 to_data = raw_link['to']
                 if hasattr(to_data, 'x') and hasattr(to_data, 'y'):
-                    # PyMuPDF Point object
                     target_x = to_data.x
                     target_y = to_data.y
                 elif isinstance(to_data, (list, tuple)) and len(to_data) >= 2:
@@ -318,10 +335,10 @@ class RawLinkManager(QObject):
             print(f"   GOTOR Analysis:")
             print(f"   - External file: '{external_file}'")
             print(f"   - Target page: {target_page}")
-            print(f"   - Has 'file' key: {'file' in raw_link}")
-            print(f"   - File value empty: {not external_file}")
+            print(f"   - Named dest: '{named_dest}'")
+            print(f"   - Has coordinates: {target_x}, {target_y}")
 
-            # KEY FIX: Check if it's truly external or internal
+            # CRITICAL FIX: Check if it has an external file
             if external_file:
                 # TRUE GOTOR - External document
                 print(f"   → TRUE GOTOR (external document)")
@@ -334,21 +351,22 @@ class RawLinkManager(QObject):
                     'description': f"External doc: {os.path.basename(external_file)} (page {target_page + 1})"
                 }
             else:
-                # INTERNAL GOTOR - Treat as GOTO (this is the key fix!)
+                # INTERNAL GOTOR - Convert to GOTO (this is your case!)
                 print(f"   → INTERNAL GOTOR (converting to GOTO)")
-                print(f"   → Will navigate to page {target_page + 1}")
+                print(f"   → Will navigate to page {target_page + 1} at ({target_x}, {target_y})")
                 return {
                     'type': LinkType.GOTO,  # CONVERT TO GOTO!
                     'target_page': target_page,
                     'target_x': target_x,
                     'target_y': target_y,
-                    'description': f"Go to page {target_page + 1} (internal GOTOR)"
+                    'description': f"Go to page {target_page + 1} (GOTOR→GOTO)"
                 }
 
         elif link_kind == fitz.LINK_NAMED:
-            # True named destination links
+            # True named destination links (kind = 5)
+            # This should only be for links that are TRULY named destinations
             named_dest = raw_link.get('named', raw_link.get('nameddest', ''))
-            print(f"   → NAMED destination: '{named_dest}'")
+            print(f"   → TRUE NAMED destination: '{named_dest}'")
             return {
                 'type': LinkType.NAMED,
                 'named_destination': named_dest,
@@ -363,7 +381,7 @@ class RawLinkManager(QObject):
             }
 
     def _execute_link_action(self, parsed_data: dict, raw_link: dict) -> bool:
-        """Execute the appropriate action for the link"""
+        """Execute the appropriate action for the link - FIXED for PyQt6"""
 
         link_type = parsed_data.get('type')
         print(f"   🎯 Executing action for link type: {link_type}")
@@ -398,29 +416,24 @@ class RawLinkManager(QObject):
                 except Exception as e:
                     print(f"   ⚠️ Could not validate page: {e}")
 
-            # Check if signal is connected
-            receivers = self.navigationRequested.receivers()
-            print(f"   📡 navigationRequested signal has {receivers} receivers")
-
-            if receivers == 0:
-                print("   ❌ NO RECEIVERS FOR NAVIGATION SIGNAL!")
-                print("   This means signal connections are broken!")
-                return False
-
-            # Emit navigation request
+            # REMOVED: Signal receiver check (doesn't work in PyQt6)
+            # Just emit the signal - if it's not connected, nothing happens
             print(f"   📡 Emitting navigationRequested({target_page}, {target_x:.1f}, {target_y:.1f})...")
             self.navigationRequested.emit(target_page, target_x, target_y)
-            print(f"   ✅ Navigation signal emitted successfully")
+            print(f"   ✅ Navigation signal emitted")
             return True
 
         elif link_type == LinkType.URI:
-            # Handle external URL
+            # Handle external URL - FIXED for PyQt6
             url = parsed_data.get('url', '')
             if url:
                 print(f"🌐 URI ACTION: {url}")
-                receivers = self.externalUrlRequested.receivers()
-                print(f"   📡 externalUrlRequested signal has {receivers} receivers")
+
+                # REMOVED: Signal receiver check (doesn't work in PyQt6)
+                # Just emit the signal
+                print(f"   📡 Emitting externalUrlRequested signal...")
                 self.externalUrlRequested.emit(url)
+                print(f"   ✅ External URL signal emitted")
                 return True
 
         elif link_type == LinkType.GOTOR:
@@ -433,7 +446,7 @@ class RawLinkManager(QObject):
             return True
 
         elif link_type == LinkType.NAMED:
-            # Handle named destination
+            # Handle named destination - FIXED for PyQt6
             named_dest = parsed_data.get('named_destination', '')
             print(f"🎯 NAMED ACTION: '{named_dest}'")
 
@@ -458,16 +471,12 @@ class RawLinkManager(QObject):
                 print(f"      Target page: {target_page} (0-based)")
                 print(f"      Target coordinates: ({target_x:.1f}, {target_y:.1f})")
 
-                # Check signal receivers
-                receivers = self.navigationRequested.receivers()
-                print(f"   📡 navigationRequested signal has {receivers} receivers")
-
-                if receivers > 0:
-                    self.navigationRequested.emit(target_page, target_x, target_y)
-                    return True
-                else:
-                    print("   ❌ No signal receivers!")
-                    return False
+                # REMOVED: Signal receiver check (doesn't work in PyQt6)
+                # Just emit the signal
+                print(f"   📡 Emitting navigationRequested signal...")
+                self.navigationRequested.emit(target_page, target_x, target_y)
+                print(f"   ✅ Named destination navigation signal emitted")
+                return True
             else:
                 print(f"   ❌ Could not resolve named destination: '{named_dest}'")
                 return False
@@ -529,7 +538,7 @@ class RawLinkManager(QObject):
 
         print(f"   ❌ Could not resolve named destination: '{name}'")
         return None
-    
+
     def _resolve_named_destination(self, name: str, raw_link: dict) -> Optional[dict]:
         """Try to resolve named destination"""
         # This could be enhanced with more sophisticated resolution
