@@ -45,21 +45,21 @@ def get_database_url():
         return database_url
 
     # Check for individual environment variables
-    db_type = os.getenv('DB_TYPE', 'sqlite')
+    db_type = os.getenv('DB_TYPE', 'postgresql')
 
     if db_type == 'postgresql':
         db_config = DatabaseConfig(
             db_type='postgresql',
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 5432)),
-            database=os.getenv('DB_NAME', 'pdf_research'),
+            database=os.getenv('DB_NAME', 'synaiptic'),
             username=os.getenv('DB_USER'),
             password=os.getenv('DB_PASSWORD')
         )
         return db_config.get_database_url()
 
     elif db_type == 'sqlite':
-        db_path = os.getenv('DB_PATH', 'data/projects.db')
+        db_path = os.getenv('DB_PATH', 'data/synaiptic.db')
         db_config = DatabaseConfig(db_type='sqlite', path=db_path)
         return db_config.get_database_url()
 

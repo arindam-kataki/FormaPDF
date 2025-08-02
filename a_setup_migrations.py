@@ -15,9 +15,9 @@ from a_migration_manager import MigrationManager
 
 def setup_migration_environment():
     """
-    Set up the complete migration environment for the project
+    Set up the complete migration environment for SYNAIPTIC
     """
-    print("🚀 Setting up migration environment for PDF Research Platform...")
+    print("🚀 Setting up migration environment for SYNAIPTIC AI Research Platform...")
 
     # 1. Create necessary directories
     directories = [
@@ -60,27 +60,27 @@ def setup_migration_environment():
 
 def create_env_template():
     """Create environment variables template"""
-    env_template = """# Environment Variables for PDF Research Platform
+    env_template = """# Environment Variables for SYNAIPTIC AI Research Platform
 # Copy this file to .env and configure your database settings
 
 # Database Configuration
-# Choose one of the following configurations:
+# PostgreSQL is recommended for production use
 
-# === SQLite Configuration (Default) ===
-DB_TYPE=sqlite
-DB_PATH=data/projects.db
+# === PostgreSQL Configuration (Recommended) ===
+DB_TYPE=postgresql
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=synaiptic
+DB_USER=synaiptic_user
+DB_PASSWORD=your_secure_password
 
-# === PostgreSQL Configuration ===
-# DB_TYPE=postgresql
-# DB_HOST=localhost
-# DB_PORT=5432
-# DB_NAME=pdf_research
-# DB_USER=your_username
-# DB_PASSWORD=your_password
+# === SQLite Configuration (Development Only) ===
+# DB_TYPE=sqlite
+# DB_PATH=data/synaiptic.db
 
 # === Alternative: Full Database URL ===
-# DATABASE_URL=sqlite:///data/projects.db
-# DATABASE_URL=postgresql://user:password@localhost:5432/pdf_research
+# DATABASE_URL=postgresql://synaiptic_user:password@localhost:5432/synaiptic
+# DATABASE_URL=sqlite:///data/synaiptic.db
 
 # Application Settings
 DEBUG=true
@@ -99,26 +99,46 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
     # Create a basic .env file if it doesn't exist
     if not Path(".env").exists():
         with open(".env", "w") as f:
-            f.write("# Environment Variables\n")
-            f.write("DB_TYPE=sqlite\n")
-            f.write("DB_PATH=data/projects.db\n")
-        print("✅ Created default .env file")
+            f.write("# Environment Variables for SYNAIPTIC\n")
+            f.write("DB_TYPE=postgresql\n")
+            f.write("DB_HOST=localhost\n")
+            f.write("DB_PORT=5432\n")
+            f.write("DB_NAME=synaiptic\n")
+            f.write("DB_USER=synaiptic_user\n")
+            f.write("DB_PASSWORD=change_this_password\n")
+        print("✅ Created default .env file with PostgreSQL configuration")
 
 
 def setup_database_config():
     """Set up initial database configuration"""
     try:
         # Try to read from environment or use defaults
-        db_type = os.getenv('DB_TYPE', 'sqlite')
+        db_type = os.getenv('DB_TYPE', 'postgresql')
 
-        if db_type == 'sqlite':
+        if db_type == 'postgresql':
+            config = DatabaseConfig(
+                db_type='postgresql',
+                host=os.getenv('DB_HOST', 'localhost'),
+                port=int(os.getenv('DB_PORT', 5432)),
+                database=os.getenv('DB_NAME', 'synaiptic'),
+                username=os.getenv('DB_USER'),
+                password=os.getenv('DB_PASSWORD')
+            )
+
+            print("🔄 Testing PostgreSQL connection...")
+            if not config.config.get('username') or not config.config.get('password'):
+                print("⚠️ PostgreSQL username/password not configured")
+                print("Please set DB_USER and DB_PASSWORD in your .env file")
+                return
+
+        elif db_type == 'sqlite':
             config = DatabaseConfig(
                 db_type='sqlite',
-                path=os.getenv('DB_PATH', 'data/projects.db')
+                path=os.getenv('DB_PATH', 'data/synaiptic.db')
             )
+            print("🔄 Testing SQLite connection...")
         else:
-            print("⚠️ PostgreSQL configuration detected but not set up automatically")
-            print("Please configure your PostgreSQL settings in .env file")
+            print(f"❌ Unknown database type: {db_type}")
             return
 
         # Test database connection
@@ -140,6 +160,13 @@ def setup_database_config():
 
     except Exception as e:
         print(f"❌ Database setup error: {e}")
+        if db_type == 'postgresql':
+            print("\n💡 PostgreSQL Setup Help:")
+            print("1. Install PostgreSQL: https://www.postgresql.org/download/")
+            print("2. Create database: createdb synaiptic")
+            print("3. Create user: createuser -P synaiptic_user")
+            print("4. Grant permissions: GRANT ALL PRIVILEGES ON DATABASE synaiptic TO synaiptic_user;")
+            print("5. Update .env file with correct credentials")
         print("Please check your database configuration in .env file")
 
 
@@ -183,12 +210,18 @@ def verify_setup():
 
     # Try to create a migration manager
     try:
-        db_type = os.getenv('DB_TYPE', 'sqlite')
-        if db_type == 'sqlite':
-            config = DatabaseConfig(db_type='sqlite', path=os.getenv('DB_PATH', 'data/projects.db'))
+        db_type = os.getenv('DB_TYPE', 'postgresql')
+        if db_type == 'postgresql':
+            config = DatabaseConfig(
+                db_type='postgresql',
+                host=os.getenv('DB_HOST', 'localhost'),
+                port=int(os.getenv('DB_PORT', 5432)),
+                database=os.getenv('DB_NAME', 'synaiptic'),
+                username=os.getenv('DB_USER'),
+                password=os.getenv('DB_PASSWORD')
+            )
         else:
-            print("⚠️ PostgreSQL verification skipped - please test manually")
-            return True
+            config = DatabaseConfig(db_type='sqlite', path=os.getenv('DB_PATH', 'data/synaiptic.db'))
 
         manager = MigrationManager(config)
         status = manager.check_database_status()
@@ -201,13 +234,15 @@ def verify_setup():
 
     except Exception as e:
         print(f"❌ Migration verification failed: {e}")
+        if db_type == 'postgresql':
+            print("💡 This is normal if PostgreSQL isn't set up yet")
         return False
 
 
 def main():
     """Main setup function"""
     print("=" * 60)
-    print("PDF Research Platform - Migration Setup")
+    print("SYNAIPTIC - AI Research Platform Migration Setup")
     print("=" * 60)
 
     # Load environment variables from .env if it exists
@@ -228,12 +263,12 @@ def main():
 
     # Verify setup
     if verify_setup():
-        print("\n🎉 Migration setup completed successfully!")
+        print("\n🎉 SYNAIPTIC migration setup completed successfully!")
 
         print("\n📋 Quick Start Commands:")
         print("   python a_migration_manager.py status    # Check current status")
         print("   python a_migration_manager.py fresh     # Set up fresh database")
-        print("   python a_migration_manager.py create 'Add new feature'  # Create migration")
+        print("   python a_migration_manager.py create 'Add neural features'  # Create migration")
         print("   python a_migration_manager.py apply     # Apply migrations")
 
     else:

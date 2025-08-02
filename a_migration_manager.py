@@ -346,21 +346,21 @@ def main():
     command_name = sys.argv[1]
 
     # Create database config from environment
-    db_type = os.getenv('DB_TYPE', 'sqlite')
+    db_type = os.getenv('DB_TYPE', 'postgresql')
 
     if db_type == 'postgresql':
         config = DatabaseConfig(
             db_type='postgresql',
             host=os.getenv('DB_HOST', 'localhost'),
             port=int(os.getenv('DB_PORT', 5432)),
-            database=os.getenv('DB_NAME', 'pdf_research'),
+            database=os.getenv('DB_NAME', 'synaiptic'),
             username=os.getenv('DB_USER'),
             password=os.getenv('DB_PASSWORD')
         )
     else:
         config = DatabaseConfig(
             db_type='sqlite',
-            path=os.getenv('DB_PATH', 'data/projects.db')
+            path=os.getenv('DB_PATH', 'data/synaiptic.db')
         )
 
     manager = MigrationManager(config)
