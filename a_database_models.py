@@ -46,7 +46,7 @@ class Document(Base):
     page_count = Column(Integer)  # Number of pages/sheets
     created_at = Column(DateTime, default=datetime.utcnow)
     last_accessed = Column(DateTime, default=datetime.utcnow)
-    metadata = Column(JSON)  # Store document-specific metadata
+    document_metadata = Column(JSON)  # Store document-specific metadata
 
     # Relationships
     assembly = relationship("Assembly", back_populates="documents")
