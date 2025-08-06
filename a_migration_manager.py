@@ -30,6 +30,13 @@ class MigrationManager:
     """
 
     def __init__(self, database_config: DatabaseConfig, alembic_ini_path: str = "a_alembic.ini"):
+        # Load environment variables if not already loaded
+        try:
+            from dotenv import load_dotenv
+            load_dotenv()
+        except:
+            pass
+
         self.database_config = database_config
         self.alembic_ini_path = alembic_ini_path
         self.engine = create_database_engine(database_config)
@@ -331,6 +338,17 @@ def main():
     Command-line interface for migration management
     Usage: python a_migration_manager.py <command> [args]
     """
+
+    # Load environment variables from .env file
+    try:
+        from dotenv import load_dotenv
+        load_dotenv()
+        print("✅ Loaded environment variables from .env")
+    except ImportError:
+        print("⚠️ python-dotenv not installed - install with: pip install python-dotenv")
+    except Exception as e:
+        print(f"⚠️ Could not load .env file: {e}")
+
     if len(sys.argv) < 2:
         print("Usage: python a_migration_manager.py <command> [args]")
         print("Commands:")

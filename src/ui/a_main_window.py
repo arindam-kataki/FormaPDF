@@ -21,10 +21,14 @@ from ui.a_pdf_link_control_panel import PDFLinkControlPanel, PDFLinkVoiceIntegra
 from ui.a_pdf_link_integration import ExternalLinkConfirmDialog
 from ui.a_pdf_link_manager import PDFLink
 from ui.a_link_debug_control_panel import LinkDebugControlPanel
-#from ui.a_pdf_link_overlay_manager import PDFLinkIntegration
 from ui.a_raw_link_overlay_manager import RawLinkIntegration
+from a_assembly_integration import AssemblyManagementMixin
 
-class PDFMainWindow(QMainWindow):
+import sys
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+class PDFMainWindow(QMainWindow, AssemblyManagementMixin):
     """
     Main window for PDF Voice Editor
     Integrates canvas widget with toolbar widget for clean separation
@@ -36,6 +40,8 @@ class PDFMainWindow(QMainWindow):
 
     def __init__(self):
         super().__init__()
+
+        self.init_assembly_management()
 
         # Core components
         self.link_menu_integration = None

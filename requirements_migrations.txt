@@ -1,0 +1,4 @@
+# Additional requirements for database migrations
+alembic>=1.12.0
+psycopg2-binary>=2.9.7  # PostgreSQL adapter
+python-dotenv>=1.0.0    # Environment variable loading
