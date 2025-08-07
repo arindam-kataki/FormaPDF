@@ -80,7 +80,10 @@ class AssemblyMainWindow(QMainWindow):
         self.init_ui()
 
         # Load recent assemblies from database
-        self.load_recent_assemblies()
+        try:
+            self.load_recent_assemblies()
+        except Exception as e:
+            print(f"Exception Message: {str(e)}")
 
         # Setup auto-save
         self.setup_auto_save()
@@ -1371,12 +1374,19 @@ class AssemblyMainWindow(QMainWindow):
         recent = recent[:10]
 
         self.settings.setValue("recent_assemblies", recent)
-        self.load_recent_assemblies()
+
+        try:
+            self.load_recent_assemblies()
+        except Exception as e:
+            print(f"Exception Message: {str(e)}")
 
     def clear_recent_assemblies(self):
         """Clear recent assemblies list"""
         self.settings.setValue("recent_assemblies", [])
-        self.load_recent_assemblies()
+        try:
+            self.load_recent_assemblies()
+        except Exception as e:
+            print(f"Exception Message: {str(e)}")
 
     # Window State Management
     def restore_window_state(self):

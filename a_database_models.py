@@ -65,7 +65,8 @@ class Assembly(Base):
     user_toc_entries = relationship(
         "UserTOC",
         back_populates="assembly",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="select"
     )
     assembly_notes = relationship(
         "AssemblyNote",
@@ -300,19 +301,20 @@ class UserTOC(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relationships - FIXED self-referential relationship
+    # Relationships - CORRECTLY CONFIGURED
     assembly = relationship("Assembly", back_populates="user_toc_entries")
     document = relationship("Document")
 
-    # Self-referential relationship with proper configuration
+    # Self-referential relationship - THIS IS THE KEY FIX
     children = relationship(
         "UserTOC",
         backref=backref('parent', remote_side=[id]),
         cascade="all, delete-orphan",
-        foreign_keys=[parent_id]
+        foreign_keys=[parent_id],
+        lazy='select'
     )
 
-    # Indexes
+    # Indexes - these match what's in the database
     __table_args__ = (
         Index('idx_toc_assembly', 'assembly_id'),
         Index('idx_toc_document', 'document_id'),
@@ -340,6 +342,7 @@ class UserTOC(Base):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
 class CrossReference(Base):
     """Cross-references between annotations"""
     __tablename__ = 'cross_references'
