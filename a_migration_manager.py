@@ -29,7 +29,7 @@ class MigrationManager:
     Provides a clean Python interface for migration operations
     """
 
-    def __init__(self, database_config: DatabaseConfig, alembic_ini_path: str = "a_alembic.ini"):
+    def __init__(self, database_config: DatabaseConfig, alembic_ini_path: str = "alembic.ini"):
         # Load environment variables if not already loaded
         try:
             from dotenv import load_dotenv

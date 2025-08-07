@@ -405,7 +405,7 @@ class AssemblyManager:
                 content_hash=file_hash,
                 file_size=file_path.stat().st_size,
                 page_count=self._get_page_count(file_path),
-                metadata={
+                document_metadata={
                     'added_date': datetime.now().isoformat(),
                     'original_path': str(file_path)
                 }
@@ -735,7 +735,7 @@ class AssemblyManager:
             'created': document.created_at.isoformat(),
             'modified': document.updated_at.isoformat(),
             'last_accessed': document.last_accessed.isoformat() if document.last_accessed else None,
-            'metadata': document.metadata or {},
+            'metadata': document.document_metadata or {},
             'is_processed': document.is_processed,
             'is_indexed': document.is_indexed
         }

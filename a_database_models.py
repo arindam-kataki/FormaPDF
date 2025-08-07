@@ -117,7 +117,7 @@ class Document(Base):
     last_accessed = Column(DateTime(timezone=True), server_default=func.now())
 
     # Document metadata (JSONB for PostgreSQL)
-    metadata = Column(JSONB, default=dict)  # Title, author, creation date, etc.
+    document_metadata = Column('metadata', JSONB, default=dict)  # Column name in DB is still 'metadata'
     extracted_text = Column(Text)  # Full text for search
 
     # Processing status
