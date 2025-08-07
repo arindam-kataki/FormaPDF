@@ -46,6 +46,11 @@ class AssemblyMainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
 
+        self.current_assembly = None
+        self.current_assembly_id = None
+        self.assembly_modified = False
+        self.assembly_path = None
+
         # Initialize Assembly Manager (PostgreSQL connection)
         try:
             from a_assembly_manager import AssemblyManager
@@ -639,23 +644,148 @@ class AssemblyMainWindow(QMainWindow):
         self.last_saved_label = QLabel("Not Saved")
         self.status_bar.addPermanentWidget(self.last_saved_label)
 
+    # ============================================================================
+    # Assembly Management Methods (FIXED)
+    # ============================================================================
+
+    def new_assembly(self):
+        """Create a new research assembly"""
+        # Import here to avoid circular imports
+        try:
+            from ui.a_assembly_dialog import AssemblyDialog
+        except ImportError:
+            # If AssemblyDialog is not available, show a simple dialog
+            from PyQt6.QtWidgets import QInputDialog, QMessageBox
+
+            name, ok = QInputDialog.getText(
+                self,
+                "New Assembly",
+                "Enter assembly name:",
+                text="New Research Assembly"
+            )
+
+            if ok and name:
+                # Create basic assembly structure
+                self.current_assembly = {
+                    'name': name,
+                    'description': '',
+                    'researcher': '',
+                    'keywords': [],
+                    'documents': []
+                }
+                self.current_assembly_id = 1  # Simple ID for now
+                self.assembly_modified = False
+
+                # Update UI
+                self.update_ui_state()
+
+                # Show success message
+                QMessageBox.information(
+                    self,
+                    "Assembly Created",
+                    f"Assembly '{name}' has been created.\nYou can now import documents."
+                )
+
+                # Emit signal if it exists
+                if hasattr(self, 'assembly_created'):
+                    self.assembly_created.emit(self.current_assembly)
+            return
+
+        # Use the full dialog if available
+        dialog = AssemblyDialog(self)
+        dialog.assembly_created.connect(self._on_assembly_created)
+
+        if dialog.exec():
+            print("Assembly dialog completed")
+
+    def _on_assembly_created(self, assembly_data):
+        """Handle assembly creation from dialog"""
+        # Create the assembly
+        self.current_assembly = assembly_data
+        self.current_assembly_id = 1  # Simple ID for now
+        self.assembly_modified = False
+
+        # Update UI
+        self.update_ui_state()
+
+        # Emit signal
+        if hasattr(self, 'assembly_created'):
+            self.assembly_created.emit(self.current_assembly)
+
+        # Show success message
+        from PyQt6.QtWidgets import QMessageBox
+        QMessageBox.information(
+            self,
+            "Assembly Created",
+            f"Assembly '{assembly_data.get('name', 'Unnamed')}' has been created successfully."
+        )
+
+    def save_assembly_as(self):
+        """Save assembly with a new name"""
+        from PyQt6.QtWidgets import QFileDialog, QMessageBox
+
+        if not self.current_assembly:
+            QMessageBox.warning(
+                self,
+                "No Assembly",
+                "No assembly to save. Please create an assembly first."
+            )
+            return
+
+        file_dialog = QFileDialog(self)
+        file_dialog.setNameFilter("Assembly files (*.asmb);;All files (*.*)")
+        file_dialog.setAcceptMode(QFileDialog.AcceptMode.AcceptSave)
+        file_dialog.setDefaultSuffix("asmb")
+
+        if file_dialog.exec():
+            file_path = file_dialog.selectedFiles()[0]
+            # For now, just show a message
+            QMessageBox.information(
+                self,
+                "Save Assembly",
+                f"Assembly would be saved to:\n{file_path}\n\n(Database implementation pending)"
+            )
+
+    def update_ui_state(self):
+        """Update UI elements based on current state"""
+        has_assembly = self.current_assembly is not None
+
+        # Enable/disable actions based on assembly state
+        if hasattr(self, 'save_assembly_action'):
+            self.save_assembly_action.setEnabled(has_assembly)
+        if hasattr(self, 'save_as_action'):
+            self.save_as_action.setEnabled(has_assembly)
+        if hasattr(self, 'save_btn'):
+            self.save_btn.setEnabled(has_assembly)
+        if hasattr(self, 'import_btn'):
+            self.import_btn.setEnabled(has_assembly)
+
+        # Update status bar
+        if hasattr(self, 'assembly_label'):
+            if has_assembly:
+                name = self.current_assembly.get('name', 'Unnamed Assembly')
+                self.assembly_label.setText(f"Assembly: {name}")
+            else:
+                self.assembly_label.setText("No Assembly Loaded")
+
+        # Update document count
+        if hasattr(self, 'doc_count_label'):
+            doc_count = len(self.current_assembly.get('documents', [])) if has_assembly else 0
+            self.doc_count_label.setText(f"{doc_count} documents")
+
     def setup_auto_save(self):
         """Setup auto-save timer"""
         self.auto_save_timer = QTimer()
         self.auto_save_timer.timeout.connect(self.auto_save_assembly)
         self.auto_save_timer.start(300000)  # Auto-save every 5 minutes
 
-        self.assembly_path = None
-        self.assembly_modified = True
-        self.update_ui_state()
+        #self.assembly_path = None
+        #self.assembly_modified = True
+        #self.update_ui_state()
 
-        self.assembly_created.emit(self.current_assembly)
+        #self.assembly_created.emit(self.current_assembly)
 
-        QMessageBox.information(
-            self,
-            "New Assembly",
-            "New assembly created. Import documents to begin your research."
-        )
+
 
     def open_assembly(self):
         """Open an existing assembly"""

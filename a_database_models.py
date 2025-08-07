@@ -10,7 +10,7 @@ from sqlalchemy import (
     CheckConstraint, func
 )
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship, validates
+from sqlalchemy.orm import relationship, validates, backref
 from sqlalchemy.dialects.postgresql import UUID, JSONB, ARRAY
 from datetime import datetime
 import uuid
@@ -272,10 +272,13 @@ class UserTOC(Base):
     """User-created table of contents for an assembly"""
     __tablename__ = 'user_toc'
 
-    # Primary key and foreign key
+    # Primary key
     id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Foreign keys
     assembly_id = Column(Integer, ForeignKey('assemblies.id', ondelete='CASCADE'), nullable=False)
     document_id = Column(Integer, ForeignKey('documents.id', ondelete='CASCADE'))
+    parent_id = Column(Integer, ForeignKey('user_toc.id', ondelete='CASCADE'))
 
     # TOC entry information
     title = Column(String(500), nullable=False)
@@ -283,8 +286,7 @@ class UserTOC(Base):
     section_number = Column(String(50))  # 1.2.3 style numbering
     level = Column(Integer, default=1)  # Heading level (1-6)
 
-    # Navigation
-    parent_id = Column(Integer, ForeignKey('user_toc.id', ondelete='CASCADE'))
+    # Navigation and ordering
     order_index = Column(Integer, nullable=False, default=0)
 
     # Entry type
@@ -298,13 +300,16 @@ class UserTOC(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
-    # Relationships
+    # Relationships - FIXED self-referential relationship
     assembly = relationship("Assembly", back_populates="user_toc_entries")
     document = relationship("Document")
+
+    # Self-referential relationship with proper configuration
     children = relationship(
         "UserTOC",
-        backref="parent",
-        cascade="all, delete-orphan"
+        backref=backref('parent', remote_side=[id]),
+        cascade="all, delete-orphan",
+        foreign_keys=[parent_id]
     )
 
     # Indexes
@@ -317,7 +322,24 @@ class UserTOC(Base):
     def __repr__(self):
         return f"<UserTOC(id={self.id}, title='{self.title}', level={self.level})>"
 
-
+    def to_dict(self):
+        """Convert to dictionary for serialization"""
+        return {
+            'id': self.id,
+            'assembly_id': self.assembly_id,
+            'document_id': self.document_id,
+            'parent_id': self.parent_id,
+            'title': self.title,
+            'page_number': self.page_number,
+            'section_number': self.section_number,
+            'level': self.level,
+            'order_index': self.order_index,
+            'entry_type': self.entry_type,
+            'notes': self.notes,
+            'color': self.color,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
 class CrossReference(Base):
     """Cross-references between annotations"""
     __tablename__ = 'cross_references'
