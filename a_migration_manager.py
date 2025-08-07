@@ -16,9 +16,8 @@ from alembic import command
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 from alembic.runtime.migration import MigrationContext
-from sqlalchemy import create_engine, inspect
-
-from a_database_models import DatabaseConfig, create_database_engine
+from sqlalchemy import create_engine, inspect, NullPool
+from a_database_config import DatabaseConfig
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +38,7 @@ class MigrationManager:
 
         self.database_config = database_config
         self.alembic_ini_path = alembic_ini_path
-        self.engine = create_database_engine(database_config)
+        self.engine = self.create_database_engine(database_config)
 
         # Set up Alembic config
         self.alembic_config = Config(alembic_ini_path)
@@ -331,6 +330,42 @@ class MigrationManager:
         except Exception as e:
             logger.error(f"❌ Failed to migrate to PostgreSQL: {e}")
             return False
+
+    def create_database_engine(self):
+        """
+        Create a database engine from configuration
+
+        Args:
+            self: DatabaseConfig instance or class
+
+        Returns:
+            SQLAlchemy engine
+        """
+        # Get URL from config
+        if hasattr(self, 'get_database_url'):
+            database_url = self.get_database_url()
+        else:
+            # Assume it's a URL string
+            database_url = str(self)
+
+        # Create engine with appropriate settings
+        if 'postgresql' in database_url:
+            return create_engine(
+                database_url,
+                poolclass=NullPool,
+                pool_pre_ping=True,
+                connect_args={
+                    "connect_timeout": 10,
+                    "options": "-c statement_timeout=30000"
+                }
+            )
+        else:
+            # SQLite
+            return create_engine(
+                database_url,
+                poolclass=NullPool,
+                connect_args={"check_same_thread": False}
+            )
 
 
 def main():
